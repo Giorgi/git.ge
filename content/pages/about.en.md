@@ -55,6 +55,10 @@ suggestion is reviewed by hand before it's added.
 No cookies, no analytics, no tracking, and no requests to third parties. If you
 switch to English, that choice is stored only in your browser's local storage.
 
+## How it was built {#built-with}
+
+The whole project, from the data fetcher and the site generator to the automation, was built with AI: [Claude Code](https://claude.com/claude-code) with the Claude Opus 5.5 model. Decisions about what the site does and the rules it follows were made by the maintainer.
+
 ## Data {#data}
 
 Data comes from GitHub's public API. Stars, languages and dates are shown as GitHub
