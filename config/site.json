@@ -3,5 +3,6 @@
   "maintainerLogin": "Giorgi",
   "trendWindowDays": 30,
   "trendToleranceDays": 7,
-  "listingMinStars": 10
+  "listingMinStars": 10,
+  "repoUrl": "https://github.com/Giorgi/git.ge"
 }

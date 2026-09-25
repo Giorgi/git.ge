@@ -1,0 +1,64 @@
+{
+  "//": "Inference runs in passes, strongest signal first: topics, then primary language, then whole words in the repo name and description, then fallbackLanguages. Within a pass the first rule in this list wins. A category set in data/manual/projects.json always overrides this.",
+  "order": ["web", "mobile", "dotnet", "data", "devops", "libraries", "tools", "learning", "other"],
+  "rules": [
+    {
+      "category": "learning",
+      "topics": ["tutorial", "tutorials", "course", "learning", "education", "roadmap", "awesome", "awesome-list", "interview", "interview-questions", "book", "examples", "cheatsheet", "demo", "junior-project"],
+      "words": ["roadmap", "tutorial", "awesome", "cheatsheet", "cheat sheet", "interview questions", "code accompanying", "demo", "article", "sample", "examples", "resources"]
+    },
+    {
+      "category": "mobile",
+      "languages": ["Swift", "Kotlin", "Dart", "Objective-C"],
+      "topics": ["android", "ios", "flutter", "react-native", "mobile", "swiftui", "jetpack-compose", "xamarin", "maui", "android-library"],
+      "words": ["android", "ios", "iphone", "flutter", "react native", "recyclerview"]
+    },
+    {
+      "category": "dotnet",
+      "languages": ["C#", "F#", "Visual Basic .NET"],
+      "topics": ["dotnet", "csharp", "aspnetcore", "aspnet-core", "efcore", "entity-framework", "blazor", "nuget"],
+      "words": [".net", "c#", "asp.net"]
+    },
+    {
+      "category": "data",
+      "languages": ["Jupyter Notebook", "R"],
+      "topics": ["machine-learning", "deep-learning", "data-science", "ml", "ai", "llm", "nlp", "database", "sql", "analytics", "pytorch", "tensorflow", "computer-vision", "postgresql", "duckdb", "etl", "data", "mongodb", "redis", "stable-diffusion", "openai", "mcp", "mcp-server", "ai-agent", "agents", "rag"],
+      "words": ["machine learning", "neural network", "dataset", "database", "llm", "ai", "agent", "agents", "gpt", "yolo", "mcp", "sql", "postgres", "mongodb", "redis", "dictionary", "dictionaries"]
+    },
+    {
+      "category": "devops",
+      "languages": ["HCL", "Dockerfile", "Nix"],
+      "topics": ["docker", "kubernetes", "k8s", "devops", "terraform", "ansible", "helm", "ci", "cicd", "github-actions", "monitoring", "infrastructure", "self-hosted", "backup", "nixos", "logging"],
+      "words": ["kubernetes", "docker", "terraform", "deployment", "deploy", "backup", "monitoring", "build system", "ci"]
+    },
+    {
+      "category": "web",
+      "languages": ["HTML", "CSS", "SCSS", "Vue", "Svelte", "PHP", "Astro"],
+      "topics": ["react", "reactjs", "vue", "angular", "nextjs", "laravel", "django", "flask", "frontend", "website", "web", "express", "svelte", "css", "wordpress", "tailwindcss", "html", "web-app", "nodejs", "nestjs", "deno", "denoland", "backend", "rest-api", "graphql", "api", "sse"],
+      "words": ["website", "web app", "web", "frontend", "backend", "landing page", "node.js", "nodejs", "django", "react", "browser", "http", "npm"]
+    },
+    {
+      "category": "libraries",
+      "topics": ["library", "sdk", "npm-package", "package", "api-client", "api-wrapper", "framework", "parser", "typescript-library", "middleware", "crate", "gem", "rate-limiter", "json"],
+      "words": ["library", "libraries", "sdk", "package", "framework", "bindings", "binding", "client for", "module", "wrapper", "adapter", "engine", "toolkit", "implementation", "parser", "api for", "validates", "faker", "json"]
+    },
+    {
+      "category": "tools",
+      "topics": ["cli", "tool", "tools", "command-line", "utility", "vscode-extension", "chrome-extension", "plugin", "extension", "bot", "telegram-bot", "telegram", "linux", "macos", "neovim", "vim", "emacs", "git", "configuration", "dotfiles", "terminal", "shell", "automation", "wayland", "window-manager", "desktop"],
+      "words": ["cli", "command-line", "command line", "tool", "tools", "extension", "plugin", "bot", "script", "scripts", "utility", "utilities", "desktop", "app", "application", "sync", "tester", "dotfiles", "configuration", "terminal", "editor", "server"]
+    }
+  ],
+  "fallbackLanguages": {
+    "JavaScript": "web",
+    "TypeScript": "web",
+    "CoffeeScript": "web",
+    "Shell": "tools",
+    "PowerShell": "tools",
+    "Batchfile": "tools",
+    "Makefile": "tools",
+    "Awk": "tools",
+    "Lua": "tools",
+    "Emacs Lisp": "tools",
+    "Vim Script": "tools"
+  }
+}

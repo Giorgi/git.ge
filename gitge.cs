@@ -6,7 +6,7 @@
 //   dotnet run gitge.cs -- discover [--only <term>] [--max-users <n>] [--restart]
 //   dotnet run gitge.cs -- refresh [--force]
 //   dotnet run gitge.cs -- review [--top <n>] > review.md
-//   dotnet run gitge.cs -- trend | prune | selftest
+//   dotnet run gitge.cs -- trend | prune | selftest | prepare
 // See docs/data-model.md for the files these commands read and write.
 
 using System.Diagnostics;
@@ -48,6 +48,9 @@ try
             var (months, deleted) = Pruning.Run(new SnapshotStore(paths.Snapshots));
             Log.Info($"Pruned: {months} month(s) rolled up, {deleted} daily snapshot(s) deleted");
             return 0;
+        case "prepare":
+            Prepare.Run(paths);
+            return 0;
         case "selftest":
             return SelfTest.Run(paths);
         case "review":
@@ -61,6 +64,7 @@ try
             Console.Error.WriteLine("  trend                Show the current trend window and top gainers");
             Console.Error.WriteLine("  prune                Roll daily snapshots older than 90 days into monthly ones");
             Console.Error.WriteLine("  selftest             Test trending and pruning against tests/fixtures");
+            Console.Error.WriteLine("  prepare              Write _build/site-data.json for the site renderer");
             return 2;
     }
 }
@@ -469,8 +473,52 @@ static class Refresh
 
         Store.WriteList(paths.Projects, projects.Values.OrderBy(p => p.Id));
         Store.WriteSnapshot(Path.Combine(paths.DailySnapshots, $"{today}.json"), today, projects.Values);
-        Log.Info($"Refresh done: {updated} updated, {removed} removed, {toResolve.Count} submitted looked up; snapshot {today} written");
+
+        // The /help-wanted page lists the issues themselves; fetch them only where the count says there are some.
+        var issues = await FetchHelpWantedIssues(github, projects.Values.Where(p => p.HelpWantedIssues > 0).ToList(), config.HelpWantedLabels);
+        Store.WriteList(paths.Issues, issues.OrderBy(i => i.Project).ThenBy(i => i.Number));
+
+        Log.Info($"Refresh done: {updated} updated, {removed} removed, {toResolve.Count} submitted looked up, " +
+                 $"{issues.Count} help-wanted issues; snapshot {today} written");
         github.LogUsage();
+    }
+
+    const int IssuesPerRepo = 10;
+
+    static async Task<List<HelpWantedIssue>> FetchHelpWantedIssues(GitHub github, List<Project> projects, List<string> labels)
+    {
+        var issues = new List<HelpWantedIssue>();
+        foreach (var batch in projects.Chunk(50))
+        {
+            var data = await github.GraphQL($$"""
+                query($ids: [ID!]!, $labels: [String!]) {
+                  nodes(ids: $ids) {
+                    ... on Repository {
+                      issues(first: {{IssuesPerRepo}}, states: OPEN, labels: $labels, orderBy: { field: UPDATED_AT, direction: DESC }) {
+                        nodes { number title url createdAt labels(first: 10) { nodes { name } } }
+                      }
+                    }
+                  }
+                }
+                """, new() { ["ids"] = batch.Select(p => p.NodeId).ToList(), ["labels"] = labels });
+            var nodes = data["nodes"]!.AsArray();
+            for (var i = 0; i < batch.Length; i++)
+            {
+                foreach (var issue in nodes[i]?["issues"]?["nodes"]?.AsArray() ?? [])
+                {
+                    issues.Add(new HelpWantedIssue
+                    {
+                        Project = batch[i].Key,
+                        Number = issue!["number"]!.GetValue<int>(),
+                        Title = issue["title"]!.GetValue<string>(),
+                        Url = issue["url"]!.GetValue<string>(),
+                        CreatedAt = Json.Date(issue["createdAt"]),
+                        Labels = issue["labels"]!["nodes"]!.AsArray().Select(l => l!["name"]!.GetValue<string>()).ToList(),
+                    });
+                }
+            }
+        }
+        return issues;
     }
 
     // Repos with huge issue counts can make a batch time out; halve it until it fits.
@@ -757,6 +805,215 @@ static class SelfTest
 }
 
 // ---------------------------------------------------------------------------
+// Prepare: merge bot data, curation and opt-outs, apply the listing rules and
+// trend, and write _build/site-data.json for the site renderer (site/). Every
+// field in that file is public: no locations, nothing hidden or opted out.
+// ---------------------------------------------------------------------------
+
+static class Prepare
+{
+    const int NewWithinDays = 30;
+    const int ActiveWithinDays = 7;
+    const int SectionSize = 12;
+    const int SpotlightSize = 3;
+    const int SpotlightMinStars = 20;
+
+    public static void Run(Paths paths)
+    {
+        var discovery = Store.Read<DiscoveryConfig>(paths.DiscoveryConfig);
+        var site = Store.Read<SiteConfig>(paths.SiteConfig);
+        var categories = Store.Read<CategoryConfig>(paths.CategoryConfig);
+        var manualDevelopers = Store.Read<ManualDevelopers>(paths.ManualDevelopers);
+        var manualProjects = Store.Read<List<ManualProject>>(paths.ManualProjects);
+        var optOut = Store.Read<OptOut>(paths.OptOut);
+        var now = DateTimeOffset.UtcNow;
+        var ignoreCase = StringComparer.OrdinalIgnoreCase;
+
+        var blocked = new HashSet<string>(manualDevelopers.Exclude.Concat(optOut.Developers), ignoreCase);
+        var hidden = new HashSet<string>(optOut.Projects, ignoreCase);
+        var curation = manualProjects.Where(m => m.FullName is not null)
+            .GroupBy(m => m.FullName!, ignoreCase).ToDictionary(g => g.Key, g => g.Last(), ignoreCase);
+        var trend = Trending.Compute(new SnapshotStore(paths.Snapshots), site.TrendWindowDays, site.TrendToleranceDays);
+        bool IsMaintainer(string owner) => owner.Equals(site.MaintainerLogin, StringComparison.OrdinalIgnoreCase);
+
+        var projects = new List<SiteProject>();
+        foreach (var p in Store.ReadList<Project>(paths.Projects))
+        {
+            if (blocked.Contains(p.Owner) || hidden.Contains(p.FullName)) continue;
+            curation.TryGetValue(p.FullName, out var m);
+            // Curated or submitted projects skip the bar; discovered ones are re-checked in case the bar changed.
+            var curated = m is not null || p.Source == "submitted";
+            if (!curated && !discovery.QualityBar.Passes(p.FullName, p.Description, p.IsFork, p.IsArchived, p.TemplateFrom, p.Stars, p.PushedAt, now))
+                continue;
+
+            projects.Add(new SiteProject
+            {
+                Key = p.Key,
+                Name = p.FullName.Split('/')[1],
+                FullName = p.FullName,
+                Owner = p.Owner,
+                Url = p.HtmlUrl,
+                Description = m?.Description ?? p.Description,
+                DescriptionKa = m?.DescriptionKa,
+                Language = p.Language,
+                Topics = p.Topics ?? [],
+                Stars = p.Stars,
+                Trend = trend.Delta.TryGetValue(p.Id, out var delta) ? delta : null,
+                HelpWanted = p.HelpWantedIssues,
+                PushedAt = p.PushedAt,
+                CreatedAt = p.CreatedAt,
+                Category = m?.Category ?? categories.Infer(p),
+                Archived = p.IsArchived,
+                Featured = m?.Featured ?? false,
+                Verified = m?.Verified ?? false,
+                Maintainer = IsMaintainer(p.Owner),
+                Listed = curated || p.Stars >= site.ListingMinStars,
+                Source = curated && p.Source == "submitted" ? "submitted" : "discovered",
+            });
+        }
+
+        // Projects hosted outside GitHub: only what the submitter provided; no stats.
+        foreach (var m in manualProjects.Where(m => m.FullName is null && m.Url is not null))
+        {
+            var owner = m.Owner ?? "";
+            if (blocked.Contains(owner) || hidden.Contains(m.Url!)) continue;
+            projects.Add(new SiteProject
+            {
+                Key = $"url:{m.Url}",
+                Name = m.Name ?? m.Url!,
+                Owner = owner,
+                Url = m.Url!,
+                Description = m.Description,
+                DescriptionKa = m.DescriptionKa,
+                Category = m.Category ?? "other",
+                Featured = m.Featured ?? false,
+                Verified = m.Verified ?? false,
+                Maintainer = IsMaintainer(owner),
+                Listed = true,
+                Source = "submitted",
+            });
+        }
+
+        var newThisMonth = projects
+            .Where(p => p.CreatedAt >= now.AddDays(-NewWithinDays))
+            .OrderByDescending(p => p.Stars ?? 0).ThenByDescending(p => p.CreatedAt)
+            .Take(SectionSize).ToList();
+        var recentlyActive = projects
+            .Where(p => p.PushedAt >= now.AddDays(-ActiveWithinDays) && (p.Stars ?? 0) >= discovery.QualityBar.MinStars)
+            .OrderByDescending(p => p.PushedAt)
+            .Take(SectionSize).ToList();
+
+        // Search covers everything with a few stars; the rest would only be noise in the browser's index.
+        var inSections = newThisMonth.Concat(recentlyActive).Select(p => p.Key).ToHashSet();
+        var published = projects
+            .Where(p => p.Listed || (p.Stars ?? 0) >= discovery.QualityBar.MinStars || inSections.Contains(p.Key))
+            .OrderByDescending(p => p.Stars ?? 0).ThenBy(p => p.Key)
+            .ToList();
+        var publishedKeys = published.Select(p => p.Key).ToHashSet();
+
+        var data = new SiteData
+        {
+            GeneratedAt = now,
+            SiteUrl = site.SiteUrl,
+            RepoUrl = site.RepoUrl,
+            MaintainerLogin = site.MaintainerLogin,
+            ListingMinStars = site.ListingMinStars,
+            Trend = new SiteTrend
+            {
+                Current = trend.Current.ToString("yyyy-MM-dd"),
+                Baseline = trend.Baseline?.ToString("yyyy-MM-dd"),
+                WindowDays = site.TrendWindowDays,
+            },
+            Categories = categories.Order,
+            Developers = published.Where(p => p.Listed).Select(p => p.Owner).Distinct(ignoreCase).Count(),
+            Projects = published,
+            NewThisMonth = newThisMonth.Select(p => p.Key).ToList(),
+            RecentlyActive = recentlyActive.Select(p => p.Key).ToList(),
+            Spotlight = PickSpotlight(published, now).Select(p => p.Key).ToList(),
+            Issues = Store.ReadList<HelpWantedIssue>(paths.Issues).Where(i => publishedKeys.Contains(i.Project)).ToList(),
+        };
+
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.SiteData)!);
+        File.WriteAllText(paths.SiteData, JsonSerializer.Serialize(data, Json.Options), new UTF8Encoding(false));
+        Log.Info($"Prepared {published.Count} projects ({published.Count(p => p.Listed)} listed, {data.Developers} developers), " +
+                 $"{data.Issues.Count} help-wanted issues, trend {(trend.HasHistory ? $"since {data.Trend.Baseline}" : "not available yet")} → {paths.SiteData}");
+    }
+
+    // Spotlight = manually featured projects, topped up with a weekly rotation of
+    // active, well-starred ones. The site maintainer's own projects are never
+    // picked, even if marked featured, so the person running the site can't
+    // promote their own work. They still appear in every normal listing.
+    static List<SiteProject> PickSpotlight(List<SiteProject> projects, DateTimeOffset now)
+    {
+        var eligible = projects.Where(p => p.Listed && !p.Maintainer && !p.Archived).ToList();
+        var picks = eligible.Where(p => p.Featured).OrderByDescending(p => p.Stars ?? 0).Take(SpotlightSize).ToList();
+        var week = $"{ISOWeek.GetYear(now.UtcDateTime)}-W{ISOWeek.GetWeekOfYear(now.UtcDateTime)}";
+        picks.AddRange(eligible
+            .Where(p => !p.Featured && p.Stars >= SpotlightMinStars && p.PushedAt >= now.AddDays(-90))
+            .OrderBy(p => StableHash($"{week}:{p.Key}"))
+            .Take(SpotlightSize - picks.Count));
+        return picks;
+    }
+
+    // FNV-1a: the same week always picks the same projects, on any machine.
+    static uint StableHash(string s)
+    {
+        var hash = 2166136261;
+        foreach (var c in s) hash = (hash ^ c) * 16777619;
+        return hash;
+    }
+}
+
+sealed class SiteData
+{
+    public DateTimeOffset GeneratedAt { get; set; }
+    public string SiteUrl { get; set; } = "";
+    public string RepoUrl { get; set; } = "";
+    public string MaintainerLogin { get; set; } = "";
+    public int ListingMinStars { get; set; }
+    public SiteTrend Trend { get; set; } = new();
+    public List<string> Categories { get; set; } = [];
+    public int Developers { get; set; }
+    public List<SiteProject> Projects { get; set; } = [];
+    public List<string> NewThisMonth { get; set; } = [];
+    public List<string> RecentlyActive { get; set; } = [];
+    public List<string> Spotlight { get; set; } = [];
+    public List<HelpWantedIssue> Issues { get; set; } = [];
+}
+
+sealed class SiteTrend
+{
+    public string Current { get; set; } = "";
+    public string? Baseline { get; set; }
+    public int WindowDays { get; set; }
+}
+
+sealed class SiteProject
+{
+    public string Key { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? FullName { get; set; }
+    public string Owner { get; set; } = "";
+    public string Url { get; set; } = "";
+    public string? Description { get; set; }
+    public string? DescriptionKa { get; set; }
+    public string? Language { get; set; }
+    public List<string> Topics { get; set; } = [];
+    public int? Stars { get; set; }
+    public int? Trend { get; set; }
+    public int? HelpWanted { get; set; }
+    public DateTimeOffset? PushedAt { get; set; }
+    public DateTimeOffset? CreatedAt { get; set; }
+    public string Category { get; set; } = "other";
+    public bool Archived { get; set; }
+    public bool Featured { get; set; }
+    public bool Verified { get; set; }
+    public bool Maintainer { get; set; }
+    public bool Listed { get; set; }
+    public string Source { get; set; } = "";
+}
+
+// ---------------------------------------------------------------------------
 // Review: the developers visitors will actually see, ranked by the stars of
 // their listed repos, so curation effort goes where it matters. Output is
 // Markdown on stdout; add unwanted logins to data/manual/developers.json.
@@ -814,6 +1071,46 @@ sealed class SiteConfig
     public int TrendToleranceDays { get; set; } = 7;
     // Repos below this appear only in "Recently active" and search, not in listings.
     public int ListingMinStars { get; set; } = 10;
+    public string RepoUrl { get; set; } = "";
+}
+
+sealed class HelpWantedIssue
+{
+    public string Project { get; set; } = "";
+    public int Number { get; set; }
+    public string Title { get; set; } = "";
+    public string Url { get; set; } = "";
+    public DateTimeOffset? CreatedAt { get; set; }
+    public List<string> Labels { get; set; } = [];
+}
+
+sealed class CategoryConfig
+{
+    public List<string> Order { get; set; } = [];
+    public List<CategoryRule> Rules { get; set; } = [];
+    public Dictionary<string, string> FallbackLanguages { get; set; } = [];
+
+    // Strongest signal first: the owner's own topics, then the primary language, then
+    // words in the name/description, then a language fallback. Within each pass the
+    // first rule in config order wins. See config/categories.json.
+    public string Infer(Project p)
+    {
+        var ignoreCase = StringComparer.OrdinalIgnoreCase;
+        var text = $"{p.FullName.Split('/').Last().Replace('-', ' ').Replace('_', ' ')} {p.Description}";
+        return Rules.FirstOrDefault(r => p.Topics is not null && p.Topics.Any(t => r.Topics.Contains(t, ignoreCase)))?.Category
+            ?? Rules.FirstOrDefault(r => p.Language is not null && r.Languages.Contains(p.Language, ignoreCase))?.Category
+            ?? Rules.FirstOrDefault(r => r.Words.Any(w => Regex.IsMatch(text, $@"\b{Regex.Escape(w)}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)))?.Category
+            ?? (p.Language is not null && FallbackLanguages.TryGetValue(p.Language, out var fallback) ? fallback : null)
+            ?? "other";
+    }
+}
+
+sealed class CategoryRule
+{
+    public string Category { get; set; } = "";
+    public List<string> Languages { get; set; } = [];
+    public List<string> Topics { get; set; } = [];
+    public List<string> Words { get; set; } = [];
 }
 
 sealed class DiscoveryConfig
@@ -885,6 +1182,7 @@ sealed class ManualProject
 {
     public string? FullName { get; set; }
     public string? Url { get; set; }
+    public string? Owner { get; set; }
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? DescriptionKa { get; set; }
@@ -1027,6 +1325,9 @@ sealed class Paths(string root)
     public string BotData => Path.Combine(root, "data", "bot");
     public string Developers => Path.Combine(BotData, "discovered", "developers.json");
     public string Projects => Path.Combine(BotData, "discovered", "projects.json");
+    public string Issues => Path.Combine(BotData, "discovered", "issues.json");
+    public string CategoryConfig => Path.Combine(root, "config", "categories.json");
+    public string SiteData => Path.Combine(root, "_build", "site-data.json");
     public string Snapshots => Path.Combine(BotData, "snapshots");
     public string DailySnapshots => Path.Combine(Snapshots, "daily");
     public string DiscoveryState => Path.Combine(BotData, "state", "discovery.json");
