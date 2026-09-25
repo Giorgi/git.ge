@@ -1,7 +1,8 @@
-# Cloudflare Pages response headers. The CSP enforces "no external requests":
-# every script, style, font and image must come from git.ge itself.
+# Response headers (Cloudflare Workers static assets). The CSP allows only git.ge
+# itself, plus Cloudflare Web Analytics: its script (static.cloudflareinsights.com)
+# and its reporting endpoint (cloudflareinsights.com). Nothing else external.
 /*
-  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self' https://static.cloudflareinsights.com; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: interest-cohort=(), browsing-topics=()

@@ -39,7 +39,9 @@ Cloudflare Workers (static assets) serves it at https://git.ge.
   site that a human hasn't reviewed.
 - **Ask before adding a dependency** beyond the .NET BCL, Markdig and the ASP.NET
   Core shared framework. The rendered site loads nothing from other domains
-  (enforced by the CSP in `site/wwwroot/_headers`); no analytics, no embeds.
+  (enforced by the CSP in `site/wwwroot/_headers`). The one exception is Cloudflare
+  Web Analytics (cookie-free, injected by Cloudflare), allowed in the CSP and
+  described on the About page. No other analytics, embeds or cookies.
 - **Opt-outs win everywhere**, including the published JSON. Never publish a
   developer's location.
 - **The site must work without JavaScript.** JS only enhances (sort, search,
