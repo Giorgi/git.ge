@@ -1,0 +1,14 @@
+<Layout Path="@($"/c/{Cat}/")" TitleKey="@($"cat.{Cat}")">
+    <h1><T K="@($"cat.{Cat}")" /></h1>
+    <p class="note">
+        <T K="category.count" Args="@([Projects.Count])" /> ·
+        <T K="category.note" Args="@([Site.Data.ListingMinStars])" />
+    </p>
+    <ProjectList Items="@Site.DefaultOrder(Projects)" Sortable="true" Id="list" />
+</Layout>
+
+@code {
+    [Parameter, EditorRequired] public string Cat { get; set; } = "";
+
+    List<SiteProject> Projects => Site.Listed.Where(p => p.Category == Cat).ToList();
+}

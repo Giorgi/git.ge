@@ -1,0 +1,14 @@
+@* Roundups are written by the maintainer in content/roundups/, in the language
+   of their choice; they are not switched by the English toggle. *@
+<Layout Path="@($"/roundups/{R.Slug}/")" Title="@R.Title" Description="@R.Summary" OgType="article">
+    <article class="prose">
+        <p class="note"><a href="/roundups/"><T K="roundups.back" /></a></p>
+        <h1>@R.Title</h1>
+        <p class="note"><time datetime="@R.Date.ToString("yyyy-MM-dd")">@R.Date.ToString("yyyy-MM-dd")</time></p>
+        @((MarkupString)R.Html)
+    </article>
+</Layout>
+
+@code {
+    [Parameter, EditorRequired] public Roundup R { get; set; } = default!;
+}

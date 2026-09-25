@@ -1,0 +1,38 @@
+@* All listed projects, paginated for readers without JavaScript. With
+   JavaScript, the search box loads /index.json and filters everything in it. *@
+<Layout Path="@PagePath(Page)" TitleKey="projects.title">
+    <h1><T K="projects.title" /></h1>
+    <p class="note"><T K="projects.note" Args="@([Site.Data.ListingMinStars])" /></p>
+
+    <div class="search" hidden>
+        <label for="q" class="visually-hidden"><T K="projects.searchLabel" /></label>
+        <input id="q" type="search" autocomplete="off" spellcheck="false"
+               placeholder="@Site.Strings.Ka("projects.search")" data-i18n-placeholder="projects.search">
+        <p class="note" id="q-status" aria-live="polite"></p>
+    </div>
+
+    <ProjectList Items="@Items" Sortable="true" Id="list" />
+
+    @if (PageCount > 1)
+    {
+        <nav class="pager" aria-label="@Site.Strings.Ka("projects.page", Page, PageCount)">
+            @if (Page > 1)
+            {
+                <a href="@PagePath(Page - 1)" rel="prev"><T K="projects.prev" /></a>
+            }
+            <span><T K="projects.page" Args="@([Page, PageCount])" /></span>
+            @if (Page < PageCount)
+            {
+                <a href="@PagePath(Page + 1)" rel="next"><T K="projects.next" /></a>
+            }
+        </nav>
+    }
+</Layout>
+
+@code {
+    [Parameter, EditorRequired] public int Page { get; set; }
+    [Parameter, EditorRequired] public int PageCount { get; set; }
+    [Parameter, EditorRequired] public List<SiteProject> Items { get; set; } = [];
+
+    public static string PagePath(int page) => page == 1 ? "/projects/" : $"/projects/{page}/";
+}

@@ -898,8 +898,10 @@ static class Prepare
             .Where(p => p.CreatedAt >= now.AddDays(-NewWithinDays))
             .OrderByDescending(p => p.Stars ?? 0).ThenByDescending(p => p.CreatedAt)
             .Take(SectionSize).ToList();
+        var shownAsNew = newThisMonth.Select(p => p.Key).ToHashSet();
         var recentlyActive = projects
             .Where(p => p.PushedAt >= now.AddDays(-ActiveWithinDays) && (p.Stars ?? 0) >= discovery.QualityBar.MinStars)
+            .Where(p => !shownAsNew.Contains(p.Key))
             .OrderByDescending(p => p.PushedAt)
             .Take(SectionSize).ToList();
 

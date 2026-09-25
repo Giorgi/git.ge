@@ -1,0 +1,54 @@
+@* One project row. data-* attributes feed the client-side sort in app.js;
+   the card itself is complete without JavaScript. Keep the markup in step
+   with card() in wwwroot/assets/app.js, which renders search results. *@
+<li class="p" data-stars="@(P.Stars ?? 0)" data-trend="@P.Trend" data-pushed="@Format.Date(P.PushedAt)" data-created="@Format.Date(P.CreatedAt)">
+    <div class="p-head">
+        <a class="p-name" href="@P.Url">@if (P.FullName is not null)
+            {<span class="p-owner">@(P.Owner)/</span>}@P.Name</a>
+        @if (P.Archived)
+        {
+            <span class="badge"><T K="card.archived" /></span>
+        }
+        @if (P.Verified)
+        {
+            <span class="badge ok"><T K="card.verified" /></span>
+        }
+        @if (P.HelpWanted > 0)
+        {
+            <a class="badge hw" href="/help-wanted/#@P.Anchor"><T K="card.helpWanted" Args="@([P.HelpWanted])" /></a>
+        }
+    </div>
+    @if (P.DescriptionKa is not null)
+    {
+        <p class="p-desc" data-desc-en="@P.Description">@P.DescriptionKa</p>
+    }
+    else if (P.Description is not null)
+    {
+        <p class="p-desc">@P.Description</p>
+    }
+    <div class="p-meta">
+        @if (P.Language is not null)
+        {
+            <span class="p-lang">@P.Language</span>
+        }
+        @if (P.Stars is not null)
+        {
+            <span class="p-stars" title="@Site.Strings.Ka("card.starsTitle")" data-i18n-title="card.starsTitle">★ @Format.Number(P.Stars)</span>
+        }
+        @if (Site.Data.Trend.HasHistory && P.Stars is not null)
+        {
+            <span class="p-trend @TrendClass" title="@Site.Strings.Ka("card.trendTitle", Site.Data.Trend.WindowDays)"
+                  data-i18n-title="card.trendTitle" data-i18n-title-args="@($"[{Site.Data.Trend.WindowDays}]")">@Format.Trend(P.Trend)</span>
+        }
+        @if (P.PushedAt is not null)
+        {
+            <time class="p-pushed" datetime="@Format.Date(P.PushedAt)" title="@Site.Strings.Ka("card.pushedTitle")" data-i18n-title="card.pushedTitle">@Format.Date(P.PushedAt)</time>
+        }
+    </div>
+</li>
+
+@code {
+    [Parameter, EditorRequired] public SiteProject P { get; set; } = default!;
+
+    string TrendClass => P.Trend switch { > 0 => "up", < 0 => "down", _ => "" };
+}

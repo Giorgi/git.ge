@@ -1,0 +1,53 @@
+<Layout Path="/help-wanted/" TitleKey="hw.title">
+    <h1><T K="hw.title" /></h1>
+    <p class="lead"><T K="hw.intro" /></p>
+
+    @if (Groups.Count == 0)
+    {
+        <p class="note"><T K="hw.none" /></p>
+    }
+    else
+    {
+        <p class="note"><T K="hw.count" Args="@([Site.Data.Issues.Count, Groups.Count])" /></p>
+        @foreach (var (project, issues) in Groups)
+        {
+            <section class="hw-project" id="@project.Anchor">
+                <h2>
+                    <a href="@project.Url"><span class="p-owner">@(project.Owner)/</span>@project.Name</a>
+                    <span class="p-meta">
+                        @if (project.Language is not null)
+                        {
+                            <span class="p-lang">@project.Language</span>
+                        }
+                        <span class="p-stars">★ @Format.Number(project.Stars)</span>
+                    </span>
+                </h2>
+                <ul class="issues">
+                    @foreach (var issue in issues)
+                    {
+                        <li>
+                            <a href="@issue.Url">@issue.Title</a>
+                            <span class="issue-meta">
+                                #@issue.Number
+                                @foreach (var label in issue.Labels)
+                                {
+                                    <span class="label">@label</span>
+                                }
+                                <time datetime="@Format.Date(issue.CreatedAt)">@Format.Date(issue.CreatedAt)</time>
+                            </span>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+    }
+</Layout>
+
+@code {
+    List<(SiteProject Project, List<HelpWantedIssue> Issues)> Groups =>
+        Site.Data.Issues
+            .GroupBy(i => i.Project)
+            .Select(g => (Project: Site.Project(g.Key), Issues: g.OrderByDescending(i => i.CreatedAt).ToList()))
+            .OrderByDescending(g => g.Project.Stars ?? 0)
+            .ToList();
+}

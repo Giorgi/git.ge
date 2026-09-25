@@ -1,0 +1,30 @@
+@* A list of project cards. With Sortable, app.js reveals sort buttons that
+   reorder the rendered cards; without JavaScript the default order stands. *@
+@if (Sortable)
+{
+    <div class="sort" hidden data-sort-for="@Id">
+        <T K="sort.label" />
+        @foreach (var (key, label) in SortOptions)
+        {
+            <button type="button" data-sort="@key" aria-pressed="@(key == DefaultSort ? "true" : "false")"><T K="@label" /></button>
+        }
+    </div>
+}
+<ol class="plist" id="@Id">
+    @foreach (var p in Items)
+    {
+        <ProjectCard P="p" />
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<SiteProject> Items { get; set; } = [];
+    [Parameter] public bool Sortable { get; set; }
+    [Parameter] public string? Id { get; set; }
+
+    static string DefaultSort => Site.Data.Trend.HasHistory ? "trend" : "stars";
+
+    static IEnumerable<(string Key, string Label)> SortOptions =>
+        (Site.Data.Trend.HasHistory ? new[] { ("trend", "sort.trend") } : [])
+        .Concat([("stars", "sort.stars"), ("pushed", "sort.recent"), ("created", "sort.new")]);
+}

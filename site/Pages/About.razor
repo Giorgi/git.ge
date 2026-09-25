@@ -1,0 +1,8 @@
+@* Long-form text lives in content/pages/about.{ka,en}.md. Both are rendered;
+   CSS shows the one matching <html lang>, so it works without JavaScript too. *@
+<Layout Path="/about/" TitleKey="about.title">
+    <article class="prose">
+        <div class="l10n" lang="ka">@((MarkupString)Site.Pages["about.ka"])</div>
+        <div class="l10n" lang="en">@((MarkupString)Site.Pages["about.en"])</div>
+    </article>
+</Layout>

@@ -1,0 +1,164 @@
+/* git.ge: dense, text-first, fast. No framework. */
+
+/* Noto Sans Georgian (SIL OFL, see fonts/OFL.txt), Georgian subset only: the
+   browser fetches it only for Mkhedruli/Mtavruli text. Latin uses the system font. */
+@font-face {
+  font-family: "Noto Sans Georgian";
+  src: url("/assets/fonts/noto-sans-georgian.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0589, U+10A0-10FF, U+1C90-1CBA, U+1CBD-1CBF, U+205A, U+2D00-2D2F, U+2E31;
+}
+
+:root {
+  --bg: #fdfdfc;
+  --fg: #1b1b1a;
+  --muted: #62625f;
+  --line: #e4e3df;
+  --soft: #f3f2ef;
+  --accent: #b3261e;
+  --link: #1f4fbf;
+  --up: #1d7a3a;
+  --down: #9a3b1c;
+  --badge: #efeae0;
+  --font: "Noto Sans Georgian", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141413;
+    --fg: #e8e7e3;
+    --muted: #a09f9a;
+    --line: #2d2c2a;
+    --soft: #1d1c1b;
+    --accent: #f07167;
+    --link: #8ab4ff;
+    --up: #6fcf8b;
+    --down: #f0a07a;
+    --badge: #2a2824;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 var(--font);
+  /* Georgian words are long; never let them push the layout sideways. */
+  overflow-wrap: break-word;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+h1, h2, h3 { line-height: 1.25; margin: 1.6em 0 .3em; }
+h1 { font-size: 1.6rem; margin-top: 1.2em; }
+h2 { font-size: 1.15rem; }
+
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
+
+.skip { position: absolute; left: -999px; }
+.skip:focus { left: 1rem; top: .5rem; background: var(--bg); padding: .3rem .6rem; z-index: 10; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Header */
+.site-header { border-bottom: 1px solid var(--line); background: var(--soft); }
+.bar { display: flex; align-items: center; gap: 1.25rem; padding-top: .6rem; padding-bottom: .4rem; flex-wrap: wrap; }
+.logo { font-weight: 700; font-size: 1.25rem; color: var(--fg); letter-spacing: -.01em; }
+.logo span { color: var(--accent); }
+.logo:hover { text-decoration: none; }
+.nav { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .95rem; }
+.nav a, .cats a { color: var(--fg); }
+.nav a[aria-current], .cats a[aria-current] { color: var(--accent); font-weight: 600; }
+.lang {
+  margin-left: auto; font: inherit; font-size: .85rem; color: var(--fg); background: none;
+  border: 1px solid var(--line); border-radius: 4px; padding: .15rem .6rem; cursor: pointer;
+}
+.cats { display: flex; gap: .9rem; flex-wrap: wrap; font-size: .9rem; padding-bottom: .55rem; }
+
+/* Footer */
+.site-footer { border-top: 1px solid var(--line); margin-top: 3rem; padding: 1rem 0 2rem; color: var(--muted); font-size: .85rem; }
+.site-footer p { margin: .2rem 0; }
+
+/* Text */
+.intro h1 { margin-bottom: .1em; }
+.stats, .note, .lead { color: var(--muted); }
+.note { font-size: .88rem; margin: 0 0 .5rem; }
+.lead { max-width: 46rem; }
+.notice { background: var(--soft); border-left: 3px solid var(--accent); padding: .5rem .8rem; font-size: .92rem; }
+.more { margin: .6rem 0 0; }
+
+/* Layout */
+.cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 2.5rem; }
+@media (max-width: 52rem) { .cols { grid-template-columns: minmax(0, 1fr); } }
+
+/* Project rows */
+.plist { list-style: none; margin: 0; padding: 0; }
+.p { padding: .55rem 0; border-bottom: 1px solid var(--line); }
+.p-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; }
+.p-name { font-weight: 600; overflow-wrap: anywhere; }
+.p-owner { font-weight: 400; color: var(--muted); }
+.p-desc { margin: .1rem 0 .15rem; font-size: .93rem; }
+.p-meta { display: flex; flex-wrap: wrap; gap: .1rem .9rem; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.p-lang::before { content: ""; display: inline-block; width: .5em; height: .5em; border-radius: 50%; background: var(--muted); margin-right: .35em; vertical-align: .08em; }
+.p-trend.up { color: var(--up); font-weight: 600; }
+.p-trend.down { color: var(--down); }
+
+.badge { font-size: .72rem; background: var(--badge); color: var(--fg); border-radius: 3px; padding: .05rem .4rem; white-space: nowrap; }
+.badge.hw { color: var(--up); }
+.badge.ok { color: var(--link); }
+
+/* Category overview */
+.catgrid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem 1.5rem; }
+.catgrid li { border-top: 2px solid var(--line); padding-top: .4rem; }
+.catgrid a { color: var(--fg); }
+.catgrid .count { color: var(--muted); font-size: .85rem; margin-left: .3rem; }
+.catgrid p { margin: .15rem 0 0; font-size: .82rem; color: var(--muted); }
+
+/* Sort and search (revealed by app.js) */
+.sort { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .85rem; color: var(--muted); margin: .4rem 0; }
+.sort button {
+  font: inherit; color: var(--fg); background: none; border: 1px solid var(--line);
+  border-radius: 3px; padding: .1rem .55rem; cursor: pointer;
+}
+.sort button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.search input {
+  width: 100%; max-width: 36rem; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: .45rem .65rem; margin: .3rem 0;
+}
+.pager { display: flex; gap: 1.2rem; align-items: center; margin: 1.2rem 0; font-size: .92rem; }
+.pager span { color: var(--muted); }
+
+/* Help wanted */
+.hw-project h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .8rem; font-size: 1rem; }
+.hw-project h2 .p-meta { font-weight: 400; }
+.issues { margin: 0; padding-left: 1.1rem; }
+.issues li { margin: .25rem 0; }
+.issue-meta { display: inline-flex; flex-wrap: wrap; gap: .1rem .5rem; margin-left: .3rem; font-size: .78rem; color: var(--muted); }
+.label { background: var(--badge); border-radius: 3px; padding: 0 .35rem; color: var(--fg); }
+
+/* Roundups and long text */
+.roundups { list-style: none; padding: 0; }
+.roundups li { padding: .5rem 0; border-bottom: 1px solid var(--line); }
+.roundups time { color: var(--muted); font-size: .85rem; margin-right: .6rem; font-variant-numeric: tabular-nums; }
+.roundups p { margin: .1rem 0 0; color: var(--muted); font-size: .92rem; }
+.prose { max-width: 46rem; }
+.prose h2 { margin-top: 1.8em; }
+.prose li { margin: .2rem 0; }
+.prose code { font-family: var(--mono); font-size: .88em; background: var(--soft); padding: .05rem .3rem; border-radius: 3px; }
+
+/* The about page carries both languages; show the one matching <html lang>. */
+html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: none; }
+
+@media (max-width: 36rem) {
+  body { font-size: 15px; }
+  h1 { font-size: 1.35rem; }
+  .bar { gap: .4rem 1rem; }
+}

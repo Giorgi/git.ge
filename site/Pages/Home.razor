@@ -1,0 +1,68 @@
+<Layout Path="/" TitleKey="site.tagline">
+    <section class="intro">
+        <h1><T K="site.tagline" /></h1>
+        <p class="stats"><T K="home.stats" Args="@([Format.Number(Site.Listed.Count()), Format.Number(Site.Data.Developers)])" /></p>
+    </section>
+
+    @if (!Site.Data.Trend.HasHistory)
+    {
+        <p class="notice"><T K="home.coldStart" Args="@([Site.Data.Trend.FirstTrendDate])" /></p>
+    }
+
+    @if (Site.Data.Spotlight.Count > 0)
+    {
+        <section class="spotlight" aria-labelledby="spotlight">
+            <h2 id="spotlight"><T K="home.spotlight" /></h2>
+            <p class="note"><T K="home.spotlightNote" /></p>
+            <ProjectList Items="@Site.Data.Spotlight.Select(Site.Project)" />
+        </section>
+    }
+
+    <div class="cols">
+        <section aria-labelledby="top">
+            @if (Site.Data.Trend.HasHistory)
+            {
+                <h2 id="top"><T K="home.trending" /></h2>
+                <p class="note"><T K="home.trendingNote" Args="@([Site.Data.Trend.WindowDays])" /></p>
+            }
+            else
+            {
+                <h2 id="top"><T K="home.topStars" /></h2>
+                <p class="note"><T K="home.topStarsNote" /></p>
+            }
+            <ProjectList Items="@Site.DefaultOrder(Site.Listed).Take(TopCount)" />
+            <p class="more"><a href="/projects/"><T K="home.allProjects" /></a></p>
+        </section>
+
+        <div>
+            <section aria-labelledby="new">
+                <h2 id="new"><T K="home.new" /></h2>
+                <p class="note"><T K="home.newNote" /></p>
+                <ProjectList Items="@Site.Data.NewThisMonth.Select(Site.Project)" />
+            </section>
+            <section aria-labelledby="active">
+                <h2 id="active"><T K="home.active" /></h2>
+                <p class="note"><T K="home.activeNote" /></p>
+                <ProjectList Items="@Site.Data.RecentlyActive.Select(Site.Project)" />
+            </section>
+        </div>
+    </div>
+
+    <section aria-labelledby="categories">
+        <h2 id="categories"><T K="home.categories" /></h2>
+        <ul class="catgrid">
+            @foreach (var cat in Site.Data.Categories)
+            {
+                var projects = Site.Listed.Where(p => p.Category == cat).ToList();
+                <li>
+                    <a href="/c/@cat/"><strong><T K="@($"cat.{cat}")" /></strong> <span class="count">@projects.Count</span></a>
+                    <p>@string.Join(", ", Site.DefaultOrder(projects).Take(4).Select(p => p.Name))</p>
+                </li>
+            }
+        </ul>
+    </section>
+</Layout>
+
+@code {
+    const int TopCount = 25;
+}

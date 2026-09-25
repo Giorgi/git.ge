@@ -1,0 +1,25 @@
+<Layout Path="/roundups/" TitleKey="roundups.title">
+    <h1><T K="roundups.title" /></h1>
+    <p class="lead"><T K="roundups.intro" /> <a href="/roundups/feed.xml"><T K="roundups.rss" /></a></p>
+
+    @if (Site.Roundups.Count == 0)
+    {
+        <p class="note"><T K="roundups.none" /></p>
+    }
+    else
+    {
+        <ol class="roundups">
+            @foreach (var r in Site.Roundups)
+            {
+                <li>
+                    <time datetime="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToString("yyyy-MM-dd")</time>
+                    <a href="/roundups/@r.Slug/">@r.Title</a>
+                    @if (r.Summary is not null)
+                    {
+                        <p>@r.Summary</p>
+                    }
+                </li>
+            }
+        </ol>
+    }
+</Layout>

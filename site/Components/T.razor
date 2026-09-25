@@ -1,0 +1,9 @@
+@* A UI string from i18n/: rendered in Georgian; app.js swaps in English by key. *@
+<span data-i18n="@K" data-i18n-args="@ArgsJson">@Site.Strings.Ka(K, Args)</span>
+
+@code {
+    [Parameter, EditorRequired] public string K { get; set; } = "";
+    [Parameter] public object?[] Args { get; set; } = [];
+
+    string? ArgsJson => Args.Length == 0 ? null : System.Text.Json.JsonSerializer.Serialize(Args);
+}

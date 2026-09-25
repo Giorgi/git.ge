@@ -1,0 +1,98 @@
+@* The page shell. The document is Georgian (lang="ka"); app.js switches to English
+   on request. No external requests: fonts, styles and scripts are all local. *@
+<html lang="ka">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title data-i18n="@TitleKey" data-i18n-args="@TitleArgsJson" data-i18n-prefix="@(IsHome ? "git.ge · " : null)" data-i18n-suffix="@TitleSuffix">@PageTitle</title>
+    <meta name="description" content="@MetaDescription">
+    <link rel="canonical" href="@Site.Url(Path)">
+    <meta property="og:site_name" content="git.ge">
+    <meta property="og:type" content="@OgType">
+    <meta property="og:title" content="@PageTitle">
+    <meta property="og:description" content="@MetaDescription">
+    <meta property="og:url" content="@Site.Url(Path)">
+    <meta property="og:locale" content="ka_GE">
+    <meta property="og:locale:alternate" content="en_US">
+    <meta name="twitter:card" content="summary">
+    <meta name="color-scheme" content="light dark">
+    <link rel="preload" href="/assets/fonts/noto-sans-georgian.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="@Site.Asset("assets/site.css")">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="alternate" type="application/rss+xml" title="git.ge" href="/roundups/feed.xml">
+    <script src="@Site.Asset("assets/i18n.js")" defer></script>
+    <script src="@Site.Asset("assets/app.js")" defer></script>
+</head>
+<body>
+    <a class="skip" href="#main"><T K="skip" /></a>
+    <header class="site-header">
+        <div class="wrap bar">
+            <a class="logo" href="/">git<span>.ge</span></a>
+            <nav class="nav" aria-label="git.ge">
+                @foreach (var (href, key) in Nav)
+                {
+                    <a href="@href" aria-current="@(Path.StartsWith(href) ? "page" : null)"><T K="@key" /></a>
+                }
+            </nav>
+            <button class="lang" type="button" hidden data-i18n-title="lang.switchTitle" title="@Site.Strings.Ka("lang.switchTitle")"><T K="lang.switch" /></button>
+        </div>
+        <nav class="wrap cats" aria-label="@Site.Strings.Ka("home.categories")">
+            @foreach (var cat in Site.Data.Categories)
+            {
+                var href = $"/c/{cat}/";
+                <a href="@href" aria-current="@(Path == href ? "page" : null)"><T K="@($"cat.{cat}")" /></a>
+            }
+        </nav>
+    </header>
+    <main id="main" class="wrap">
+        @ChildContent
+    </main>
+    <footer class="site-footer">
+        <div class="wrap">
+            <p>
+                <T K="footer.updated" Args="@([Format.Date(Site.Data.GeneratedAt)])" /> ·
+                <T K="footer.privacy" />
+            </p>
+            <p>
+                <a href="@Site.Data.RepoUrl"><T K="footer.source" /></a> ·
+                <a href="/about/#removal"><T K="footer.removal" /></a> ·
+                <a href="/roundups/feed.xml">RSS</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>
+
+@code {
+    [Parameter, EditorRequired] public string Path { get; set; } = "/";
+    // Title: a UI string key (translated), or literal text such as a roundup title.
+    [Parameter] public string? TitleKey { get; set; }
+    [Parameter] public object?[] TitleArgs { get; set; } = [];
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string OgType { get; set; } = "website";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    static readonly (string Href, string Key)[] Nav =
+    [
+        ("/projects/", "nav.projects"),
+        ("/help-wanted/", "nav.helpWanted"),
+        ("/roundups/", "nav.roundups"),
+        ("/about/", "nav.about"),
+    ];
+
+    bool IsHome => Path == "/";
+    string? TitleSuffix => IsHome ? null : " · git.ge";
+    string? TitleArgsJson => TitleArgs.Length == 0 ? null : System.Text.Json.JsonSerializer.Serialize(TitleArgs);
+
+    string PageTitle
+    {
+        get
+        {
+            var text = Title ?? (TitleKey is null ? "" : Site.Strings.Ka(TitleKey, TitleArgs));
+            return IsHome ? $"git.ge · {text}" : $"{text} · git.ge";
+        }
+    }
+
+    string MetaDescription => Description ?? Site.Strings.Ka("site.description");
+}
