@@ -111,8 +111,16 @@ projects hosted elsewhere. Only the fields being set need to be present.
 
 ```json
 { "fullName": "owner/repo", "descriptionKa": "…", "category": "tools", "featured": false, "verified": true }
-{ "url": "https://gitlab.com/x/y", "name": "y", "description": "…", "category": "libraries" }
+{ "url": "https://gitlab.com/x/y", "owner": "x", "name": "y", "description": "…", "category": "libraries", "issue": 42 }
 ```
+
+- `owner` (non-GitHub only) is the account name when the URL makes it clear
+  (GitLab, Codeberg, Bitbucket, Gitea, sourcehut); opt-outs and the maintainer
+  rule match against it.
+- `issue` is the submission issue the entry came from, when added by
+  `gitge.cs submit`; it makes re-running the same issue a no-op.
+- Fields that aren't set are left out of the file rather than written as `null`.
+  The file stays one record per line, sorted by `fullName`/`url`.
 
 The generator merges the two: manual fields win; `hidden` comes from
 `optout.json`; `category` is manual if set, otherwise inferred from

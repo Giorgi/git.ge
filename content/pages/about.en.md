@@ -37,16 +37,18 @@ listings and sorts like everyone else's. This rule is enforced in the site's cod
 
 ## Removal {#removal}
 
-Don't want to be listed? Open an issue in [the repository]({{repoUrl}}), or send a
-pull request that adds your GitHub login (or `owner/repo` for a single project) to
-`data/optout.json`. Removal takes effect with the next nightly update and applies
-everywhere, including the site's data files.
+Don't want to be listed? Fill in the [removal form]({{repoUrl}}/issues/new?template=remove.yml)
+with your GitHub login (for your whole account) or `owner/repo` (for a single
+project). You can also send a pull request that adds it to `data/optout.json`.
+Once the request is accepted, removal takes effect with the next nightly update
+and applies everywhere, including the site's data files.
 
 ## Suggesting a project {#submit}
 
-Projects are found automatically, but you can also suggest one through
-[the repository]({{repoUrl}}), for example if you don't set a location on GitHub or
-the project isn't hosted on GitHub.
+Projects are found automatically, but you can also
+[suggest one]({{repoUrl}}/issues/new?template=submit-project.yml), for example if
+you don't set a location on GitHub or the project isn't hosted on GitHub. Every
+suggestion is reviewed by hand before it's added.
 
 ## Privacy {#privacy}
 

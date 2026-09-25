@@ -46,6 +46,37 @@ Anyone can ask to be removed by opening an issue or a PR that adds their login (
 `owner/repo`) to [`data/optout.json`](data/optout.json). Opt-out beats everything
 else. The next refresh drops the entries from the data and from the site.
 
+## Submissions and removals
+
+Two issue forms live in [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/):
+**Suggest a project** (label `submission`) and **Request removal** (label
+`removal`). Nothing is added or removed without the maintainer's review:
+
+1. Someone fills in a form. GitHub opens an issue with the `submission` or
+   `removal` label.
+2. The maintainer reads it and, if it's fine, adds the label `accepted`.
+3. A workflow runs `dotnet run gitge.cs -- submit --issue <n>`:
+   - A submission is added to `data/manual/projects.json`. GitHub URLs are
+     normalised to `owner/repo` and checked: the repo must exist, be public, not be
+     a fork and have a description. Duplicates and opted-out or excluded owners
+     are rejected.
+   - A removal adds the login or `owner/repo` to `data/optout.json`.
+4. If it succeeds (exit 0), the workflow opens a pull request that closes the
+   issue. If it's rejected (exit 3), the workflow posts the bilingual explanation
+   as a comment on the issue instead.
+5. The maintainer merges the pull request.
+
+Each added entry records the issue it came from (`"issue": 42`), so running the
+same issue twice changes nothing. To try it locally without GitHub:
+
+```sh
+dotnet run gitge.cs -- submit --body-file tests/fixtures/issues/submit-github.md --type submission --offline
+```
+
+(This edits `data/manual/projects.json`; revert it afterwards.) If you rename a
+field label in a form, update `SubmissionForm`/`RemovalForm` in `gitge.cs`: they
+match headings by the English part of the label.
+
 ## Running the fetcher locally
 
 Requirements: .NET 10 SDK. For a token, either set `GH_TOKEN`, or be logged in
