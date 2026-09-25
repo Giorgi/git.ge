@@ -1,0 +1,97 @@
+# Weekly: full discovery of developers by location, then a refresh that
+# fetches only the repos discovery just added.
+#
+# A full run takes about 35 minutes with a personal token, and several hours
+# with the default GITHUB_TOKEN (~1,000 requests/hour). Discovery saves a
+# checkpoint to data/bot/state/discovery.json about once a minute. If a run
+# stops early (step timeout, cancellation, error), the checkpoint is still
+# committed, and the daily resume check below continues it the next day.
+
+name: Discover
+
+on:
+  schedule:
+    # Mondays 03:23 UTC: start a new weekly discovery.
+    - cron: "23 3 * * 1"
+    # Daily 04:41 UTC: resume an unfinished discovery, if a checkpoint exists.
+    - cron: "41 4 * * *"
+    # GitHub may start scheduled runs late; nothing depends on exact timing.
+  workflow_dispatch:
+    inputs:
+      restart:
+        description: Discard an unfinished run's checkpoint and start over
+        type: boolean
+        default: false
+
+# Shared with nightly.yml: only one workflow writes the `data` branch at a time.
+concurrency:
+  group: data-branch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write   # push to the `data` branch
+    env:
+      GH_TOKEN: ${{ secrets.GITGE_TOKEN || github.token }}
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out bot data
+        id: data
+        uses: actions/checkout@v7
+        with:
+          ref: data
+          path: data/bot
+
+      - name: Decide whether to run
+        id: gate
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ "$EVENT" = "schedule" ] && [ "$SCHEDULE" = "41 4 * * *" ] && [ ! -f data/bot/state/discovery.json ]; then
+            echo "No unfinished discovery to resume."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-dotnet@v6
+        if: steps.gate.outputs.run == 'true'
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Discover developers and repos
+        if: steps.gate.outputs.run == 'true'
+        # A step timeout (not only the job timeout) so the commit step below
+        # still gets to run and save the checkpoint.
+        timeout-minutes: 320
+        env:
+          RESTART: ${{ inputs.restart && '--restart' || '' }}
+        run: dotnet run gitge.cs -- discover $RESTART
+
+      - name: Refresh newly discovered repos
+        if: steps.gate.outputs.run == 'true'
+        # Repos already refreshed today are skipped, so this only fetches new ones.
+        timeout-minutes: 60
+        run: dotnet run gitge.cs -- refresh
+
+      - name: Commit bot data
+        # always(): an unfinished run's checkpoint must be saved for the resume.
+        if: always() && steps.data.outcome == 'success' && steps.gate.outputs.run == 'true'
+        working-directory: data/bot
+        run: |
+          if [ -f state/discovery.json ]; then
+            message="Discovery checkpoint $(date -u +%F)"
+          else
+            message="Weekly discovery $(date -u +%F)"
+          fi
+          bash ../../.github/scripts/commit-data.sh "$message"

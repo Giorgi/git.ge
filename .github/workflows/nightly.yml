@@ -1,0 +1,86 @@
+# Nightly: refresh every known repo, write today's star snapshot, roll up old
+# snapshots, prepare the site data, commit the bot data to the `data` branch,
+# then build and deploy the site.
+#
+# Commits pushed with GITHUB_TOKEN don't trigger other workflows, so this
+# workflow calls deploy.yml directly instead of relying on a push trigger.
+
+name: Nightly
+
+on:
+  schedule:
+    # 02:17 UTC. GitHub may start scheduled runs late under load; nothing here
+    # depends on exact timing (the snapshot is dated by the UTC day it runs).
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+# Shared with discover.yml: only one workflow writes the `data` branch at a time.
+concurrency:
+  group: data-branch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write   # push to the `data` branch
+    env:
+      # A fine-grained token raises the API budget from ~1,000 to ~5,000
+      # requests/hour; the default token works, just with less headroom.
+      GH_TOKEN: ${{ secrets.GITGE_TOKEN || github.token }}
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out bot data
+        id: data
+        uses: actions/checkout@v7
+        with:
+          ref: data
+          path: data/bot
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Refresh repos and write today's snapshot
+        # Resumable: a rerun the same day skips repos already refreshed.
+        timeout-minutes: 90
+        run: dotnet run gitge.cs -- refresh
+
+      - name: Roll up old snapshots
+        run: dotnet run gitge.cs -- prune
+
+      - name: Prepare site data
+        run: dotnet run gitge.cs -- prepare
+
+      - name: Commit bot data
+        # always(): keep a partial refresh's progress and the Spotlight history
+        # even if a later step failed.
+        if: always() && steps.data.outcome == 'success'
+        working-directory: data/bot
+        run: bash ../../.github/scripts/commit-data.sh "Nightly refresh $(date -u +%F)"
+
+      - name: Build site
+        run: dotnet run --project site
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: _site
+          include-hidden-files: true   # _headers
+          retention-days: 7
+
+  deploy:
+    needs: update
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      artifact: site
+    secrets: inherit

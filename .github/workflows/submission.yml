@@ -1,0 +1,96 @@
+# Turn an accepted submission or removal issue into a pull request.
+#
+# Flow: someone opens an issue with the submission or removal form (labelled
+# `submission` / `removal`); the maintainer reviews it and adds `accepted`;
+# this workflow runs `gitge.cs submit`, which validates the issue and edits
+# data/manual/projects.json or data/optout.json. The change is proposed as a
+# PR that closes the issue, so nothing reaches the site without a merge.
+#
+# Requires the repository setting "Allow GitHub Actions to create and approve
+# pull requests" (Settings → Actions → General → Workflow permissions).
+#
+# Issue text is untrusted: it is only ever read by gitge.cs, never interpolated
+# into a shell command here. Only the issue number is passed along.
+
+name: Submission
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    if: >-
+      github.event.label.name == 'accepted' &&
+      (contains(github.event.issue.labels.*.name, 'submission') ||
+       contains(github.event.issue.labels.*.name, 'removal'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write        # push the submission/<n> branch
+      pull-requests: write   # open the PR
+      issues: write          # comment on rejected issues, remove the label
+    concurrency:
+      group: submission-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      BRANCH: submission/${{ github.event.issue.number }}
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Validate and apply the issue
+        id: submit
+        env:
+          GH_TOKEN: ${{ secrets.GITGE_TOKEN || github.token }}
+        run: |
+          set +e
+          dotnet run gitge.cs -- submit --issue "$ISSUE" > "$RUNNER_TEMP/submit.md"
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/submit.md"
+          # 0 = applied, 3 = rejected (explained in the output); anything else is a bug.
+          if [ "$code" -ne 0 ] && [ "$code" -ne 3 ]; then
+            echo "::error::gitge.cs submit failed with exit code $code"
+            exit 1
+          fi
+
+      - name: Open a pull request
+        if: steps.submit.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then
+            gh issue comment "$ISSUE" --body "Nothing to change: the data already contains this. / ცვლილება საჭირო არ არის: მონაცემები უკვე შეიცავს ამას."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add data/manual/projects.json data/optout.json
+          git commit -q -m "Apply #$ISSUE"
+          # Force: re-accepting an issue replaces the earlier proposal.
+          git push -q --force origin "$BRANCH"
+          if gh pr view "$BRANCH" --json state --jq .state 2>/dev/null | grep -q OPEN; then
+            gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/submit.md"
+          else
+            gh pr create --base main --head "$BRANCH" --title "Apply #$ISSUE" --body-file "$RUNNER_TEMP/submit.md"
+          fi
+
+      - name: Explain the rejection on the issue
+        if: steps.submit.outputs.code == '3'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/submit.md"
+          gh issue edit "$ISSUE" --remove-label accepted

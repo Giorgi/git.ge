@@ -1,0 +1,54 @@
+# Checks for every push to main and every pull request: the self-test, the
+# site project build, and a full site build from the current `data` branch, so
+# a change that breaks rendering fails here instead of in the nightly run.
+# Needs no token or secrets, so it also runs for pull requests from forks.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out bot data
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository }}
+          ref: data
+          path: data/bot
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Self-test (trending, pruning, Spotlight)
+        run: dotnet run gitge.cs -- selftest
+
+      - name: Build the site project
+        run: dotnet build site
+
+      - name: Build the site from current data
+        run: |
+          dotnet run gitge.cs -- prepare
+          dotnet run --project site --no-build
+          for page in index.html 404.html index.json sitemap.xml robots.txt projects/index.html help-wanted/index.html about/index.html roundups/feed.xml; do
+            test -s "_site/$page" || { echo "::error::_site/$page is missing or empty"; exit 1; }
+          done
+          echo "Built $(find _site -name '*.html' | wc -l) pages."
