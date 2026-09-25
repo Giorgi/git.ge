@@ -136,7 +136,7 @@ GitHub Actions runs everything; the workflows are in `.github/workflows/`.
 |---|---|---|
 | `nightly.yml` | daily, 02:17 UTC | `refresh` → `prune` → `prepare`, commits bot data to the `data` branch, builds the site, deploys it |
 | `discover.yml` | Mondays 03:23 UTC; daily 04:41 UTC only to resume | full `discover`, then `refresh` for the new repos, commits bot data |
-| `deploy.yml` | called by `nightly.yml`; or run by hand | publishes `_site/` to Cloudflare Pages. The only file that knows the host |
+| `deploy.yml` | called by `nightly.yml`; or run by hand | publishes `_site/` to Cloudflare Workers (static assets). The only file that knows the host |
 | `submission.yml` | an issue labelled `submission` or `removal` gets the `accepted` label | runs `gitge.cs submit` and opens a PR, or comments why the issue was rejected |
 | `ci.yml` | pushes to `main`, pull requests | `selftest`, builds the site project, builds the whole site from the `data` branch |
 
@@ -159,8 +159,8 @@ Secrets (Settings → Secrets and variables → Actions):
 
 Variables:
 
-- `CF_PAGES_PROJECT` (optional): the Cloudflare Pages project name, default
-  `git-ge`.
+- `CF_WORKER_NAME` (optional): the Cloudflare Worker's name, default `git-ge`.
+  The Worker is created on the first deploy.
 
 Repository settings:
 

@@ -1,7 +1,12 @@
 # Deploy the built site. This is the only file that knows about the host.
 #
-# Currently Cloudflare Pages via Wrangler. To switch to Netlify, replace the
-# "Deploy" step with the Netlify CLI, e.g.
+# Currently Cloudflare Workers static assets (a Worker with no script, only
+# the files in _site/), deployed with Wrangler. Not Cloudflare Pages, which
+# Cloudflare now calls legacy. The Worker is created on first deploy; attach
+# the custom domain in the dashboard (Worker > Settings > Domains & Routes).
+#
+# To switch to Netlify, replace the "Write Wrangler config" and "Deploy" steps
+# with the Netlify CLI, e.g.
 #   npx netlify-cli deploy --prod --dir=_site --site=$NETLIFY_SITE_ID
 # with NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID secrets. Netlify reads the same
 # _headers file format, so nothing else changes.
@@ -85,10 +90,31 @@ jobs:
           name: ${{ inputs.artifact || 'site' }}
           path: _site
 
-      - name: Deploy to Cloudflare Pages
+      - name: Write Wrangler config
+        # Kept here rather than in a repo file, so this workflow stays the only
+        # place that knows about the host. _headers in _site is applied natively;
+        # unknown URLs get _site/404.html with a 404 status.
+        if: steps.cf.outputs.configured == 'true'
+        env:
+          WORKER_NAME: ${{ vars.CF_WORKER_NAME || 'git-ge' }}
+        run: |
+          cat > wrangler.jsonc <<EOF
+          {
+            "name": "$WORKER_NAME",
+            "compatibility_date": "2026-09-25",
+            "assets": {
+              "directory": "./_site",
+              "not_found_handling": "404-page",
+              "html_handling": "auto-trailing-slash"
+            }
+          }
+          EOF
+          cat wrangler.jsonc
+
+      - name: Deploy to Cloudflare Workers
         if: steps.cf.outputs.configured == 'true'
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy _site --project-name=${{ vars.CF_PAGES_PROJECT || 'git-ge' }} --branch=main
+          command: deploy
