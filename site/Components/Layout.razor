@@ -36,13 +36,16 @@
             </nav>
             <button class="lang" type="button" hidden data-i18n-title="lang.switchTitle" title="@Site.Strings.Ka("lang.switchTitle")"><T K="lang.switch" /></button>
         </div>
-        <nav class="wrap cats" aria-label="@Site.Strings.Ka("home.categories")">
-            @foreach (var cat in Site.Data.Categories)
-            {
-                var href = $"/c/{cat}/";
-                <a href="@href" aria-current="@(Path == href ? "page" : null)"><T K="@($"cat.{cat}")" /></a>
-            }
-        </nav>
+        <div class="cats-bar">
+            <nav class="wrap cats" aria-labelledby="cats-label">
+                <span class="cats-label" id="cats-label"><T K="home.categories" /></span>
+                @foreach (var cat in Site.Data.Categories)
+                {
+                    var href = $"/c/{cat}/";
+                    <a href="@href" aria-current="@(Path == href ? "page" : null)"><T K="@($"cat.{cat}")" /> <span class="n">@CategoryCounts.GetValueOrDefault(cat)</span></a>
+                }
+            </nav>
+        </div>
     </header>
     <main id="main" class="wrap">
         @ChildContent
@@ -80,6 +83,10 @@
         ("/roundups/", "nav.roundups"),
         ("/about/", "nav.about"),
     ];
+
+    static Dictionary<string, int>? categoryCounts;
+    static Dictionary<string, int> CategoryCounts =>
+        categoryCounts ??= Site.Listed.GroupBy(p => p.Category).ToDictionary(g => g.Key, g => g.Count());
 
     bool IsHome => Path == "/";
     string? TitleSuffix => IsHome ? null : " · git.ge";

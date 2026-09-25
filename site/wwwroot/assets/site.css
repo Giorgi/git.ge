@@ -75,13 +75,25 @@ h2 { font-size: 1.15rem; }
 .logo span { color: var(--accent); }
 .logo:hover { text-decoration: none; }
 .nav { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .95rem; }
-.nav a, .cats a { color: var(--fg); }
-.nav a[aria-current], .cats a[aria-current] { color: var(--accent); font-weight: 600; }
+.nav a { color: var(--fg); }
+.nav a[aria-current] { color: var(--accent); font-weight: 600; }
 .lang {
   margin-left: auto; font: inherit; font-size: .85rem; color: var(--fg); background: none;
   border: 1px solid var(--line); border-radius: 4px; padding: .15rem .6rem; cursor: pointer;
 }
-.cats { display: flex; gap: .9rem; flex-wrap: wrap; font-size: .9rem; padding-bottom: .55rem; }
+/* Category bar: its own strip, a label, and chips with counts, so it doesn't read
+   as a second row of the main menu. */
+.cats-bar { border-top: 1px solid var(--line); background: var(--bg); }
+.cats { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .4rem; font-size: .85rem; padding-top: .45rem; padding-bottom: .45rem; }
+.cats-label { color: var(--muted); margin-right: .3rem; }
+.cats a {
+  color: var(--fg); background: var(--soft); border: 1px solid var(--line);
+  border-radius: 999px; padding: .08rem .6rem; white-space: nowrap;
+}
+.cats a:hover { border-color: var(--muted); text-decoration: none; }
+.cats a[aria-current] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.cats .n { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.cats a[aria-current] .n { color: inherit; opacity: .7; }
 
 /* Footer */
 .site-footer { border-top: 1px solid var(--line); margin-top: 3rem; padding: 1rem 0 2rem; color: var(--muted); font-size: .85rem; }
@@ -159,6 +171,10 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
 
 @media (max-width: 36rem) {
   body { font-size: 15px; }
+  /* One swipeable row of categories instead of four wrapped lines. */
+  .cats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .cats::-webkit-scrollbar { display: none; }
+  .cats-label { flex: none; }
   h1 { font-size: 1.35rem; }
   .bar { gap: .4rem 1rem; }
 }
