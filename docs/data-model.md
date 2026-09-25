@@ -83,6 +83,7 @@ GitHub fields only. `null` means "unknown / not fetched", never a guess.
   "topics": ["dotnet", "cli"],
   "isFork": false,
   "isArchived": false,
+  "templateFrom": null,
   "pushedAt": "2026-09-20T10:00:00+00:00",
   "createdAt": "2024-01-05T08:00:00+00:00",
   "source": "discovered",
@@ -93,6 +94,8 @@ GitHub fields only. `null` means "unknown / not fetched", never a guess.
 
 - `key` uses GitHub's numeric repo id, so renames and transfers keep their history.
 - `openIssues` counts issues only (not pull requests).
+- `templateFrom` is the template repo this one was generated from (GitHub Skills
+  exercises, course starters), or `null`.
 - `helpWantedIssues` = open issues carrying any label in
   `config/discovery.json` → `helpWantedLabels`.
 - `source` is `"discovered"` (found via location search / include list) or
@@ -147,7 +150,25 @@ run on the same UTC day overwrites).
 
 ## Quality bar (auto-discovered repos only)
 
-Defaults, configurable in `config/discovery.json`: not a fork, not archived, has
-a description, and (≥ 3 stars **or** pushed within the last 12 months). Submitted
-projects bypass the bar. A repo that later drops below the bar stays in the data
-file and is filtered at site-generation time, so the list doesn't flicker.
+Configurable in `config/discovery.json` → `qualityBar`. A repo is admitted when
+it is not a fork, not archived, not generated from a template, has a
+description, does not match any of `excludePatterns` (case-insensitive regexes
+over name and description, aimed at homework, course exercises and test
+assignments), and has (≥ 3 stars **or** a push within the last 12 months).
+Submitted projects bypass the bar. A repo that later drops below the bar stays in
+the data file and is filtered at site-generation time, so the list doesn't
+flicker.
+
+## What is shown where
+
+- **Category listings and the all-time sort** only show repos with at least
+  `listingMinStars` stars (`config/site.json`, default 10).
+- Admitted repos below that threshold appear only in **"Recently active" / "New
+  this month"** and in search.
+
+## Curation
+
+`dotnet run gitge.cs -- review > review.md` writes a Markdown table of the
+developers who have at least one listed repo, ranked by total stars. That is the
+set visitors actually see, so it's the list worth reviewing by hand. Unwanted
+accounts go into `exclude` in `data/manual/developers.json`.

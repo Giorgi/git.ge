@@ -5,16 +5,17 @@
 // git.ge tooling. Run from the repository root:
 //   dotnet run gitge.cs -- discover [--only <term>] [--max-users <n>]
 //   dotnet run gitge.cs -- refresh
+//   dotnet run gitge.cs -- review [--top <n>] > review.md
 // See docs/data-model.md for the files these commands read and write.
 
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 var command = args.FirstOrDefault();
 var paths = new Paths(Directory.GetCurrentDirectory());
@@ -38,10 +39,14 @@ try
             using (var github = new GitHub(GitHub.ResolveToken()))
                 await Refresh.Run(github, paths);
             return 0;
+        case "review":
+            Review.Run(paths, options);
+            return 0;
         default:
-            Console.Error.WriteLine("usage: dotnet run gitge.cs -- <discover|refresh> [options]");
+            Console.Error.WriteLine("usage: dotnet run gitge.cs -- <discover|refresh|review> [options]");
             Console.Error.WriteLine("  discover [--only <location term>] [--max-users <n>]");
             Console.Error.WriteLine("  refresh");
+            Console.Error.WriteLine("  review [--top <n>]   Markdown list of the most visible developers, for curation");
             return 2;
     }
 }
@@ -112,7 +117,7 @@ static class Discovery
             {
                 var admitted = owner.Repos
                     .Where(r => !blockedProjects.Contains(r.FullName))
-                    .Where(r => config.QualityBar.Passes(r.IsFork, r.IsArchived, r.Description, r.Stars, r.PushedAt, DateTimeOffset.UtcNow))
+                    .Where(r => config.QualityBar.Passes(r.FullName, r.Description, r.IsFork, r.IsArchived, r.TemplateFrom, r.Stars, r.PushedAt, DateTimeOffset.UtcNow))
                     .ToList();
                 if (admitted.Count == 0) continue;
 
@@ -246,7 +251,8 @@ static class Discovery
         repositories(first: 100, after: $AFTER, privacy: PUBLIC, ownerAffiliations: [OWNER], isFork: false,
                      orderBy: { field: PUSHED_AT, direction: DESC }) {
           pageInfo { hasNextPage endCursor }
-          nodes { id databaseId nameWithOwner url description stargazerCount isFork isArchived pushedAt }
+          nodes { id databaseId nameWithOwner url description stargazerCount isFork isArchived pushedAt
+                  templateRepository { nameWithOwner } }
         }
         """;
 
@@ -388,6 +394,7 @@ static class Refresh
               id databaseId nameWithOwner url description
               owner { __typename login }
               stargazerCount forkCount isFork isArchived pushedAt createdAt
+              templateRepository { nameWithOwner }
               primaryLanguage { name }
               repositoryTopics(first: 20) { nodes { topic { name } } }
               openIssues: issues(states: OPEN) { totalCount }
@@ -416,8 +423,64 @@ static class Refresh
 }
 
 // ---------------------------------------------------------------------------
+// Review: the developers visitors will actually see, ranked by the stars of
+// their listed repos, so curation effort goes where it matters. Output is
+// Markdown on stdout; add unwanted logins to data/manual/developers.json.
+// ---------------------------------------------------------------------------
+
+static class Review
+{
+    public static void Run(Paths paths, Options options)
+    {
+        var config = Store.Read<DiscoveryConfig>(paths.DiscoveryConfig);
+        var site = Store.Read<SiteConfig>(paths.SiteConfig);
+        var developers = Store.ReadList<Developer>(paths.Developers).ToDictionary(d => d.Login, StringComparer.OrdinalIgnoreCase);
+        var now = DateTimeOffset.UtcNow;
+
+        var listed = Store.ReadList<Project>(paths.Projects)
+            .Where(p => p.Stars >= site.ListingMinStars)
+            .Where(p => config.QualityBar.Passes(p.FullName, p.Description, p.IsFork, p.IsArchived, p.TemplateFrom, p.Stars, p.PushedAt, now))
+            .GroupBy(p => p.Owner, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (Owner: g.Key, Stars: g.Sum(p => p.Stars), Repos: g.OrderByDescending(p => p.Stars).ToList()))
+            .OrderByDescending(x => x.Stars)
+            .ToList();
+
+        var top = options.Top ?? 200;
+        var output = new StringBuilder();
+        output.AppendLine($"# Developer review — top {Math.Min(top, listed.Count)} of {listed.Count}");
+        output.AppendLine();
+        output.AppendLine($"Developers with at least one listed repo (≥ {site.ListingMinStars} stars, passing the quality bar), ranked by total stars of those repos.");
+        output.AppendLine("To remove someone, add their login to `exclude` in `data/manual/developers.json`.");
+        output.AppendLine();
+        output.AppendLine("| # | Login | Name | Location | Found by | ★ | Top repos |");
+        output.AppendLine("|---|---|---|---|---|---|---|");
+        var rank = 0;
+        foreach (var (owner, stars, repos) in listed.Take(top))
+        {
+            developers.TryGetValue(owner, out var d);
+            var topRepos = string.Join(", ", repos.Take(3).Select(r => $"[{r.FullName.Split('/')[1]}]({r.HtmlUrl}) {r.Stars}"));
+            output.AppendLine($"| {++rank} | [{owner}](https://github.com/{owner}) | {Cell(d?.Name)} | {Cell(d?.Location)} | {Cell(d?.Source)} | {stars} | {topRepos} |");
+        }
+        Console.OutputEncoding = new UTF8Encoding(false);
+        Console.Write(output.ToString());
+    }
+
+    static string Cell(string? s) => s is null ? "" : s.Replace("|", "\\|").Replace("\n", " ");
+}
+
+// ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
+
+sealed class SiteConfig
+{
+    public string SiteUrl { get; set; } = "";
+    public string MaintainerLogin { get; set; } = "";
+    public int TrendWindowDays { get; set; } = 30;
+    public int TrendToleranceDays { get; set; } = 7;
+    // Repos below this appear only in "Recently active" and search, not in listings.
+    public int ListingMinStars { get; set; } = 10;
+}
 
 sealed class DiscoveryConfig
 {
@@ -432,16 +495,31 @@ sealed class QualityBar
 {
     public bool AllowForks { get; set; }
     public bool AllowArchived { get; set; }
+    public bool AllowTemplateGenerated { get; set; }
     public bool RequireDescription { get; set; } = true;
     public int MinStars { get; set; } = 3;
     public int ActiveWithinMonths { get; set; } = 12;
+    // Case-insensitive regexes matched against the repo name and description,
+    // to drop course exercises and test assignments.
+    public List<string> ExcludePatterns { get; set; } = [];
 
-    public bool Passes(bool isFork, bool isArchived, string? description, int stars, DateTimeOffset? pushedAt, DateTimeOffset now)
+    Regex[]? excludeRegexes;
+
+    public bool Passes(string fullName, string? description, bool isFork, bool isArchived, string? templateFrom,
+                       int stars, DateTimeOffset? pushedAt, DateTimeOffset now)
     {
         if (isFork && !AllowForks) return false;
         if (isArchived && !AllowArchived) return false;
+        if (templateFrom is not null && !AllowTemplateGenerated) return false;
         if (RequireDescription && string.IsNullOrWhiteSpace(description)) return false;
+        if (IsExercise(fullName.Split('/').Last(), description)) return false;
         return stars >= MinStars || (pushedAt is { } p && p >= now.AddMonths(-ActiveWithinMonths));
+    }
+
+    bool IsExercise(string name, string? description)
+    {
+        excludeRegexes ??= ExcludePatterns.Select(p => new Regex(p, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)).ToArray();
+        return excludeRegexes.Any(r => r.IsMatch(name) || (description is not null && r.IsMatch(description)));
     }
 }
 
@@ -500,6 +578,7 @@ sealed class Project
     public List<string>? Topics { get; set; }
     public bool IsFork { get; set; }
     public bool IsArchived { get; set; }
+    public string? TemplateFrom { get; set; }
     public DateTimeOffset? PushedAt { get; set; }
     public DateTimeOffset? CreatedAt { get; set; }
     public string Source { get; set; } = "";
@@ -520,6 +599,7 @@ sealed class Project
         Stars = repo.Stars;
         IsFork = repo.IsFork;
         IsArchived = repo.IsArchived;
+        TemplateFrom = repo.TemplateFrom;
         PushedAt = repo.PushedAt;
     }
 
@@ -540,6 +620,7 @@ sealed class Project
         Topics = repo["repositoryTopics"]!["nodes"]!.AsArray().Select(t => t!["topic"]!["name"]!.GetValue<string>()).ToList();
         IsFork = repo["isFork"]!.GetValue<bool>();
         IsArchived = repo["isArchived"]!.GetValue<bool>();
+        TemplateFrom = repo["templateRepository"]?["nameWithOwner"]?.GetValue<string>();
         PushedAt = Json.Date(repo["pushedAt"]);
         CreatedAt = Json.Date(repo["createdAt"]);
         RefreshedAt = today;
@@ -570,7 +651,7 @@ sealed class Owner
 }
 
 sealed record RepoSummary(long Id, string NodeId, string FullName, string HtmlUrl, string? Description,
-                          int Stars, bool IsFork, bool IsArchived, DateTimeOffset? PushedAt)
+                          int Stars, bool IsFork, bool IsArchived, string? TemplateFrom, DateTimeOffset? PushedAt)
 {
     public static RepoSummary From(JsonNode n) => new(
         n["databaseId"]!.GetValue<long>(),
@@ -581,6 +662,7 @@ sealed record RepoSummary(long Id, string NodeId, string FullName, string HtmlUr
         n["stargazerCount"]!.GetValue<int>(),
         n["isFork"]!.GetValue<bool>(),
         n["isArchived"]!.GetValue<bool>(),
+        n["templateRepository"]?["nameWithOwner"]?.GetValue<string>(),
         Json.Date(n["pushedAt"]));
 }
 
@@ -591,6 +673,7 @@ sealed record RepoSummary(long Id, string NodeId, string FullName, string HtmlUr
 sealed class Paths(string root)
 {
     public string DiscoveryConfig => Path.Combine(root, "config", "discovery.json");
+    public string SiteConfig => Path.Combine(root, "config", "site.json");
     public string ManualDevelopers => Path.Combine(root, "data", "manual", "developers.json");
     public string ManualProjects => Path.Combine(root, "data", "manual", "projects.json");
     public string OptOut => Path.Combine(root, "data", "optout.json");
@@ -764,6 +847,7 @@ sealed class Options
 {
     public string? Only { get; private set; }
     public int? MaxUsers { get; private set; }
+    public int? Top { get; private set; }
 
     public static Options Parse(string[] args)
     {
@@ -774,6 +858,7 @@ sealed class Options
             {
                 case "--only": options.Only = args[++i]; break;
                 case "--max-users": options.MaxUsers = int.Parse(args[++i]); break;
+                case "--top": options.Top = int.Parse(args[++i]); break;
                 default: throw new ArgumentException($"Unknown option '{args[i]}'");
             }
         }
