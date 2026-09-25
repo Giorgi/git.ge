@@ -735,6 +735,8 @@ static class SelfTest
     {
         var d = Dates.Parse;
 
+        SpotlightRules();
+
         Log.Info("Baseline selection (latest 2026-06-30, window 30 ± 7 days, target 2026-05-31)");
         var current = d("2026-06-30");
         Check(Trending.PickBaseline(current, [d("2026-06-01"), d("2026-05-25")], 30, 7) == d("2026-06-01"), "picks the snapshot closest to 30 days back");
@@ -782,6 +784,44 @@ static class SelfTest
         return failures == 0 ? 0 : 1;
     }
 
+    static void SpotlightRules()
+    {
+        Log.Info("Spotlight rules");
+        var week1 = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);   // Wednesday of 2026-W23
+        SiteProject Make(string key, string owner, bool maintainer = false, bool featured = false) => new()
+        {
+            Key = key, Name = key, Owner = owner, Stars = 100, PushedAt = week1, Listed = true,
+            Maintainer = maintainer, Featured = featured,
+        };
+        var projects = new List<SiteProject>
+        {
+            Make("a1", "alice"), Make("a2", "alice"), Make("a3", "alice"),
+            Make("b1", "bob"), Make("c1", "carol"), Make("d1", "dan"), Make("e1", "erin"),
+            Make("f1", "fay"), Make("g1", "gus"),
+            Make("m1", "maintainer", maintainer: true, featured: true),
+        };
+        var history = new List<SpotlightWeek>();
+
+        var first = Prepare.PickSpotlight(projects, week1, history).Select(p => p.Key).ToList();
+        Check(first.Count == 3, $"three picks (got {string.Join(", ", first)})");
+        Check(!first.Contains("m1"), "the maintainer's project is never picked, even when featured");
+        Check(first.Select(k => projects.First(p => p.Key == k).Owner).Distinct().Count() == 3, "at most one pick per owner");
+        Check(Prepare.PickSpotlight(projects, week1.AddDays(2), history).Select(p => p.Key).SequenceEqual(first), "picks stay the same for the rest of the week");
+
+        var seen = new HashSet<string>(first);
+        var repeated = false;
+        for (var w = 1; w <= 2; w++)
+        {
+            var picks = Prepare.PickSpotlight(projects, week1.AddDays(7 * w), history).Select(p => p.Key).ToList();
+            repeated |= picks.Any(seen.Contains);
+            seen.UnionWith(picks);
+        }
+        Check(!repeated, "no project returns within the cooldown (weeks 2 and 3)");
+
+        var later = Prepare.PickSpotlight(projects, week1.AddDays(7 * 9), history).Select(p => p.Key).ToList();
+        Check(later.Count == 3, "after 8 weeks, earlier picks are eligible again");
+    }
+
     static string? RolledUpFrom(SnapshotStore store, string month)
     {
         var path = Path.Combine(store.Monthly, $"{month}.json");
@@ -817,6 +857,8 @@ static class Prepare
     const int SectionSize = 12;
     const int SpotlightSize = 3;
     const int SpotlightMinStars = 20;
+    const int SpotlightCooldownWeeks = 8;
+    const int SpotlightHistoryWeeks = 52;
 
     public static void Run(Paths paths)
     {
@@ -913,6 +955,7 @@ static class Prepare
             .ToList();
         var publishedKeys = published.Select(p => p.Key).ToHashSet();
 
+        var spotlightHistory = Store.ReadList<SpotlightWeek>(paths.SpotlightHistory);
         var data = new SiteData
         {
             GeneratedAt = now,
@@ -931,10 +974,11 @@ static class Prepare
             Projects = published,
             NewThisMonth = newThisMonth.Select(p => p.Key).ToList(),
             RecentlyActive = recentlyActive.Select(p => p.Key).ToList(),
-            Spotlight = PickSpotlight(published, now).Select(p => p.Key).ToList(),
+            Spotlight = PickSpotlight(published, now, spotlightHistory).Select(p => p.Key).ToList(),
             Issues = Store.ReadList<HelpWantedIssue>(paths.Issues).Where(i => publishedKeys.Contains(i.Project)).ToList(),
         };
 
+        Store.WriteList(paths.SpotlightHistory, spotlightHistory.OrderBy(h => h.Week));
         Directory.CreateDirectory(Path.GetDirectoryName(paths.SiteData)!);
         File.WriteAllText(paths.SiteData, JsonSerializer.Serialize(data, Json.Options), new UTF8Encoding(false));
         Log.Info($"Prepared {published.Count} projects ({published.Count(p => p.Listed)} listed, {data.Developers} developers), " +
@@ -942,20 +986,55 @@ static class Prepare
     }
 
     // Spotlight = manually featured projects, topped up with a weekly rotation of
-    // active, well-starred ones. The site maintainer's own projects are never
-    // picked, even if marked featured, so the person running the site can't
-    // promote their own work. They still appear in every normal listing.
-    static List<SiteProject> PickSpotlight(List<SiteProject> projects, DateTimeOffset now)
+    // active, well-starred ones. Rules:
+    // - The site maintainer's own projects are never picked, even if marked
+    //   featured, so the person running the site can't promote their own work.
+    //   They still appear in every normal listing.
+    // - At most one pick per owner.
+    // - A rotation pick doesn't come back within SpotlightCooldownWeeks weeks.
+    // - Once chosen, a week's picks stay put for the rest of that week.
+    // The history of picks is kept in data/bot/spotlight.json.
+    internal static List<SiteProject> PickSpotlight(List<SiteProject> projects, DateTimeOffset now, List<SpotlightWeek> history)
     {
+        var monday = WeekStart(now);
+        var week = WeekId(monday);
         var eligible = projects.Where(p => p.Listed && !p.Maintainer && !p.Archived).ToList();
-        var picks = eligible.Where(p => p.Featured).OrderByDescending(p => p.Stars ?? 0).Take(SpotlightSize).ToList();
-        var week = $"{ISOWeek.GetYear(now.UtcDateTime)}-W{ISOWeek.GetWeekOfYear(now.UtcDateTime)}";
-        picks.AddRange(eligible
-            .Where(p => !p.Featured && p.Stars >= SpotlightMinStars && p.PushedAt >= now.AddDays(-90))
-            .OrderBy(p => StableHash($"{week}:{p.Key}"))
-            .Take(SpotlightSize - picks.Count));
+        var byKey = eligible.ToDictionary(p => p.Key);
+        var recent = history
+            .Where(h => ParseWeekId(h.Week) is var m && m < monday && m >= monday.AddDays(-7 * SpotlightCooldownWeeks))
+            .SelectMany(h => h.Picks)
+            .ToHashSet();
+
+        var picks = new List<SiteProject>();
+        var owners = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Add(SiteProject p)
+        {
+            if (picks.Count < SpotlightSize && !picks.Contains(p) && owners.Add(p.Owner))
+                picks.Add(p);
+        }
+
+        foreach (var p in eligible.Where(p => p.Featured).OrderByDescending(p => p.Stars ?? 0))
+            Add(p);
+        foreach (var key in history.FirstOrDefault(h => h.Week == week)?.Picks ?? [])
+            if (byKey.TryGetValue(key, out var p))
+                Add(p);
+        foreach (var p in eligible
+                     .Where(p => !p.Featured && p.Stars >= SpotlightMinStars && p.PushedAt >= now.AddDays(-90) && !recent.Contains(p.Key))
+                     .OrderBy(p => StableHash($"{week}:{p.Key}")))
+            Add(p);
+
+        history.RemoveAll(h => h.Week == week || ParseWeekId(h.Week) < monday.AddDays(-7 * SpotlightHistoryWeeks));
+        history.Add(new SpotlightWeek { Week = week, Picks = picks.Select(p => p.Key).ToList() });
         return picks;
     }
+
+    static DateTime WeekStart(DateTimeOffset t) =>
+        ISOWeek.ToDateTime(ISOWeek.GetYear(t.UtcDateTime), ISOWeek.GetWeekOfYear(t.UtcDateTime), DayOfWeek.Monday);
+
+    static string WeekId(DateTime monday) => $"{ISOWeek.GetYear(monday)}-W{ISOWeek.GetWeekOfYear(monday):D2}";
+
+    static DateTime ParseWeekId(string id) =>
+        ISOWeek.ToDateTime(int.Parse(id[..4], CultureInfo.InvariantCulture), int.Parse(id[6..], CultureInfo.InvariantCulture), DayOfWeek.Monday);
 
     // FNV-1a: the same week always picks the same projects, on any machine.
     static uint StableHash(string s)
@@ -981,6 +1060,12 @@ sealed class SiteData
     public List<string> RecentlyActive { get; set; } = [];
     public List<string> Spotlight { get; set; } = [];
     public List<HelpWantedIssue> Issues { get; set; } = [];
+}
+
+sealed class SpotlightWeek
+{
+    public string Week { get; set; } = "";         // ISO week, e.g. 2026-W39
+    public List<string> Picks { get; set; } = [];  // project keys
 }
 
 sealed class SiteTrend
@@ -1330,6 +1415,7 @@ sealed class Paths(string root)
     public string Issues => Path.Combine(BotData, "discovered", "issues.json");
     public string CategoryConfig => Path.Combine(root, "config", "categories.json");
     public string SiteData => Path.Combine(root, "_build", "site-data.json");
+    public string SpotlightHistory => Path.Combine(BotData, "spotlight.json");
     public string Snapshots => Path.Combine(BotData, "snapshots");
     public string DailySnapshots => Path.Combine(Snapshots, "daily");
     public string DiscoveryState => Path.Combine(BotData, "state", "discovery.json");

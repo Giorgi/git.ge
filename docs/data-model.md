@@ -37,6 +37,7 @@ data branch (worktree at data/bot/)
     monthly/YYYY-MM.json
   state/
     discovery.json        checkpoint of an unfinished discovery run (absent otherwise)
+  spotlight.json          past Spotlight picks by ISO week (written by `prepare`)
 ```
 
 **One file per entity type, one record per line, sorted by key.** A changed star
@@ -175,3 +176,17 @@ flicker.
 developers who have at least one listed repo, ranked by total stars. That is the
 set visitors actually see, so it's the list worth reviewing by hand. Unwanted
 accounts go into `exclude` in `data/manual/developers.json`.
+
+## Spotlight
+
+Three projects a week on the home page, chosen by `prepare`:
+
+1. Projects marked `featured` in `data/manual/projects.json` come first.
+2. The remaining slots rotate weekly among listed, non-archived projects with at
+   least 20 stars and a push in the last 90 days, in an order derived from a hash
+   of the week and the project key.
+
+Rules: the maintainer's own projects are never picked, even when featured; at
+most one pick per owner; a rotation pick doesn't return within 8 weeks; a week's
+picks stay fixed once chosen. `spotlight.json` keeps a year of history for the
+8-week rule.

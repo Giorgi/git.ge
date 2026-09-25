@@ -27,7 +27,7 @@
   "home.topStarsNote": "by stars",
   "home.coldStart": "Trend data is still accumulating. The first trends appear from {0}; until then, lists are sorted by stars.",
   "home.spotlight": "Spotlight",
-  "home.spotlightNote": "Rotates weekly. The site maintainer's own projects are never picked.",
+  "home.spotlightNote": "Rotates weekly.",
   "home.new": "New this month",
   "home.newNote": "created in the last 30 days",
   "home.active": "Recently active",
