@@ -8,7 +8,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        პროექტები ავტომატურად მოიძებნება GitHub-ის პროფილის ადგილმდებარეობის მიხედვით. ეს ფორმა გამოიყენეთ, თუ პროექტი სიაში არ ჩანს, მაგალითად, თუ ადგილმდებარეობა არ გაქვთ მითითებული ან პროექტი GitHub-ზე არ არის. შეთავაზებას საიტის ავტორი განიხილავს და, თუ დაამტკიცებს, პროექტი pull request-ით დაემატება.
+        პროექტები ავტომატურად მოიძებნება GitHub-ის ანგარიშის ადგილმდებარეობის მიხედვით. ეს ფორმა გამოიყენეთ, თუ პროექტი სიაში არ ჩანს, მაგალითად, თუ ადგილმდებარეობა არ გაქვთ მითითებული ან პროექტი GitHub-ზე არ არის. შეთავაზებას საიტის ავტორი განიხილავს და, თუ დაამტკიცებს, პროექტი pull request-ით დაემატება.
 
         Projects are found automatically from GitHub profile locations. Use this form if a project is missing, for example because you don't set a location or the project isn't on GitHub. Each suggestion is reviewed by the maintainer and, if accepted, added through a pull request.
   - type: input
