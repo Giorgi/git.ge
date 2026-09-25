@@ -1,0 +1,68 @@
+# Parsed by `gitge.cs submit`, which matches each heading by the English label
+# after " / ". If you rename a label, update SubmissionForm in gitge.cs too.
+name: "პროექტის შეთავაზება / Suggest a project"
+description: "დაამატეთ პროექტი git.ge-ზე / Add a project to git.ge"
+title: "პროექტი / Project: "
+labels: ["submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        პროექტები ავტომატურად მოიძებნება GitHub-ის პროფილის ადგილმდებარეობის მიხედვით. ეს ფორმა გამოიყენეთ, თუ პროექტი სიაში არ ჩანს, მაგალითად, თუ ადგილმდებარეობა არ გაქვთ მითითებული ან პროექტი GitHub-ზე არ არის. შეთავაზებას საიტის ავტორი განიხილავს და, თუ დაამტკიცებს, პროექტი pull request-ით დაემატება.
+
+        Projects are found automatically from GitHub profile locations. Use this form if a project is missing, for example because you don't set a location or the project isn't on GitHub. Each suggestion is reviewed by the maintainer and, if accepted, added through a pull request.
+  - type: input
+    id: url
+    attributes:
+      label: "პროექტის ბმული / Project URL"
+      description: "GitHub-ის რეპოზიტორია (https://github.com/owner/repo) ან სხვა https ბმული / A GitHub repository (https://github.com/owner/repo) or another https link"
+      placeholder: "https://github.com/owner/repo"
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: "სახელი / Name"
+      description: "საჭიროა მხოლოდ იმ პროექტებისთვის, რომლებიც GitHub-ზე არ არის / Only needed for projects not hosted on GitHub"
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: "აღწერა (ინგლისურად) / Description (English)"
+      description: "ერთი-ორი წინადადება. GitHub-ის პროექტისთვის, თუ ველი ცარიელია, რეპოზიტორიის აღწერა გამოიყენება / One or two sentences. For GitHub projects, the repository's own description is used if this is empty"
+    validations:
+      required: false
+  - type: textarea
+    id: description_ka
+    attributes:
+      label: "აღწერა ქართულად / Georgian description"
+      description: "არასავალდებულო. ნაჩვენები იქნება საიტის ქართულ ვერსიაში / Optional. Shown on the Georgian version of the site"
+    validations:
+      required: false
+  - type: dropdown
+    id: category
+    attributes:
+      label: "კატეგორია / Category"
+      description: "თუ დარწმუნებული არ ხართ, აირჩიეთ „auto“ / If unsure, choose “auto”"
+      options:
+        - "auto — ავტომატურად / automatic"
+        - "web — ვები / Web"
+        - "mobile — მობილური / Mobile"
+        - "dotnet — .NET"
+        - "data — მონაცემები და AI / Data & AI"
+        - "devops — DevOps"
+        - "libraries — ბიბლიოთეკები / Libraries"
+        - "tools — ხელსაწყოები / Tools"
+        - "learning — სასწავლო / Learning"
+        - "other — სხვა / Other"
+      default: 0
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: "თანხმობა / Consent"
+      options:
+        - label: "მე ვარ პროექტის ავტორი ან მაქვს ავტორის ნებართვა / I'm the author of this project or have the author's permission"
+          required: true

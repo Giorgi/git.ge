@@ -1,0 +1,28 @@
+# Parsed by `gitge.cs submit`, which matches each heading by the English label
+# after " / ". If you rename a label, update RemovalForm in gitge.cs too.
+name: "წაშლის მოთხოვნა / Request removal"
+description: "ამოიღეთ თქვენი ანგარიში ან პროექტი git.ge-დან / Remove your account or a project from git.ge"
+title: "წაშლა / Removal: "
+labels: ["removal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ანგარიშის წაშლისას git.ge-დან ამ ანგარიშის ყველა პროექტი ქრება. წაშლა ძალაში შედის მოთხოვნის დამტკიცების შემდეგ, მომდევნო ღამის განახლებისას.
+
+        Removing an account removes all of its projects from git.ge. Removal takes effect with the nightly update after the request is accepted.
+  - type: input
+    id: target
+    attributes:
+      label: "ანგარიში ან პროექტი / Account or project"
+      description: "GitHub-ის მომხმარებლის სახელი (მთელი ანგარიშისთვის) ან owner/repo (ერთი პროექტისთვის) / A GitHub login (for the whole account) or owner/repo (for one project)"
+      placeholder: "login / owner/repo"
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: "თანხმობა / Consent"
+      options:
+        - label: "მე ვარ ამ ანგარიშის ან პროექტის მფლობელი ან მხარდამჭერი / I'm the owner or a maintainer of this account or project"
+          required: true
