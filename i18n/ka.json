@@ -39,7 +39,7 @@
   "sort.label": "დალაგება:",
   "sort.trend": "ტრენდი",
   "sort.stars": "ვარსკვლავები",
-  "sort.recent": "ბოლო აქტივობა",
+  "sort.recent": "ბოლო ცვლილება",
   "sort.new": "უახლესი",
 
   "card.helpWanted": "დახმარება სჭირდება: {0}",
@@ -64,7 +64,7 @@
   "projects.next": "შემდეგი →",
 
   "hw.title": "დახმარება სჭირდება",
-  "hw.intro": "ღია issue-ები ლეიბლით „good first issue“ ან „help wanted“. კარგი ადგილია ღია კოდში პირველი წვლილის შესატანად.",
+  "hw.intro": "ღია issue-ები ჭდით „good first issue“ ან „help wanted“. კარგი ადგილია ღია კოდში პირველი წვლილის შესატანად.",
   "hw.count": "{0} issue {1} პროექტში",
   "hw.none": "ამჟამად ასეთი issue არ არის.",
 
