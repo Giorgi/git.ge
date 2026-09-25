@@ -52,11 +52,8 @@ suggestion is reviewed by hand before it's added.
 
 ## Privacy {#privacy}
 
-No cookies, no tracking and no ads. We count visits with Cloudflare Web Analytics,
-which works without cookies: it records which page was viewed, where the visit came
-from, the browser type and the country, and shows them only as totals. It builds no
-personal profiles and doesn't follow you across sites. If you switch to English,
-that choice is stored only in your browser's local storage.
+No cookies, no tracking, and no requests to third parties. If you
+switch to English, that choice is stored only in your browser's local storage.
 
 ## How it was built {#built-with}
 
