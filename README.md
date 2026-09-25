@@ -68,6 +68,17 @@ dotnet run gitge.cs -- refresh
 A partial run (`--only` or `--max-users`) only adds and updates. Only a full run
 removes developers who are no longer found.
 
+**Both commands resume after a crash or timeout.** Just run the same command
+again:
+
+- `discover` saves a checkpoint to `data/bot/state/discovery.json` about once a
+  minute: the candidate list from the search, and which owners are done. A rerun
+  with the same options skips the search and the finished owners. The checkpoint
+  is deleted when the run completes. Pass `--restart` to throw it away. A
+  checkpoint older than 14 days is ignored.
+- `refresh` saves `projects.json` about once a minute and skips repos already
+  refreshed today (UTC). Pass `--force` to refresh everything again.
+
 Commit the results in the worktree (`cd data/bot && git add -A && git commit`),
 not on `main`.
 

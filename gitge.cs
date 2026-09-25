@@ -3,8 +3,8 @@
 #:property Nullable=enable
 
 // git.ge tooling. Run from the repository root:
-//   dotnet run gitge.cs -- discover [--only <term>] [--max-users <n>]
-//   dotnet run gitge.cs -- refresh
+//   dotnet run gitge.cs -- discover [--only <term>] [--max-users <n>] [--restart]
+//   dotnet run gitge.cs -- refresh [--force]
 //   dotnet run gitge.cs -- review [--top <n>] > review.md
 // See docs/data-model.md for the files these commands read and write.
 
@@ -37,15 +37,15 @@ try
             return 0;
         case "refresh":
             using (var github = new GitHub(GitHub.ResolveToken()))
-                await Refresh.Run(github, paths);
+                await Refresh.Run(github, paths, options);
             return 0;
         case "review":
             Review.Run(paths, options);
             return 0;
         default:
             Console.Error.WriteLine("usage: dotnet run gitge.cs -- <discover|refresh|review> [options]");
-            Console.Error.WriteLine("  discover [--only <location term>] [--max-users <n>]");
-            Console.Error.WriteLine("  refresh");
+            Console.Error.WriteLine("  discover [--only <location term>] [--max-users <n>] [--restart]");
+            Console.Error.WriteLine("  refresh [--force]    --force re-fetches repos already refreshed today");
             Console.Error.WriteLine("  review [--top <n>]   Markdown list of the most visible developers, for curation");
             return 2;
     }
@@ -75,43 +75,36 @@ static class Discovery
         var blocked = Logins(manualDevelopers.Exclude.Concat(optOut.Developers));
         var blockedProjects = new HashSet<string>(optOut.Projects, StringComparer.OrdinalIgnoreCase);
 
+        // A crashed or timed-out run leaves a checkpoint; pick up where it stopped.
+        var state = LoadCheckpoint(paths, options);
+
         // 1. Collect candidate owners: location search + include list.
-        var candidates = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase); // login -> matched term
-        var terms = options.Only is null ? config.Locations : config.Locations.Where(t => t.Equals(options.Only, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (terms.Count == 0)
-            throw new InvalidOperationException($"--only '{options.Only}' is not in config/discovery.json locations.");
-
-        foreach (var term in terms)
+        if (state.Candidates.Count == 0)
         {
-            int found = 0, rejected = 0;
-            await foreach (var user in SearchUsers(github, term, config))
-            {
-                var login = user.Login;
-                if (blocked.Contains(login)) continue;
-                // Search matches location loosely; require the term to actually appear.
-                if (user.Location is null || !user.Location.Contains(term, StringComparison.OrdinalIgnoreCase)) { rejected++; continue; }
-                if (candidates.TryAdd(login, term)) found++;
-                if (options.MaxUsers is { } max && candidates.Count >= max) break;
-            }
-            Log.Info($"'{term}': {found} new candidates, {rejected} rejected (location did not contain term)");
-            if (options.MaxUsers is { } m && candidates.Count >= m) break;
+            await SearchCandidates(github, config, options, blocked, state.Candidates);
+            foreach (var login in manualDevelopers.Include)
+                if (!blocked.Contains(login))
+                    state.Candidates[login] = null;
+            Store.WriteObject(paths.DiscoveryState, state);
         }
+        var candidates = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (login, term) in state.Candidates)
+            candidates.TryAdd(login, term);
+        var fetched = Logins(state.Fetched);
+        var seenOwners = Logins(state.Seen);
+        var pending = candidates.Keys.Where(l => !fetched.Contains(l)).ToList();
 
-        foreach (var login in manualDevelopers.Include)
-            if (!blocked.Contains(login))
-                candidates[login] = null;
-
-        Log.Info($"{candidates.Count} candidate owners; fetching their repositories");
+        Log.Info($"{candidates.Count} candidate owners, {pending.Count} still to fetch");
 
         // 2. Fetch each owner's public, non-fork repos in batches and apply the quality bar.
         var developers = Store.ReadList<Developer>(paths.Developers).ToDictionary(d => d.Login, StringComparer.OrdinalIgnoreCase);
         var projects = Store.ReadList<Project>(paths.Projects).ToDictionary(p => p.Key);
         var includeSet = Logins(manualDevelopers.Include);
-        var seenOwners = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int admittedTotal = 0, newProjects = 0;
 
-        var progress = new Progress("owners", candidates.Count);
-        foreach (var batch in candidates.Keys.Chunk(OwnersPerQuery))
+        var progress = new Progress("owners", pending.Count);
+        var sinceCheckpoint = Stopwatch.StartNew();
+        foreach (var batch in pending.Chunk(OwnersPerQuery))
         {
             var owners = await FetchOwners(github, batch);
             progress.Advance(batch.Length);
@@ -152,6 +145,17 @@ static class Discovery
                     admittedTotal++;
                 }
             }
+
+            fetched.UnionWith(batch);
+            if (sinceCheckpoint.Elapsed >= CheckpointInterval)
+            {
+                // Data first, then state: if we die in between, those owners are simply fetched again.
+                WriteData(paths, developers, projects);
+                state.Fetched = [.. fetched];
+                state.Seen = [.. seenOwners];
+                Store.WriteObject(paths.DiscoveryState, state);
+                sinceCheckpoint.Restart();
+            }
         }
 
         // 3. Drop anything blocked; on a full run also drop owners no longer found.
@@ -174,12 +178,70 @@ static class Discovery
             }
         }
 
-        Store.WriteList(paths.Developers, developers.Values.OrderBy(d => d.Login, StringComparer.OrdinalIgnoreCase));
-        Store.WriteList(paths.Projects, projects.Values.OrderBy(p => p.Id));
+        WriteData(paths, developers, projects);
+        File.Delete(paths.DiscoveryState);
         Log.Info($"Discovery done: {developers.Count} developers, {projects.Count} projects " +
                  $"({newProjects} new, {admittedTotal} passed the bar, removed {removedDevelopers} developers / {removedProjects} projects)" +
                  (isFullRun ? "" : " [partial run: owners not seen were kept]"));
         github.LogUsage();
+    }
+
+    static readonly TimeSpan CheckpointInterval = TimeSpan.FromMinutes(1);
+    static readonly TimeSpan CheckpointMaxAge = TimeSpan.FromDays(14);
+
+    static DiscoveryState LoadCheckpoint(Paths paths, Options options)
+    {
+        var fresh = new DiscoveryState { StartedAt = DateTimeOffset.UtcNow, Only = options.Only, MaxUsers = options.MaxUsers };
+        if (!File.Exists(paths.DiscoveryState)) return fresh;
+
+        var saved = Store.Read<DiscoveryState>(paths.DiscoveryState);
+        if (options.Restart)
+        {
+            Log.Info("--restart: discarding the saved checkpoint");
+            return fresh;
+        }
+        if (DateTimeOffset.UtcNow - saved.StartedAt > CheckpointMaxAge)
+        {
+            Log.Warn($"Checkpoint from {saved.StartedAt:yyyy-MM-dd} is older than {CheckpointMaxAge.TotalDays} days; starting over");
+            return fresh;
+        }
+        if (saved.Only != options.Only || saved.MaxUsers != options.MaxUsers)
+            throw new InvalidOperationException(
+                $"An unfinished discovery run (--only {saved.Only ?? "-"} --max-users {saved.MaxUsers?.ToString() ?? "-"}) has a checkpoint. " +
+                "Rerun with the same options to resume it, or pass --restart to discard it.");
+
+        Log.Info($"Resuming discovery started {saved.StartedAt:yyyy-MM-dd HH:mm} UTC: {saved.Fetched.Count} of {saved.Candidates.Count} owners already fetched");
+        return saved;
+    }
+
+    static async Task SearchCandidates(GitHub github, DiscoveryConfig config, Options options,
+                                       HashSet<string> blocked, Dictionary<string, string?> candidates)
+    {
+        var terms = options.Only is null ? config.Locations : config.Locations.Where(t => t.Equals(options.Only, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (terms.Count == 0)
+            throw new InvalidOperationException($"--only '{options.Only}' is not in config/discovery.json locations.");
+
+        foreach (var term in terms)
+        {
+            int found = 0, rejected = 0;
+            await foreach (var user in SearchUsers(github, term, config))
+            {
+                var login = user.Login;
+                if (blocked.Contains(login)) continue;
+                // Search matches location loosely; require the term to actually appear.
+                if (user.Location is null || !user.Location.Contains(term, StringComparison.OrdinalIgnoreCase)) { rejected++; continue; }
+                if (!candidates.ContainsKey(login)) { candidates[login] = term; found++; }
+                if (options.MaxUsers is { } max && candidates.Count >= max) break;
+            }
+            Log.Info($"'{term}': {found} new candidates, {rejected} rejected (location did not contain term)");
+            if (options.MaxUsers is { } m && candidates.Count >= m) break;
+        }
+    }
+
+    static void WriteData(Paths paths, Dictionary<string, Developer> developers, Dictionary<string, Project> projects)
+    {
+        Store.WriteList(paths.Developers, developers.Values.OrderBy(d => d.Login, StringComparer.OrdinalIgnoreCase));
+        Store.WriteList(paths.Projects, projects.Values.OrderBy(p => p.Id));
     }
 
     // GitHub search returns at most 1,000 results per query. When a query reports
@@ -324,7 +386,7 @@ static class Refresh
 {
     const int ReposPerQuery = 100;
 
-    public static async Task Run(GitHub github, Paths paths)
+    public static async Task Run(GitHub github, Paths paths, Options options)
     {
         var config = Store.Read<DiscoveryConfig>(paths.DiscoveryConfig);
         var manualDevelopers = Store.Read<ManualDevelopers>(paths.ManualDevelopers);
@@ -356,11 +418,21 @@ static class Refresh
             if (blocked.Contains(project.Owner) || blockedProjects.Contains(project.FullName))
                 projects.Remove(project.Key);
 
-        // Refresh everything by node id, up to 100 repos per query.
+        // Refresh by node id, up to 100 repos per query. Repos already refreshed today
+        // are skipped, so rerunning after a crash resumes instead of starting over.
         int updated = 0, removed = 0;
-        var progress = new Progress("repos", projects.Count);
-        foreach (var batch in projects.Values.ToList().Chunk(ReposPerQuery))
+        var pending = projects.Values.Where(p => options.Force || p.RefreshedAt != today).ToList();
+        if (pending.Count < projects.Count)
+            Log.Info($"{projects.Count - pending.Count} repos already refreshed today; resuming with {pending.Count}");
+        var progress = new Progress("repos", pending.Count);
+        var sinceCheckpoint = Stopwatch.StartNew();
+        foreach (var batch in pending.Chunk(ReposPerQuery))
         {
+            if (sinceCheckpoint.Elapsed >= TimeSpan.FromMinutes(1))
+            {
+                Store.WriteList(paths.Projects, projects.Values.OrderBy(p => p.Id));
+                sinceCheckpoint.Restart();
+            }
             foreach (var (project, node) in await FetchRepos(github, batch, config.HelpWantedLabels))
             {
                 if (node is null)
@@ -542,6 +614,17 @@ sealed class QualityBar
     }
 }
 
+// Checkpoint of an unfinished discovery run (data/bot/state/discovery.json).
+sealed class DiscoveryState
+{
+    public DateTimeOffset StartedAt { get; set; }
+    public string? Only { get; set; }
+    public int? MaxUsers { get; set; }
+    public Dictionary<string, string?> Candidates { get; set; } = [];  // login -> matched term
+    public List<string> Fetched { get; set; } = [];                    // owners whose repos are done
+    public List<string> Seen { get; set; } = [];                       // fetched owners with a listed repo
+}
+
 sealed class ManualDevelopers
 {
     public List<string> Include { get; set; } = [];
@@ -700,6 +783,7 @@ sealed class Paths(string root)
     public string Developers => Path.Combine(BotData, "discovered", "developers.json");
     public string Projects => Path.Combine(BotData, "discovered", "projects.json");
     public string DailySnapshots => Path.Combine(BotData, "snapshots", "daily");
+    public string DiscoveryState => Path.Combine(BotData, "state", "discovery.json");
 }
 
 static class Json
@@ -710,6 +794,8 @@ static class Json
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
     };
+
+    public static readonly JsonSerializerOptions Indented = new(Options) { WriteIndented = true };
 
     public static string? NullIfBlank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
 
@@ -724,6 +810,9 @@ static class Store
         File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json.Options) ?? new T() : new T();
 
     public static List<T> ReadList<T>(string path) => Read<List<T>>(path);
+
+    public static void WriteObject<T>(string path, T value) =>
+        Write(path, JsonSerializer.Serialize(value, Json.Indented) + "\n");
 
     public static void WriteList<T>(string path, IEnumerable<T> items)
     {
@@ -881,6 +970,8 @@ sealed class Options
     public string? Only { get; private set; }
     public int? MaxUsers { get; private set; }
     public int? Top { get; private set; }
+    public bool Restart { get; private set; }
+    public bool Force { get; private set; }
 
     public static Options Parse(string[] args)
     {
@@ -892,6 +983,8 @@ sealed class Options
                 case "--only": options.Only = args[++i]; break;
                 case "--max-users": options.MaxUsers = int.Parse(args[++i]); break;
                 case "--top": options.Top = int.Parse(args[++i]); break;
+                case "--restart": options.Restart = true; break;
+                case "--force": options.Force = true; break;
                 default: throw new ArgumentException($"Unknown option '{args[i]}'");
             }
         }

@@ -35,6 +35,8 @@ data branch (worktree at data/bot/)
   snapshots/
     daily/YYYY-MM-DD.json
     monthly/YYYY-MM.json
+  state/
+    discovery.json        checkpoint of an unfinished discovery run (absent otherwise)
 ```
 
 **One file per entity type, one record per line, sorted by key.** A changed star
