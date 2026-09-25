@@ -1,4 +1,11 @@
 {
-  "include": [],
+  "include": [
+    "Anbani",
+    "bekatom",
+    "d0ragon",
+    "nodarai",
+    "safareli",
+    "zkikvidze"
+  ],
   "exclude": []
 }
