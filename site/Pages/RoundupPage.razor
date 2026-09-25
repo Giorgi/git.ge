@@ -1,14 +1,22 @@
-@* Roundups are written by the maintainer in content/roundups/, in the language
-   of their choice; they are not switched by the English toggle. *@
-<Layout Path="@($"/roundups/{R.Slug}/")" Title="@R.Title" Description="@R.Summary" OgType="article">
+@* Roundups are written by hand (or drafted with the /roundup skill and then
+   reviewed) in content/roundups/. Georgian and English versions are both
+   rendered; CSS shows the one matching <html lang>, so it works without JS. *@
+<Layout Path="@($"/roundups/{R.Slug}/")" Title="@R.Ka.Title" Description="@R.Ka.Summary" OgType="article">
     <article class="prose">
         <p class="note"><a href="/roundups/"><T K="roundups.back" /></a></p>
-        <h1>@R.Title</h1>
-        <p class="note"><time datetime="@R.Date.ToString("yyyy-MM-dd")">@R.Date.ToString("yyyy-MM-dd")</time></p>
-        @((MarkupString)R.Html)
+        @foreach (var (lang, text) in Versions)
+        {
+            <div class="l10n" lang="@lang">
+                <h1>@text.Title</h1>
+                <p class="note"><time datetime="@R.Date.ToString("yyyy-MM-dd")">@R.Date.ToString("yyyy-MM-dd")</time></p>
+                @((MarkupString)text.Html)
+            </div>
+        }
     </article>
 </Layout>
 
 @code {
     [Parameter, EditorRequired] public Roundup R { get; set; } = default!;
+
+    IEnumerable<(string Lang, RoundupText Text)> Versions => [("ka", R.Ka), ("en", R.En)];
 }

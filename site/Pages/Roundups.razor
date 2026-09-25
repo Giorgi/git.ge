@@ -13,10 +13,15 @@
             {
                 <li>
                     <time datetime="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToString("yyyy-MM-dd")</time>
-                    <a href="/roundups/@r.Slug/">@r.Title</a>
-                    @if (r.Summary is not null)
+                    @foreach (var (lang, text) in new[] { ("ka", r.Ka), ("en", r.En) })
                     {
-                        <p>@r.Summary</p>
+                        <span class="l10n" lang="@lang">
+                            <a href="/roundups/@r.Slug/">@text.Title</a>
+                            @if (text.Summary is not null)
+                            {
+                                <p>@text.Summary</p>
+                            }
+                        </span>
                     }
                 </li>
             }

@@ -74,7 +74,14 @@ public sealed class HelpWantedIssue
     public List<string> Labels { get; set; } = [];
 }
 
-public sealed record Roundup(string Slug, string Title, DateOnly Date, string? Summary, string Html);
+// One roundup: Georgian, plus English when <slug>.en.md exists (otherwise the
+// Georgian text is used for both).
+public sealed record RoundupText(string Title, string? Summary, string Html);
+
+public sealed record Roundup(string Slug, DateOnly Date, RoundupText Ka, RoundupText En)
+{
+    public bool HasEnglish => !ReferenceEquals(Ka, En);
+}
 
 // Everything a page needs, loaded once. The renderer is a batch job that runs
 // once per build, so a static context is simpler than threading it through.

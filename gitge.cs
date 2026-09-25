@@ -60,6 +60,9 @@ try
         case "review":
             Review.Run(paths, options);
             return 0;
+        case "roundup":
+            using (var github = new GitHub(GitHub.ResolveToken()))
+                return await Roundup.Run(github, paths, options);
         default:
             Console.Error.WriteLine("usage: dotnet run gitge.cs -- <discover|refresh|review> [options]");
             Console.Error.WriteLine("  discover [--only <location term>] [--max-users <n>] [--restart]");
@@ -71,6 +74,7 @@ try
             Console.Error.WriteLine("  prepare              Write _build/site-data.json for the site renderer");
             Console.Error.WriteLine("  submit --issue <n>   Apply an accepted submission/removal issue to data/ (exit 3 = rejected)");
             Console.Error.WriteLine("  submit --body-file <f> --type <submission|removal> [--issue <n>] [--offline]");
+            Console.Error.WriteLine("  roundup [--month YYYY-MM] [--force]   Write a bilingual roundup skeleton to content/roundups/");
             return 2;
     }
 }
@@ -1479,6 +1483,182 @@ static class Submit
 }
 
 // ---------------------------------------------------------------------------
+// Roundup: the factual skeleton of a monthly roundup, in Georgian and English
+// (content/roundups/YYYY-MM.ka.md and .en.md). Every fact comes from the data;
+// the prose is left as TODO markers for a person (or the /roundup skill, with
+// a person reviewing) to write. Same data in, same skeleton out.
+// ---------------------------------------------------------------------------
+
+static class Roundup
+{
+    const int TopCount = 10;
+
+    static readonly string[] MonthsKa =
+        ["იანვარი", "თებერვალი", "მარტი", "აპრილი", "მაისი", "ივნისი", "ივლისი", "აგვისტო", "სექტემბერი", "ოქტომბერი", "ნოემბერი", "დეკემბერი"];
+
+    public static async Task<int> Run(GitHub github, Paths paths, Options options)
+    {
+        var now = DateTime.UtcNow;
+        var first = options.Month is { } m
+            ? DateOnly.ParseExact(m + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : new DateOnly(now.Year, now.Month, 1).AddMonths(-1);
+        var last = first.AddMonths(1).AddDays(-1);
+        var slug = first.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        var dir = Path.Combine(paths.Root, "content", "roundups");
+        var kaPath = Path.Combine(dir, $"{slug}.ka.md");
+        var enPath = Path.Combine(dir, $"{slug}.en.md");
+        if (!options.Force && (File.Exists(kaPath) || File.Exists(enPath)))
+        {
+            Log.Error($"{slug} already has a roundup in content/roundups/; pass --force to overwrite it.");
+            return 1;
+        }
+
+        Prepare.Run(paths);   // work from the same merged, filtered data the site shows
+        var data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(paths.SiteData), Json.Options)!;
+        var nodeIds = Store.ReadList<Project>(paths.Projects).ToDictionary(p => p.Key, p => p.NodeId);
+        bool InMonth(DateTimeOffset? t) => t is { } x && DateOnly.FromDateTime(x.UtcDateTime) is var d && d >= first && d <= last;
+
+        // 1. Most popular repos created this month (current stars).
+        var minStars = Store.Read<DiscoveryConfig>(paths.DiscoveryConfig).QualityBar.MinStars;
+        var created = data.Projects.Where(p => p.FullName is not null && InMonth(p.CreatedAt)).ToList();
+        var topNew = created.OrderByDescending(p => p.Stars ?? 0).ThenBy(p => p.CreatedAt).Take(TopCount).ToList();
+
+        // 2. Biggest star gains over the month, from snapshots at its start and end.
+        var files = new SnapshotStore(paths.Snapshots).List();
+        var start = files.Keys.Where(d => d <= first).Cast<DateOnly?>().LastOrDefault()
+                    ?? files.Keys.Where(d => d >= first && d <= first.AddDays(3)).Cast<DateOnly?>().FirstOrDefault();
+        var end = files.Keys.Where(d => d <= last).Cast<DateOnly?>().LastOrDefault();
+        var gains = new List<(SiteProject Project, int Delta)>();
+        if (start is { } s && end is { } e && e > s)
+        {
+            var delta = Trending.Diff(SnapshotStore.Load(files[e]).Stars, SnapshotStore.Load(files[s]).Stars);
+            gains = data.Projects
+                .Where(p => p.Listed && p.Key.StartsWith("gh:") && delta.TryGetValue(long.Parse(p.Key[3..]), out var dd) && dd > 0)
+                .Select(p => (p, delta[long.Parse(p.Key[3..])]!.Value))
+                .OrderByDescending(x => x.Item2).Take(TopCount).ToList();
+        }
+
+        // 3. Releases published this month by listed projects.
+        var releases = await FetchReleases(github, data.Projects.Where(p => p.Listed && nodeIds.ContainsKey(p.Key)).ToList(), nodeIds, InMonth);
+
+        // 4. Spotlight picks for weeks starting in this month.
+        var spotlight = Store.ReadList<SpotlightWeek>(paths.SpotlightHistory)
+            .Where(w => DateOnly.FromDateTime(ISOWeek.ToDateTime(int.Parse(w.Week[..4]), int.Parse(w.Week[6..]), DayOfWeek.Monday)) is var mon && mon >= first && mon <= last)
+            .SelectMany(w => w.Picks).Distinct()
+            .Select(k => data.Projects.FirstOrDefault(p => p.Key == k)).OfType<SiteProject>().ToList();
+
+        var facts = new Facts(first, last, created.Count(p => p.Stars >= minStars), topNew, start, end, gains, releases, spotlight,
+                              data.Projects.Count(p => p.Listed), data.Developers, data.Issues.Count, minStars);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(kaPath, Render(facts, ka: true), new UTF8Encoding(false));
+        File.WriteAllText(enPath, Render(facts, ka: false), new UTF8Encoding(false));
+        Log.Info($"Roundup skeleton for {slug}: {created.Count} repos created, top {topNew.Count} listed; " +
+                 $"{(gains.Count > 0 ? $"star gains {start:yyyy-MM-dd}→{end:yyyy-MM-dd}" : "no snapshot span for star gains")}; " +
+                 $"{releases.Count} releases → content/roundups/{slug}.ka.md, .en.md");
+        github.LogUsage();
+        return 0;
+    }
+
+    sealed record Release(SiteProject Project, string Name, string Url, DateTimeOffset PublishedAt);
+
+    sealed record Facts(DateOnly First, DateOnly Last, int CreatedCount, List<SiteProject> TopNew,
+                        DateOnly? Start, DateOnly? End, List<(SiteProject Project, int Delta)> Gains,
+                        List<Release> Releases, List<SiteProject> Spotlight,
+                        int Listed, int Developers, int HelpWanted, int MinStars);
+
+    static async Task<List<Release>> FetchReleases(GitHub github, List<SiteProject> projects, Dictionary<string, string> nodeIds, Func<DateTimeOffset?, bool> inMonth)
+    {
+        var found = new List<Release>();
+        foreach (var batch in projects.Chunk(100))
+        {
+            var result = await github.GraphQL("""
+                query($ids: [ID!]!) {
+                  nodes(ids: $ids) {
+                    ... on Repository {
+                      releases(first: 5, orderBy: { field: CREATED_AT, direction: DESC }) {
+                        nodes { name tagName url publishedAt isPrerelease isDraft }
+                      }
+                    }
+                  }
+                }
+                """, new() { ["ids"] = batch.Select(p => nodeIds[p.Key]).ToList() });
+            var nodes = result["nodes"]!.AsArray();
+            for (var i = 0; i < batch.Length; i++)
+            {
+                // The newest stable release published this month, per project.
+                var release = (nodes[i]?["releases"]?["nodes"]?.AsArray() ?? [])
+                    .Where(r => r is not null && !r["isPrerelease"]!.GetValue<bool>() && !r["isDraft"]!.GetValue<bool>())
+                    .Select(r => (Node: r!, At: Json.Date(r!["publishedAt"])))
+                    .FirstOrDefault(r => inMonth(r.At));
+                if (release.Node is null) continue;
+                var name = Json.NullIfBlank(release.Node["name"]?.GetValue<string>()) ?? release.Node["tagName"]!.GetValue<string>();
+                found.Add(new Release(batch[i], name, release.Node["url"]!.GetValue<string>(), release.At!.Value));
+            }
+        }
+        return found.OrderByDescending(r => r.Project.Stars ?? 0).Take(TopCount).ToList();
+    }
+
+    static string Render(Facts f, bool ka)
+    {
+        string T(string georgian, string english) => ka ? georgian : english;
+        var monthName = ka ? $"{MonthsKa[f.First.Month - 1]} {f.First.Year}" : f.First.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+        var md = new StringBuilder();
+        md.Append($"""
+            ---
+            title: {monthName}
+            date: {f.Last.AddDays(1):yyyy-MM-dd}
+            summary: TODO: {T("ერთი წინადადება სიისა და RSS-ისთვის.", "One sentence for the list and the RSS feed.")}
+            ---
+
+            TODO: {T("შესავალი, ორი-სამი წინადადება.", "Introduction, two or three sentences.")}
+
+            """);
+
+        md.Append($"\n## {T("თვის ახალი პროექტები", "New this month")}\n\n");
+        var monthIn = $"{f.First.Year} წლის {MonthsKa[f.First.Month - 1].TrimEnd('ი')}ში";   // "2026 წლის სექტემბერში"
+        md.Append(T($"ყველაზე პოპულარული რეპოზიტორიები, რომლებიც {monthIn} შეიქმნა, ვარსკვლავების მიხედვით.\n",
+                    $"The most popular repositories created in {monthName}, by stars.\n"));
+        if (f.TopNew.Count == 0) md.Append(T("\nამ თვეში ახალი პროექტი არ შექმნილა.\n", "\nNo new projects this month.\n"));
+        foreach (var p in f.TopNew)
+            Entry(md, p, $"★ {p.Stars:#,0} · {p.Language ?? "—"} · {T("შეიქმნა", "created")} {p.CreatedAt:yyyy-MM-dd}", ka);
+
+        md.Append($"\n## {T("ყველაზე დიდი ზრდა", "Biggest gains")}\n\n");
+        if (f.Gains.Count == 0)
+            md.Append(T("ამ თვისთვის ვარსკვლავების ზრდის მონაცემები ჯერ არ არსებობს.\n", "There is no star-growth data for this month yet.\n"));
+        else
+        {
+            md.Append(T($"ვარსკვლავები {f.Start:yyyy-MM-dd}-დან {f.End:yyyy-MM-dd}-მდე.\n", $"Stars gained from {f.Start:yyyy-MM-dd} to {f.End:yyyy-MM-dd}.\n"));
+            foreach (var (p, delta) in f.Gains)
+                Entry(md, p, $"+{delta:#,0} ★ ({T("სულ", "total")} {p.Stars:#,0}) · {p.Language ?? "—"}", ka);
+        }
+
+        md.Append($"\n## {T("ახალი ვერსიები", "New releases")}\n\n");
+        if (f.Releases.Count == 0) md.Append(T("ამ თვეში ახალი ვერსია არ გამოსულა.\n", "No releases this month.\n"));
+        foreach (var r in f.Releases)
+            md.Append($"- [{r.Project.FullName}]({r.Project.Url}): [{r.Name}]({r.Url}) ({r.PublishedAt:yyyy-MM-dd})\n");
+
+        if (f.Spotlight.Count > 0)
+        {
+            md.Append($"\n## {T("რჩეული", "Spotlight")}\n\n");
+            foreach (var p in f.Spotlight) md.Append($"- [{p.FullName ?? p.Name}]({p.Url})\n");
+        }
+
+        md.Append($"\n## {T("რიცხვებში", "In numbers")}\n\n");
+        md.Append(T($"- {f.Listed:#,0} პროექტი სიაში, {f.Developers:#,0} დეველოპერი\n- {f.CreatedCount:#,0} ახალი რეპოზიტორია სულ მცირე {f.MinStars} ვარსკვლავით\n- {f.HelpWanted:#,0} ღია issue ჭდით „good first issue“ ან „help wanted“\n",
+                    $"- {f.Listed:#,0} listed projects, {f.Developers:#,0} developers\n- {f.CreatedCount:#,0} new repositories with at least {f.MinStars} stars\n- {f.HelpWanted:#,0} open issues labelled \"good first issue\" or \"help wanted\"\n"));
+        return md.ToString();
+    }
+
+    static void Entry(StringBuilder md, SiteProject p, string meta, bool ka)
+    {
+        md.Append($"\n### [{p.FullName ?? p.Name}]({p.Url})\n\n{meta}\n\n");
+        var description = ka ? p.DescriptionKa ?? p.Description : p.Description;
+        if (description is not null) md.Append($"> {description}\n\n");
+        md.Append(ka ? "TODO: ერთი-ორი წინადადება პროექტზე.\n" : "TODO: One or two sentences about the project.\n");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Review: the developers visitors will actually see, ranked by the stars of
 // their listed repos, so curation effort goes where it matters. Output is
 // Markdown on stdout; add unwanted logins to data/manual/developers.json.
@@ -1998,6 +2178,7 @@ sealed class Options
     public string? BodyFile { get; private set; }
     public string? Type { get; private set; }
     public bool Offline { get; private set; }
+    public string? Month { get; private set; }
 
     public static Options Parse(string[] args)
     {
@@ -2015,6 +2196,7 @@ sealed class Options
                 case "--body-file": options.BodyFile = args[++i]; break;
                 case "--type": options.Type = args[++i]; break;
                 case "--offline": options.Offline = true; break;
+                case "--month": options.Month = args[++i]; break;
                 default: throw new ArgumentException($"Unknown option '{args[i]}'");
             }
         }

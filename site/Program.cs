@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Text.Unicode;
 using System.Xml;
 using GitGe.Site;
@@ -156,11 +157,11 @@ string Feed()
         foreach (var r in Site.Roundups)
         {
             xml.WriteStartElement("item");
-            xml.WriteElementString("title", r.Title);
+            xml.WriteElementString("title", r.Ka.Title);
             xml.WriteElementString("link", Site.Url($"/roundups/{r.Slug}/"));
             xml.WriteElementString("guid", Site.Url($"/roundups/{r.Slug}/"));
             xml.WriteElementString("pubDate", r.Date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("R", CultureInfo.InvariantCulture));
-            xml.WriteElementString("description", r.Html);
+            xml.WriteElementString("description", r.Ka.Html);
             xml.WriteEndElement();
         }
         xml.WriteEndElement();
@@ -188,18 +189,29 @@ static string SecurityElement(string s) => System.Security.SecurityElement.Escap
 static List<Roundup> LoadRoundups(string dir, MarkdownPipeline markdown)
 {
     if (!Directory.Exists(dir)) return [];
+    // <slug>.ka.md (or plain <slug>.md) is required; <slug>.en.md is optional.
     return Directory.GetFiles(dir, "*.md")
         .Where(f => !Path.GetFileName(f).Equals("README.md", StringComparison.OrdinalIgnoreCase))
-        .Select(f =>
+        .GroupBy(f => Regex.Replace(Path.GetFileNameWithoutExtension(f), @"\.(ka|en)$", ""))
+        .Select(g =>
         {
-            var (meta, body) = FrontMatter(File.ReadAllText(f));
-            var title = meta.GetValueOrDefault("title") ?? throw new InvalidOperationException($"{f}: missing 'title' in front matter");
-            var date = DateOnly.ParseExact(meta.GetValueOrDefault("date") ?? throw new InvalidOperationException($"{f}: missing 'date' in front matter"),
-                                           "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            return new Roundup(Path.GetFileNameWithoutExtension(f), title, date, meta.GetValueOrDefault("summary"), Markdown.ToHtml(body, markdown));
+            var kaFile = g.FirstOrDefault(f => f.EndsWith(".ka.md")) ?? g.FirstOrDefault(f => !f.EndsWith(".en.md"))
+                ?? throw new InvalidOperationException($"Roundup '{g.Key}' has no Georgian file ({g.Key}.ka.md)");
+            var enFile = g.FirstOrDefault(f => f.EndsWith(".en.md"));
+            var (ka, date) = Read(kaFile);
+            return new Roundup(g.Key, date, ka, enFile is null ? ka : Read(enFile).Text);
         })
         .OrderByDescending(r => r.Date)
         .ToList();
+
+    (RoundupText Text, DateOnly Date) Read(string file)
+    {
+        var (meta, body) = FrontMatter(File.ReadAllText(file));
+        var title = meta.GetValueOrDefault("title") ?? throw new InvalidOperationException($"{file}: missing 'title' in front matter");
+        var date = DateOnly.ParseExact(meta.GetValueOrDefault("date") ?? throw new InvalidOperationException($"{file}: missing 'date' in front matter"),
+                                       "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return (new RoundupText(title, meta.GetValueOrDefault("summary"), Markdown.ToHtml(body, markdown)), date);
+    }
 }
 
 static (Dictionary<string, string> Meta, string Body) FrontMatter(string text)
