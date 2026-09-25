@@ -6,9 +6,11 @@
 //   dotnet run gitge.cs -- discover [--only <term>] [--max-users <n>] [--restart]
 //   dotnet run gitge.cs -- refresh [--force]
 //   dotnet run gitge.cs -- review [--top <n>] > review.md
+//   dotnet run gitge.cs -- trend | prune | selftest
 // See docs/data-model.md for the files these commands read and write.
 
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -39,6 +41,15 @@ try
             using (var github = new GitHub(GitHub.ResolveToken()))
                 await Refresh.Run(github, paths, options);
             return 0;
+        case "trend":
+            TrendReport.Run(paths);
+            return 0;
+        case "prune":
+            var (months, deleted) = Pruning.Run(new SnapshotStore(paths.Snapshots));
+            Log.Info($"Pruned: {months} month(s) rolled up, {deleted} daily snapshot(s) deleted");
+            return 0;
+        case "selftest":
+            return SelfTest.Run(paths);
         case "review":
             Review.Run(paths, options);
             return 0;
@@ -47,6 +58,9 @@ try
             Console.Error.WriteLine("  discover [--only <location term>] [--max-users <n>] [--restart]");
             Console.Error.WriteLine("  refresh [--force]    --force re-fetches repos already refreshed today");
             Console.Error.WriteLine("  review [--top <n>]   Markdown list of the most visible developers, for curation");
+            Console.Error.WriteLine("  trend                Show the current trend window and top gainers");
+            Console.Error.WriteLine("  prune                Roll daily snapshots older than 90 days into monthly ones");
+            Console.Error.WriteLine("  selftest             Test trending and pruning against tests/fixtures");
             return 2;
     }
 }
@@ -514,6 +528,235 @@ static class Refresh
 }
 
 // ---------------------------------------------------------------------------
+// Trending: stars gained since the snapshot closest to N days before the latest
+// one. Missing history gives null ("—"), never a guess.
+// ---------------------------------------------------------------------------
+
+sealed class Snapshot
+{
+    public string Date { get; set; } = "";
+    public Dictionary<long, int> Stars { get; set; } = [];
+}
+
+sealed class SnapshotStore(string root)
+{
+    public string Daily => Path.Combine(root, "daily");
+    public string Monthly => Path.Combine(root, "monthly");
+
+    // Every available snapshot by date. Daily files are named by date; a monthly file
+    // carries the date of the daily snapshot it was rolled up from.
+    public SortedDictionary<DateOnly, string> List()
+    {
+        var files = new SortedDictionary<DateOnly, string>();
+        if (Directory.Exists(Monthly))
+            foreach (var file in Directory.GetFiles(Monthly, "*.json"))
+                files[Dates.Parse(Load(file).Date)] = file;
+        if (Directory.Exists(Daily))
+            foreach (var file in Directory.GetFiles(Daily, "*.json"))
+                if (Dates.TryParse(Path.GetFileNameWithoutExtension(file), out var date))
+                    files[date] = file;
+        return files;
+    }
+
+    public static Snapshot Load(string path) => Store.Read<Snapshot>(path);
+}
+
+sealed record TrendResult(DateOnly Current, DateOnly? Baseline, Dictionary<long, int?> Delta)
+{
+    // False until a snapshot old enough exists; the site then sorts by stars instead.
+    public bool HasHistory => Baseline is not null;
+}
+
+static class Trending
+{
+    public static TrendResult Compute(SnapshotStore store, int windowDays, int toleranceDays)
+    {
+        var files = store.List();
+        if (files.Count == 0)
+            throw new InvalidOperationException("No snapshots found; run refresh first.");
+
+        // "Now" is the latest snapshot, not the clock, so a missed nightly run doesn't skew the window.
+        var current = files.Keys.Last();
+        var baseline = PickBaseline(current, files.Keys, windowDays, toleranceDays);
+        var currentStars = SnapshotStore.Load(files[current]).Stars;
+        var baselineStars = baseline is { } b ? SnapshotStore.Load(files[b]).Stars : null;
+        return new(current, baseline, Diff(currentStars, baselineStars));
+    }
+
+    // The snapshot closest to windowDays before current, within ± toleranceDays.
+    // On a tie the older one wins, because it covers the whole window.
+    public static DateOnly? PickBaseline(DateOnly current, IEnumerable<DateOnly> available, int windowDays, int toleranceDays)
+    {
+        var target = current.AddDays(-windowDays);
+        return available
+            .Where(d => d < current && Math.Abs(d.DayNumber - target.DayNumber) <= toleranceDays)
+            .OrderBy(d => Math.Abs(d.DayNumber - target.DayNumber))
+            .ThenBy(d => d)
+            .Select(d => (DateOnly?)d)
+            .FirstOrDefault();
+    }
+
+    // A repo absent from the baseline (new, or listed later) gets null rather than
+    // its whole star count counted as "gained".
+    public static Dictionary<long, int?> Diff(Dictionary<long, int> current, Dictionary<long, int>? baseline) =>
+        current.ToDictionary(
+            kv => kv.Key,
+            kv => baseline is not null && baseline.TryGetValue(kv.Key, out var then) ? kv.Value - then : (int?)null);
+}
+
+// ---------------------------------------------------------------------------
+// Pruning: every month that ended more than 90 days before the latest daily
+// snapshot is reduced to monthly/YYYY-MM.json, that month's last daily snapshot.
+// Whole months only, so a daily file can live up to ~120 days.
+// ---------------------------------------------------------------------------
+
+static class Pruning
+{
+    public const int KeepDailyDays = 90;
+
+    public static (int Months, int Deleted) Run(SnapshotStore store, int keepDays = KeepDailyDays)
+    {
+        if (!Directory.Exists(store.Daily)) return (0, 0);
+        var daily = Directory.GetFiles(store.Daily, "*.json")
+            .Select(f => (Ok: Dates.TryParse(Path.GetFileNameWithoutExtension(f), out var d), Date: d, Path: f))
+            .Where(f => f.Ok)
+            .ToList();
+        if (daily.Count == 0) return (0, 0);
+
+        var cutoff = daily.Max(f => f.Date).AddDays(-keepDays);
+        int months = 0, deleted = 0;
+        foreach (var month in daily.GroupBy(f => new DateOnly(f.Date.Year, f.Date.Month, 1)))
+        {
+            var lastDayOfMonth = month.Key.AddMonths(1).AddDays(-1);
+            if (lastDayOfMonth >= cutoff) continue;
+
+            var last = month.MaxBy(f => f.Date);
+            var target = Path.Combine(store.Monthly, $"{month.Key:yyyy-MM}.json");
+            // An existing roll-up is kept only if it comes from later in the month.
+            if (!File.Exists(target) || Dates.Parse(SnapshotStore.Load(target).Date) < last.Date)
+            {
+                Directory.CreateDirectory(store.Monthly);
+                File.Copy(last.Path, target, overwrite: true);
+            }
+            foreach (var file in month)
+            {
+                File.Delete(file.Path);
+                deleted++;
+            }
+            months++;
+        }
+        return (months, deleted);
+    }
+}
+
+static class Dates
+{
+    public static DateOnly Parse(string s) => DateOnly.ParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    public static bool TryParse(string s, out DateOnly date) =>
+        DateOnly.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+}
+
+static class TrendReport
+{
+    public static void Run(Paths paths)
+    {
+        var site = Store.Read<SiteConfig>(paths.SiteConfig);
+        var result = Trending.Compute(new SnapshotStore(paths.Snapshots), site.TrendWindowDays, site.TrendToleranceDays);
+        var known = result.Delta.Values.Count(v => v is not null);
+        Log.Info(result.HasHistory
+            ? $"Latest snapshot {result.Current:yyyy-MM-dd}, baseline {result.Baseline:yyyy-MM-dd} ({result.Current.DayNumber - result.Baseline!.Value.DayNumber} days): {known} of {result.Delta.Count} repos have a trend"
+            : $"Latest snapshot {result.Current:yyyy-MM-dd}: no snapshot {site.TrendWindowDays}±{site.TrendToleranceDays} days older yet, so no trends (the site sorts by stars)");
+        if (!result.HasHistory) return;
+
+        var names = Store.ReadList<Project>(paths.Projects).ToDictionary(p => p.Id, p => p.FullName);
+        foreach (var (id, delta) in result.Delta.Where(kv => kv.Value is > 0).OrderByDescending(kv => kv.Value).Take(15))
+            Console.WriteLine($"  +{delta,-5} {names.GetValueOrDefault(id, id.ToString())}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Self-test: trending and pruning against the fixtures in tests/fixtures/.
+// ---------------------------------------------------------------------------
+
+static class SelfTest
+{
+    static int failures;
+
+    public static int Run(Paths paths)
+    {
+        var d = Dates.Parse;
+
+        Log.Info("Baseline selection (latest 2026-06-30, window 30 ± 7 days, target 2026-05-31)");
+        var current = d("2026-06-30");
+        Check(Trending.PickBaseline(current, [d("2026-06-01"), d("2026-05-25")], 30, 7) == d("2026-06-01"), "picks the snapshot closest to 30 days back");
+        Check(Trending.PickBaseline(current, [d("2026-05-29"), d("2026-06-02")], 30, 7) == d("2026-05-29"), "on a tie, prefers the older snapshot");
+        Check(Trending.PickBaseline(current, [d("2026-06-20"), d("2026-06-29"), current], 30, 7) is null, "cold start: nothing old enough gives no baseline");
+        Check(Trending.PickBaseline(current, [d("2026-05-10")], 30, 7) is null, "a snapshot outside the tolerance is not used");
+        Check(Trending.PickBaseline(current, [d("2026-05-24")], 30, 7) == d("2026-05-24"), "37 days back (edge of tolerance) is used");
+        Check(Trending.PickBaseline(current, [d("2026-06-07")], 30, 7) == d("2026-06-07"), "23 days back (edge of tolerance) is used");
+        Check(Trending.PickBaseline(current, [d("2026-05-15"), d("2026-06-15")], 30, 7) is null, "a gap around the target gives no baseline");
+
+        var work = Path.Combine(Path.GetTempPath(), $"gitge-selftest-{Guid.NewGuid():N}");
+        CopyDirectory(Path.Combine(paths.Root, "tests", "fixtures", "snapshots"), work);
+        try
+        {
+            var store = new SnapshotStore(work);
+
+            Log.Info("Trend over fixture snapshots");
+            var result = Trending.Compute(store, 30, 7);
+            Check(result.Current == d("2026-06-30"), "latest snapshot is 'now'");
+            Check(result.Baseline == d("2026-06-01"), "baseline is 2026-06-01 (29 days), not 2026-05-25 (36 days)");
+            Check(result.Delta.GetValueOrDefault(1) == 15, "repo 1: 10 → 25 stars is +15");
+            Check(result.Delta.GetValueOrDefault(3) == -2, "repo 3: 50 → 48 stars is -2");
+            Check(result.Delta.GetValueOrDefault(5) == 0, "repo 5: unchanged is 0");
+            Check(result.Delta.ContainsKey(2) && result.Delta[2] is null, "repo 2: new since the baseline has no trend (null)");
+            Check(!result.Delta.ContainsKey(4), "repo 4: gone from the latest snapshot is not reported");
+
+            Log.Info("Pruning (cutoff 2026-04-01)");
+            var (months, deleted) = Pruning.Run(store);
+            Check(months == 2 && deleted == 4, $"February and March rolled up, 4 daily files deleted (got {months} months, {deleted} files)");
+            Check(RolledUpFrom(store, "2026-02") == "2026-02-27", "monthly 2026-02 is February's last daily snapshot");
+            Check(RolledUpFrom(store, "2026-03") == "2026-03-31", "monthly 2026-03 is March's last daily snapshot");
+            Check(RolledUpFrom(store, "2026-01") == "2026-01-31", "existing monthly 2026-01 is left alone");
+            Check(!File.Exists(Path.Combine(store.Daily, "2026-02-10.json")), "rolled-up daily files are deleted");
+            Check(File.Exists(Path.Combine(store.Daily, "2026-04-02.json")), "April is kept: it ends after the cutoff");
+            Check(Pruning.Run(store) == (0, 0), "a second prune changes nothing");
+            Check(Trending.Compute(store, 30, 7).Baseline == d("2026-06-01"), "trend is unchanged after pruning");
+            Check(Trending.Compute(store, 91, 7).Baseline == d("2026-03-31"), "a monthly snapshot can serve as a baseline (91-day window)");
+        }
+        finally
+        {
+            Directory.Delete(work, recursive: true);
+        }
+
+        Log.Info(failures == 0 ? "All checks passed" : $"{failures} check(s) FAILED");
+        return failures == 0 ? 0 : 1;
+    }
+
+    static string? RolledUpFrom(SnapshotStore store, string month)
+    {
+        var path = Path.Combine(store.Monthly, $"{month}.json");
+        return File.Exists(path) ? SnapshotStore.Load(path).Date : null;
+    }
+
+    static void Check(bool ok, string what)
+    {
+        if (!ok) failures++;
+        Console.Error.WriteLine($"  {(ok ? "ok  " : "FAIL")} {what}");
+    }
+
+    static void CopyDirectory(string from, string to)
+    {
+        foreach (var dir in Directory.GetDirectories(from, "*", SearchOption.AllDirectories))
+            Directory.CreateDirectory(Path.Combine(to, Path.GetRelativePath(from, dir)));
+        Directory.CreateDirectory(to);
+        foreach (var file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
+            File.Copy(file, Path.Combine(to, Path.GetRelativePath(from, file)));
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Review: the developers visitors will actually see, ranked by the stars of
 // their listed repos, so curation effort goes where it matters. Output is
 // Markdown on stdout; add unwanted logins to data/manual/developers.json.
@@ -775,6 +1018,7 @@ sealed record RepoSummary(long Id, string NodeId, string FullName, string HtmlUr
 
 sealed class Paths(string root)
 {
+    public string Root => root;
     public string DiscoveryConfig => Path.Combine(root, "config", "discovery.json");
     public string SiteConfig => Path.Combine(root, "config", "site.json");
     public string ManualDevelopers => Path.Combine(root, "data", "manual", "developers.json");
@@ -783,7 +1027,8 @@ sealed class Paths(string root)
     public string BotData => Path.Combine(root, "data", "bot");
     public string Developers => Path.Combine(BotData, "discovered", "developers.json");
     public string Projects => Path.Combine(BotData, "discovered", "projects.json");
-    public string DailySnapshots => Path.Combine(BotData, "snapshots", "daily");
+    public string Snapshots => Path.Combine(BotData, "snapshots");
+    public string DailySnapshots => Path.Combine(Snapshots, "daily");
     public string DiscoveryState => Path.Combine(BotData, "state", "discovery.json");
 }
 

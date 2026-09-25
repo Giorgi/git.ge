@@ -80,6 +80,19 @@ again:
 - `refresh` saves `projects.json` about once a minute and skips repos already
   refreshed today (UTC). Pass `--force` to refresh everything again.
 
+### Trending and snapshots
+
+```sh
+dotnet run gitge.cs -- trend      # current trend window and top gainers
+dotnet run gitge.cs -- prune      # roll daily snapshots older than ~90 days into monthly ones
+dotnet run gitge.cs -- selftest   # test trending and pruning against tests/fixtures/
+```
+
+Trend = stars gained since the snapshot closest to 30 days before the latest one
+(anywhere from 23 to 37 days back). Until such a snapshot exists, there is no
+trend and the site sorts by stars instead. A repo missing from that older snapshot
+shows "—", not its whole star count.
+
 Commit the results in the worktree (`cd data/bot && git add -A && git commit`),
 not on `main`.
 
