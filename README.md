@@ -102,3 +102,59 @@ not on `main`.
   are set by hand in `data/manual/projects.json`.
 - The include/exclude lists are maintained by hand.
 - Roundup posts are written by hand in `content/roundups/`.
+
+## Automation
+
+GitHub Actions runs everything; the workflows are in `.github/workflows/`.
+
+| Workflow | When | What it does |
+|---|---|---|
+| `nightly.yml` | daily, 02:17 UTC | `refresh` → `prune` → `prepare`, commits bot data to the `data` branch, builds the site, deploys it |
+| `discover.yml` | Mondays 03:23 UTC; daily 04:41 UTC only to resume | full `discover`, then `refresh` for the new repos, commits bot data |
+| `deploy.yml` | called by `nightly.yml`; or run by hand | publishes `_site/` to Cloudflare Pages. The only file that knows the host |
+| `submission.yml` | an issue labelled `submission` or `removal` gets the `accepted` label | runs `gitge.cs submit` and opens a PR, or comments why the issue was rejected |
+| `ci.yml` | pushes to `main`, pull requests | `selftest`, builds the site project, builds the whole site from the `data` branch |
+
+`nightly.yml` and `discover.yml` share a concurrency group, so they never write
+the `data` branch at the same time. Both commit their progress even when a step
+fails, so a rerun resumes instead of starting over.
+
+### Settings to configure
+
+Secrets (Settings → Secrets and variables → Actions):
+
+- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`: for deploys. Until they are
+  set, `deploy.yml` skips the deploy with a warning instead of failing.
+- `GITGE_TOKEN` (optional): a fine-grained personal access token with read-only
+  access to public repositories. The default `GITHUB_TOKEN` is limited to about
+  1,000 API requests an hour per repository; a personal token gets about 5,000.
+  The nightly refresh fits either way. A full weekly discovery takes about 35
+  minutes with a personal token and several hours without one; thanks to
+  checkpoints it finishes either way, just over more runs.
+
+Variables:
+
+- `CF_PAGES_PROJECT` (optional): the Cloudflare Pages project name, default
+  `git-ge`.
+
+Repository settings:
+
+- Settings → Actions → General → Workflow permissions: enable **"Allow GitHub
+  Actions to create and approve pull requests"**, or `submission.yml` can't open
+  PRs.
+- The `data` branch must exist on GitHub (push it once:
+  `git push origin data`).
+
+### Honest notes
+
+- Scheduled runs can start late, sometimes by an hour or more, when GitHub is
+  busy. Nothing depends on exact timing: snapshots are dated by the UTC day they
+  run on.
+- GitHub disables scheduled workflows in a public repository after 60 days
+  without activity. The nightly data commits count as activity, so this only
+  happens if the nightly run itself keeps failing.
+- Pull requests opened by `submission.yml` use `GITHUB_TOKEN`, and GitHub doesn't
+  run workflows for events created by that token. So `ci.yml` doesn't run on
+  those PRs automatically; close and reopen the PR (or push to it) to trigger it.
+  The change is a small edit to one JSON file, and CI runs again on `main` after
+  the merge.
