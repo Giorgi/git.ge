@@ -7,6 +7,7 @@
 //   dotnet run gitge.cs -- refresh [--force]
 //   dotnet run gitge.cs -- review [--top <n>] > review.md
 //   dotnet run gitge.cs -- trend | prune | selftest | prepare
+//   dotnet run gitge.cs -- submit --issue <n>
 // See docs/data-model.md for the files these commands read and write.
 
 using System.Diagnostics;
@@ -17,6 +18,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 var command = args.FirstOrDefault();
@@ -53,6 +55,8 @@ try
             return 0;
         case "selftest":
             return SelfTest.Run(paths);
+        case "submit":
+            return await Submit.Run(paths, options);
         case "review":
             Review.Run(paths, options);
             return 0;
@@ -65,6 +69,8 @@ try
             Console.Error.WriteLine("  prune                Roll daily snapshots older than 90 days into monthly ones");
             Console.Error.WriteLine("  selftest             Test trending and pruning against tests/fixtures");
             Console.Error.WriteLine("  prepare              Write _build/site-data.json for the site renderer");
+            Console.Error.WriteLine("  submit --issue <n>   Apply an accepted submission/removal issue to data/ (exit 3 = rejected)");
+            Console.Error.WriteLine("  submit --body-file <f> --type <submission|removal> [--issue <n>] [--offline]");
             return 2;
     }
 }
@@ -736,6 +742,7 @@ static class SelfTest
         var d = Dates.Parse;
 
         SpotlightRules();
+        Submissions(paths);
 
         Log.Info("Baseline selection (latest 2026-06-30, window 30 ± 7 days, target 2026-05-31)");
         var current = d("2026-06-30");
@@ -820,6 +827,74 @@ static class SelfTest
 
         var later = Prepare.PickSpotlight(projects, week1.AddDays(7 * 9), history).Select(p => p.Key).ToList();
         Check(later.Count == 3, "after 8 weeks, earlier picks are eligible again");
+    }
+
+    // Offline: no GitHub calls; every file written is a temporary copy.
+    static void Submissions(Paths paths)
+    {
+        Log.Info("Submissions and removals (offline, fixtures in tests/fixtures/issues)");
+        var work = Path.Combine(Path.GetTempPath(), $"gitge-submit-{Guid.NewGuid():N}");
+        try
+        {
+            CopyDirectory(Path.Combine(paths.Root, "config"), Path.Combine(work, "config"));
+            var temp = new Paths(work);
+            Directory.CreateDirectory(Path.GetDirectoryName(temp.ManualProjects)!);
+            File.WriteAllText(temp.ManualProjects, "[\n  {\"fullName\":\"example/already-listed\"}\n]\n");
+            File.WriteAllText(temp.ManualDevelopers, "{ \"include\": [], \"exclude\": [\"excluded-user\"] }\n");
+            File.WriteAllText(temp.OptOut, "{ \"developers\": [], \"projects\": [] }\n");
+
+            string Fixture(string name) => File.ReadAllText(Path.Combine(paths.Root, "tests", "fixtures", "issues", name));
+            SubmitResult Run(string body, string type, int? issue = null) => Submit.Execute(temp, body, type, issue, github: null).GetAwaiter().GetResult();
+            List<ManualProject> Manual() => Store.ReadList<ManualProject>(temp.ManualProjects);
+
+            var parsed = Submit.ParseForm(Fixture("submit-github.md"), new(StringComparer.OrdinalIgnoreCase) { ["Project URL"] = "url", ["Name"] = "name", ["Category"] = "category" });
+            Check(parsed["url"] == "https://github.com/Giorgi/DuckDB.NET.git/" && parsed["name"] == "" && parsed["category"] == "dotnet — .NET",
+                  "form parsing: headings matched by English label, _No response_ is empty");
+
+            var github = Run(Fixture("submit-github.md"), "submission", 42);
+            var added = Manual().FirstOrDefault(p => p.FullName == "Giorgi/DuckDB.NET");
+            Check(github.ExitCode == 0 && added is { Category: "dotnet", Issue: 42, Description: null } && added.DescriptionKa is not null,
+                  "GitHub submission: URL normalised to owner/repo, category and Georgian description kept");
+            Check(github.Markdown.Contains("Closes #42"), "the PR body closes the issue");
+            Check(Run(Fixture("submit-github.md"), "submission", 42).ExitCode == 0 && Manual().Count(p => p.FullName == "Giorgi/DuckDB.NET") == 1,
+                  "running the same issue twice adds it once");
+
+            var other = Run(Fixture("submit-other.md"), "submission");
+            Check(other.ExitCode == 0 && Manual().Any(p => p is { Url: "https://gitlab.com/someone/tool", Name: "tool", Owner: "someone", Category: "tools", FullName: null }),
+                  "non-GitHub submission: URL normalised, name and owner recorded");
+
+            var text = File.ReadAllText(temp.ManualProjects);
+            Check(!text.Contains("null") && text.Split('\n').Count(l => l.StartsWith("  {")) == 3,
+                  "projects.json stays one record per line, without null fields");
+            Check(Manual().Select(p => p.FullName ?? p.Url).SequenceEqual(Manual().Select(p => p.FullName ?? p.Url).Order(StringComparer.OrdinalIgnoreCase)),
+                  "projects.json stays sorted");
+
+            var duplicate = Run(Fixture("submit-duplicate.md"), "submission", 43);
+            Check(duplicate.ExitCode == Submit.Rejected && duplicate.Markdown.Contains("already listed") && duplicate.Markdown.Contains("უკვე სიაშია"),
+                  "a duplicate is rejected with a bilingual comment");
+            Check(Run(Fixture("submit-invalid-url.md"), "submission").ExitCode == Submit.Rejected, "an invalid URL is rejected");
+            Check(Run(Fixture("submit-github.md").Replace("https://github.com/Giorgi/DuckDB.NET.git/", "github.com/someone/bare"), "submission").ExitCode == 0
+                  && Manual().Any(p => p.FullName == "someone/bare"), "a URL without https:// is accepted");
+            Check(Run(Fixture("submit-github.md").Replace("https://github.com/Giorgi/DuckDB.NET.git/", "http://github.com/someone/plain"), "submission").ExitCode == Submit.Rejected,
+                  "a plain http URL is rejected");
+            Check(Run(Fixture("submit-github.md").Replace("[X]", "[ ]"), "submission", 44).ExitCode == Submit.Rejected, "a submission without consent is rejected");
+            Check(Run(Fixture("submit-github.md").Replace("Giorgi/DuckDB.NET", "excluded-user/thing"), "submission").ExitCode == Submit.Rejected,
+                  "a project of an excluded developer is rejected");
+
+            var login = Run(Fixture("remove-login.md"), "removal", 50);
+            Check(login.ExitCode == 0 && Store.Read<OptOut>(temp.OptOut).Developers.SequenceEqual(["SomeUser"]), "removal of a login: '@' dropped, added to developers");
+            var repo = Run(Fixture("remove-repo.md"), "removal", 51);
+            Check(repo.ExitCode == 0 && Store.Read<OptOut>(temp.OptOut).Projects.SequenceEqual(["someone/project"]), "removal of owner/repo from a full URL: added to projects");
+            Check(Run(Fixture("remove-login.md"), "removal", 50).ExitCode == 0 && Store.Read<OptOut>(temp.OptOut).Developers.Count == 1,
+                  "running a removal twice adds it once");
+            Check(Run(Fixture("remove-login.md").Replace("@SomeUser", "not a login!"), "removal").ExitCode == Submit.Rejected, "a malformed removal target is rejected");
+            Check(Run(Fixture("submit-github.md").Replace("Giorgi/DuckDB.NET", "SomeUser/thing"), "submission").ExitCode == Submit.Rejected,
+                  "after removal, that account's projects can't be submitted");
+        }
+        finally
+        {
+            if (Directory.Exists(work)) Directory.Delete(work, recursive: true);
+        }
     }
 
     static string? RolledUpFrom(SnapshotStore store, string month)
@@ -1101,6 +1176,309 @@ sealed class SiteProject
 }
 
 // ---------------------------------------------------------------------------
+// Submit: turn an accepted issue from .github/ISSUE_TEMPLATE/ into a data change.
+//   submit --issue <n>                                   read issue n from GitHub
+//   submit --body-file <f> --type <submission|removal>   read a saved issue body
+//          [--issue <n>] [--offline]
+// Exit 0: done (or already done); stdout is a pull request body.
+// Exit 3: rejected; stdout is a polite bilingual comment for the issue.
+// Exit 1: anything else. Logs go to stderr.
+// ---------------------------------------------------------------------------
+
+sealed record SubmitResult(int ExitCode, string Markdown);
+
+static class Submit
+{
+    public const int Rejected = 3;
+
+    // Issue-form headings are the field labels. Each is matched by its English
+    // part (after " / "), so keep these in step with the YAML templates.
+    static readonly Dictionary<string, string> SubmissionForm = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Project URL"] = "url",
+        ["Name"] = "name",
+        ["Description (English)"] = "description",
+        ["Georgian description"] = "description_ka",
+        ["Category"] = "category",
+        ["Consent"] = "consent",
+    };
+
+    static readonly Dictionary<string, string> RemovalForm = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Account or project"] = "target",
+        ["Consent"] = "consent",
+    };
+
+    static readonly Regex Login = new(@"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$");
+    static readonly Regex Repository = new(@"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$");
+
+    public static async Task<int> Run(Paths paths, Options options)
+    {
+        using var github = options.Offline ? null : new GitHub(GitHub.ResolveToken());
+        string body, type;
+        if (options.BodyFile is not null)
+        {
+            body = File.ReadAllText(options.BodyFile);
+            type = options.Type ?? throw new ArgumentException("--type submission|removal is required with --body-file");
+        }
+        else if (options.Issue is { } number)
+        {
+            (body, type) = await FetchIssue(github ?? throw new ArgumentException("--issue needs GitHub access; drop --offline or use --body-file"), paths, number);
+        }
+        else
+        {
+            throw new ArgumentException("submit needs --issue <n>, or --body-file <path> --type <submission|removal>");
+        }
+
+        var result = await Execute(paths, body, type, options.Issue, github);
+        Console.OutputEncoding = new UTF8Encoding(false);
+        Console.Write(result.Markdown);
+        return result.ExitCode;
+    }
+
+    // With github null, remote checks (repo exists, not a fork, canonical name) are skipped.
+    public static Task<SubmitResult> Execute(Paths paths, string body, string type, int? issue, GitHub? github) => type switch
+    {
+        "submission" => Submission(paths, ParseForm(body, SubmissionForm), issue, github),
+        "removal" => Task.FromResult(Removal(paths, ParseForm(body, RemovalForm), issue)),
+        _ => throw new ArgumentException($"Unknown submission type '{type}'; expected 'submission' or 'removal'"),
+    };
+
+    static async Task<SubmitResult> Submission(Paths paths, Dictionary<string, string> form, int? issue, GitHub? github)
+    {
+        if (!Consented(form))
+            return RejectSubmission("საჭიროა თანხმობა, რომ პროექტის ავტორი ხართ ან ავტორის ნებართვა გაქვთ.",
+                                    "The form needs the confirmation that you're the author or have the author's permission.");
+
+        var rawUrl = form.GetValueOrDefault("url", "").Trim();
+        // People often paste "github.com/owner/repo"; assume https for a bare host/path.
+        var withScheme = rawUrl.Contains("://", StringComparison.Ordinal) ? rawUrl : "https://" + rawUrl;
+        if (!Uri.TryCreate(withScheme, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps || !uri.Host.Contains('.'))
+            return RejectSubmission($"„{rawUrl}“ არ არის სწორი https ბმული.", $"“{rawUrl}” isn't a valid https URL.");
+
+        var categories = Store.Read<CategoryConfig>(paths.CategoryConfig).Order;
+        var categoryText = form.GetValueOrDefault("category", "").Trim();
+        var category = categoryText.Split(' ', 2)[0].ToLowerInvariant();
+        if (category is "" or "auto") category = null;
+        else if (!categories.Contains(category))
+            return RejectSubmission($"უცნობი კატეგორია: „{categoryText}“.", $"Unknown category: “{categoryText}”.");
+
+        var name = Json.NullIfBlank(form.GetValueOrDefault("name"))?.Trim();
+        var description = Json.NullIfBlank(form.GetValueOrDefault("description"))?.Trim();
+        var descriptionKa = Json.NullIfBlank(form.GetValueOrDefault("description_ka"))?.Trim();
+
+        var projects = Store.ReadList<ManualProject>(paths.ManualProjects);
+        var optOut = Store.Read<OptOut>(paths.OptOut);
+        var excluded = new HashSet<string>(Store.Read<ManualDevelopers>(paths.ManualDevelopers).Exclude.Concat(optOut.Developers), StringComparer.OrdinalIgnoreCase);
+        var optedOutProjects = new HashSet<string>(optOut.Projects, StringComparer.OrdinalIgnoreCase);
+
+        ManualProject entry;
+        string title;
+        if (uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) || uri.Host.Equals("www.github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            var segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length < 2)
+                return RejectSubmission("ბმული უნდა მიუთითებდეს რეპოზიტორიაზე: https://github.com/owner/repo.",
+                                        "The link must point to a repository: https://github.com/owner/repo.");
+            var owner = segments[0];
+            var repo = segments[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase) ? segments[1][..^4] : segments[1];
+            var fullName = $"{owner}/{repo}";
+
+            if (github is not null)
+            {
+                var data = await github.GraphQL("""
+                    query($o: String!, $n: String!) {
+                      repository(owner: $o, name: $n) { nameWithOwner isFork isPrivate description owner { login } }
+                    }
+                    """, new() { ["o"] = owner, ["n"] = repo });
+                var found = data["repository"];
+                if (found is null || found["isPrivate"]!.GetValue<bool>())
+                    return RejectSubmission($"რეპოზიტორია {fullName} GitHub-ზე ვერ მოიძებნა (ან საჯარო არ არის).",
+                                            $"The repository {fullName} wasn't found on GitHub (or isn't public).");
+                if (found["isFork"]!.GetValue<bool>())
+                    return RejectSubmission($"{fullName} არის fork. git.ge-ზე მხოლოდ ორიგინალი პროექტები ჩანს.",
+                                            $"{fullName} is a fork. git.ge lists original projects only.");
+                if (description is null && Json.NullIfBlank(found["description"]?.GetValue<string>()) is null)
+                    return RejectSubmission("რეპოზიტორიას აღწერა არ აქვს. დაამატეთ აღწერა GitHub-ზე ან ფორმაში.",
+                                            "The repository has no description. Add one on GitHub or in the form.");
+                fullName = found["nameWithOwner"]!.GetValue<string>();
+                owner = found["owner"]!["login"]!.GetValue<string>();
+            }
+
+            if (excluded.Contains(owner) || optedOutProjects.Contains(fullName))
+                return RejectSubmission($"{fullName} ან მისი ავტორი git.ge-დან ამოღებულია.",
+                                        $"{fullName} or its owner has been removed from git.ge.");
+
+            var existing = projects.FirstOrDefault(p => fullName.Equals(p.FullName, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+                return existing.Issue is not null && existing.Issue == issue
+                    ? Done($"**{fullName}** was already added from this issue; nothing to change.", issue)
+                    : RejectSubmission($"{fullName} უკვე სიაშია.", $"{fullName} is already listed.");
+
+            entry = new ManualProject { FullName = fullName, Description = description, DescriptionKa = descriptionKa, Category = category, Issue = issue };
+            title = fullName;
+        }
+        else
+        {
+            if (name is null)
+                return RejectSubmission("GitHub-ის გარეთ განთავსებულ პროექტს სახელი სჭირდება.", "Projects not hosted on GitHub need a name.");
+            if (description is null)
+                return RejectSubmission("GitHub-ის გარეთ განთავსებულ პროექტს აღწერა სჭირდება.", "Projects not hosted on GitHub need a description.");
+
+            var url = $"https://{uri.Host.ToLowerInvariant()}{uri.AbsolutePath.TrimEnd('/')}";
+            if (optedOutProjects.Contains(url))
+                return RejectSubmission("ეს პროექტი git.ge-დან ამოღებულია.", "This project has been removed from git.ge.");
+
+            var existing = projects.FirstOrDefault(p => url.Equals(p.Url, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+                return existing.Issue is not null && existing.Issue == issue
+                    ? Done($"**{name}** was already added from this issue; nothing to change.", issue)
+                    : RejectSubmission($"{url} უკვე სიაშია.", $"{url} is already listed.");
+
+            entry = new ManualProject { Url = url, Owner = ForgeOwner(uri), Name = name, Description = description, DescriptionKa = descriptionKa, Category = category, Issue = issue };
+            title = $"{name} ({url})";
+        }
+
+        projects.Add(entry);
+        Store.WriteList(paths.ManualProjects, projects.OrderBy(p => p.FullName ?? p.Url, StringComparer.OrdinalIgnoreCase), Json.OmitNulls);
+
+        var alreadyDiscovered = entry.FullName is not null
+            && Store.ReadList<Project>(paths.Projects).Any(p => p.FullName.Equals(entry.FullName, StringComparison.OrdinalIgnoreCase));
+        var summary = new StringBuilder()
+            .AppendLine($"Adds **{title}** to `data/manual/projects.json`{(issue is null ? "" : $", as suggested in #{issue}")}.")
+            .AppendLine()
+            .AppendLine($"- Category: {entry.Category ?? "inferred automatically"}")
+            .AppendLine($"- Description: {(entry.Description is null ? "the repository's own" : "from the form")}")
+            .AppendLine($"- Georgian description: {(entry.DescriptionKa is null ? "none" : "yes")}");
+        if (alreadyDiscovered)
+            summary.AppendLine("- Already found by discovery; this adds curation.");
+        return Done(summary.ToString().TrimEnd(), issue);
+    }
+
+    static SubmitResult Removal(Paths paths, Dictionary<string, string> form, int? issue)
+    {
+        if (!Consented(form))
+            return RejectRemoval("საჭიროა თანხმობა, რომ ამ ანგარიშის ან პროექტის მფლობელი ან მხარდამჭერი ხართ.",
+                                 "The form needs the confirmation that you're the owner or a maintainer of this account or project.");
+
+        var raw = form.GetValueOrDefault("target", "").Trim();
+        var target = Regex.Replace(raw, @"^(https?://)?(www\.)?github\.com/", "", RegexOptions.IgnoreCase).TrimStart('@').Trim('/');
+        if (target.EndsWith(".git", StringComparison.OrdinalIgnoreCase)) target = target[..^4];
+
+        var optOut = Store.Read<OptOut>(paths.OptOut);
+        List<string> list;
+        string what;
+        if (Repository.IsMatch(target)) (list, what) = (optOut.Projects, "project");
+        else if (Login.IsMatch(target)) (list, what) = (optOut.Developers, "account (all of its projects)");
+        else return RejectRemoval($"„{raw}“ არ ჰგავს GitHub-ის მომხმარებლის სახელს ან owner/repo-ს.",
+                                  $"“{raw}” doesn't look like a GitHub login or owner/repo.");
+
+        if (list.Contains(target, StringComparer.OrdinalIgnoreCase))
+            return Done($"**{target}** is already in `data/optout.json`; nothing to change.", issue);
+
+        list.Add(target);
+        list.Sort(StringComparer.OrdinalIgnoreCase);
+        Store.WriteObject(paths.OptOut, optOut);
+        return Done($"Adds the {what} **{target}** to `data/optout.json`{(issue is null ? "" : $", as requested in #{issue}")}. " +
+                    "It disappears from the site and its data files with the next nightly update.", issue);
+    }
+
+    // Issue-form bodies are "### <label>" headings, each followed by the answer;
+    // an empty answer is "_No response_".
+    public static Dictionary<string, string> ParseForm(string body, Dictionary<string, string> form)
+    {
+        var fields = new Dictionary<string, string>();
+        string? id = null;
+        var value = new StringBuilder();
+        void Flush()
+        {
+            if (id is null) return;
+            var text = value.ToString().Trim();
+            fields[id] = text == "_No response_" ? "" : text;
+        }
+
+        foreach (var line in body.Replace("\r\n", "\n").Split('\n'))
+        {
+            if (line.StartsWith("### ", StringComparison.Ordinal))
+            {
+                Flush();
+                var heading = line[4..].Trim();
+                var slash = heading.LastIndexOf(" / ", StringComparison.Ordinal);
+                id = form.GetValueOrDefault(slash >= 0 ? heading[(slash + 3)..].Trim() : heading);
+                value.Clear();
+            }
+            else if (id is not null)
+            {
+                value.AppendLine(line);
+            }
+        }
+        Flush();
+        return fields;
+    }
+
+    static bool Consented(Dictionary<string, string> form) =>
+        form.GetValueOrDefault("consent", "").Contains("[x]", StringComparison.OrdinalIgnoreCase);
+
+    // The account name on forges whose URLs start with it; null when it isn't clear.
+    static string? ForgeOwner(Uri uri)
+    {
+        string[] forges = ["gitlab.com", "codeberg.org", "bitbucket.org", "gitea.com", "git.sr.ht"];
+        var first = uri.AbsolutePath.Trim('/').Split('/')[0];
+        return forges.Contains(uri.Host.ToLowerInvariant()) && first.Length > 0 ? first.TrimStart('~') : null;
+    }
+
+    static async Task<(string Body, string Type)> FetchIssue(GitHub github, Paths paths, int number)
+    {
+        var (owner, name) = ThisRepository(paths);
+        var data = await github.GraphQL("""
+            query($o: String!, $n: String!, $i: Int!) {
+              repository(owner: $o, name: $n) { issue(number: $i) { body labels(first: 20) { nodes { name } } } }
+            }
+            """, new() { ["o"] = owner, ["n"] = name, ["i"] = number });
+        var issue = data["repository"]?["issue"] ?? throw new InvalidOperationException($"Issue #{number} not found in {owner}/{name}");
+        var labels = issue["labels"]!["nodes"]!.AsArray().Select(l => l!["name"]!.GetValue<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var type = (labels.Contains("submission"), labels.Contains("removal")) switch
+        {
+            (true, false) => "submission",
+            (false, true) => "removal",
+            _ => throw new InvalidOperationException($"Issue #{number} needs exactly one of the labels 'submission' or 'removal'"),
+        };
+        return (issue["body"]?.GetValue<string>() ?? "", type);
+    }
+
+    // GITHUB_REPOSITORY in Actions; otherwise the repo in config/site.json.
+    static (string Owner, string Name) ThisRepository(Paths paths)
+    {
+        var repo = Environment.GetEnvironmentVariable("GITHUB_REPOSITORY");
+        if (string.IsNullOrEmpty(repo))
+            repo = new Uri(Store.Read<SiteConfig>(paths.SiteConfig).RepoUrl).AbsolutePath.Trim('/');
+        var parts = repo.Split('/');
+        return parts.Length == 2 ? (parts[0], parts[1]) : throw new InvalidOperationException($"Can't tell the repository from '{repo}'");
+    }
+
+    static SubmitResult Done(string summary, int? issue) =>
+        new(0, summary + (issue is null ? "" : $"\n\nCloses #{issue}") + "\n");
+
+    static SubmitResult RejectSubmission(string ka, string en) => new(Rejected, $"""
+        გმადლობთ შეთავაზებისთვის! სამწუხაროდ, პროექტის დამატება ვერ მოხერხდა: {ka}
+        შეგიძლიათ შეასწოროთ issue და საიტის ავტორი მას ხელახლა გადახედავს.
+
+        Thanks for the suggestion! Unfortunately the project couldn't be added: {en}
+        You can edit the issue and the maintainer will take another look.
+
+        """);
+
+    static SubmitResult RejectRemoval(string ka, string en) => new(Rejected, $"""
+        მოთხოვნა ვერ შესრულდა: {ka}
+        შეგიძლიათ შეასწოროთ issue და საიტის ავტორი მას ხელახლა გადახედავს.
+
+        The request couldn't be processed: {en}
+        You can edit the issue and the maintainer will take another look.
+
+        """);
+}
+
+// ---------------------------------------------------------------------------
 // Review: the developers visitors will actually see, ranked by the stars of
 // their listed repos, so curation effort goes where it matters. Output is
 // Markdown on stdout; add unwanted logins to data/manual/developers.json.
@@ -1276,6 +1654,8 @@ sealed class ManualProject
     public string? Category { get; set; }
     public bool? Featured { get; set; }
     public bool? Verified { get; set; }
+    // The issue this entry came from, when added by `submit`.
+    public int? Issue { get; set; }
 }
 
 sealed class Developer
@@ -1432,6 +1812,9 @@ static class Json
 
     public static readonly JsonSerializerOptions Indented = new(Options) { WriteIndented = true };
 
+    // For hand-edited files: leave out fields that aren't set.
+    public static readonly JsonSerializerOptions OmitNulls = new(Options) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+
     public static string? NullIfBlank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
 
     public static DateTimeOffset? Date(JsonNode? n) => n is null ? null : DateTimeOffset.Parse(n.GetValue<string>());
@@ -1449,9 +1832,9 @@ static class Store
     public static void WriteObject<T>(string path, T value) =>
         Write(path, JsonSerializer.Serialize(value, Json.Indented) + "\n");
 
-    public static void WriteList<T>(string path, IEnumerable<T> items)
+    public static void WriteList<T>(string path, IEnumerable<T> items, JsonSerializerOptions? options = null)
     {
-        var lines = items.Select(i => "  " + JsonSerializer.Serialize(i, Json.Options)).ToList();
+        var lines = items.Select(i => "  " + JsonSerializer.Serialize(i, options ?? Json.Options)).ToList();
         Write(path, lines.Count == 0 ? "[]\n" : "[\n" + string.Join(",\n", lines) + "\n]\n");
     }
 
@@ -1607,6 +1990,10 @@ sealed class Options
     public int? Top { get; private set; }
     public bool Restart { get; private set; }
     public bool Force { get; private set; }
+    public int? Issue { get; private set; }
+    public string? BodyFile { get; private set; }
+    public string? Type { get; private set; }
+    public bool Offline { get; private set; }
 
     public static Options Parse(string[] args)
     {
@@ -1620,6 +2007,10 @@ sealed class Options
                 case "--top": options.Top = int.Parse(args[++i]); break;
                 case "--restart": options.Restart = true; break;
                 case "--force": options.Force = true; break;
+                case "--issue": options.Issue = int.Parse(args[++i]); break;
+                case "--body-file": options.BodyFile = args[++i]; break;
+                case "--type": options.Type = args[++i]; break;
+                case "--offline": options.Offline = true; break;
                 default: throw new ArgumentException($"Unknown option '{args[i]}'");
             }
         }
