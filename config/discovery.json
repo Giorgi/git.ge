@@ -1,0 +1,23 @@
+{
+  "locations": [
+    "Tbilisi", "თბილისი",
+    "Batumi", "ბათუმი",
+    "Kutaisi", "ქუთაისი",
+    "Rustavi", "რუსთავი",
+    "Zugdidi", "ზუგდიდი",
+    "Gori", "გორი",
+    "Poti", "ფოთი",
+    "Telavi", "თელავი",
+    "Sakartvelo", "საქართველო"
+  ],
+  "searchCreatedFrom": "2008-01-01",
+  "minPublicRepos": 1,
+  "qualityBar": {
+    "allowForks": false,
+    "allowArchived": false,
+    "requireDescription": true,
+    "minStars": 3,
+    "activeWithinMonths": 12
+  },
+  "helpWantedLabels": ["good first issue", "good-first-issue", "help wanted", "help-wanted"]
+}

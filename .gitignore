@@ -1,0 +1,11 @@
+# Bot-owned data lives on the `data` branch, checked out here as a worktree:
+#   git worktree add data/bot data
+data/bot/
+
+# Generated site
+_site/
+
+bin/
+obj/
+.vs/
+.vscode/
