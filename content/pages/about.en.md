@@ -19,7 +19,7 @@ don't belong are excluded by hand.
 
 Public repositories owned by those developers that aren't forks and have a
 description. Category pages and the full list show projects with at least
-{{listingMinStars}} stars. Smaller active projects appear under "New this month",
+{{listingMinStars}} stars. Smaller active projects appear under "New projects",
 "Recently active" and in search. Categories are inferred from a project's topics,
 language and description, and can be corrected by hand.
 
