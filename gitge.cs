@@ -1,0 +1,789 @@
+#!/usr/bin/env dotnet
+#:property PublishAot=false
+#:property Nullable=enable
+
+// git.ge tooling. Run from the repository root:
+//   dotnet run gitge.cs -- discover [--only <term>] [--max-users <n>]
+//   dotnet run gitge.cs -- refresh
+// See docs/data-model.md for the files these commands read and write.
+
+using System.Diagnostics;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+var command = args.FirstOrDefault();
+var paths = new Paths(Directory.GetCurrentDirectory());
+
+if (!File.Exists(paths.DiscoveryConfig))
+{
+    Log.Error($"Run from the repository root (missing {paths.DiscoveryConfig}).");
+    return 1;
+}
+
+try
+{
+    var options = Options.Parse(args.Skip(1).ToArray());
+    switch (command)
+    {
+        case "discover":
+            using (var github = new GitHub(GitHub.ResolveToken()))
+                await Discovery.Run(github, paths, options);
+            return 0;
+        case "refresh":
+            using (var github = new GitHub(GitHub.ResolveToken()))
+                await Refresh.Run(github, paths);
+            return 0;
+        default:
+            Console.Error.WriteLine("usage: dotnet run gitge.cs -- <discover|refresh> [options]");
+            Console.Error.WriteLine("  discover [--only <location term>] [--max-users <n>]");
+            Console.Error.WriteLine("  refresh");
+            return 2;
+    }
+}
+catch (Exception ex)
+{
+    Log.Error(ex.ToString());
+    return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Discovery: find developers by location, admit their repos that pass the bar.
+// ---------------------------------------------------------------------------
+
+static class Discovery
+{
+    const int OwnersPerQuery = 20;
+
+    public static async Task Run(GitHub github, Paths paths, Options options)
+    {
+        var config = Store.Read<DiscoveryConfig>(paths.DiscoveryConfig);
+        var manualDevelopers = Store.Read<ManualDevelopers>(paths.ManualDevelopers);
+        var optOut = Store.Read<OptOut>(paths.OptOut);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var isFullRun = options.Only is null && options.MaxUsers is null;
+
+        var blocked = Logins(manualDevelopers.Exclude.Concat(optOut.Developers));
+        var blockedProjects = new HashSet<string>(optOut.Projects, StringComparer.OrdinalIgnoreCase);
+
+        // 1. Collect candidate owners: location search + include list.
+        var candidates = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase); // login -> matched term
+        var terms = options.Only is null ? config.Locations : config.Locations.Where(t => t.Equals(options.Only, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (terms.Count == 0)
+            throw new InvalidOperationException($"--only '{options.Only}' is not in config/discovery.json locations.");
+
+        foreach (var term in terms)
+        {
+            int found = 0, rejected = 0;
+            await foreach (var user in SearchUsers(github, term, config))
+            {
+                var login = user.Login;
+                if (blocked.Contains(login)) continue;
+                // Search matches location loosely; require the term to actually appear.
+                if (user.Location is null || !user.Location.Contains(term, StringComparison.OrdinalIgnoreCase)) { rejected++; continue; }
+                if (candidates.TryAdd(login, term)) found++;
+                if (options.MaxUsers is { } max && candidates.Count >= max) break;
+            }
+            Log.Info($"'{term}': {found} new candidates, {rejected} rejected (location did not contain term)");
+            if (options.MaxUsers is { } m && candidates.Count >= m) break;
+        }
+
+        foreach (var login in manualDevelopers.Include)
+            if (!blocked.Contains(login))
+                candidates[login] = null;
+
+        Log.Info($"{candidates.Count} candidate owners; fetching their repositories");
+
+        // 2. Fetch each owner's public, non-fork repos in batches and apply the quality bar.
+        var developers = Store.ReadList<Developer>(paths.Developers).ToDictionary(d => d.Login, StringComparer.OrdinalIgnoreCase);
+        var projects = Store.ReadList<Project>(paths.Projects).ToDictionary(p => p.Key);
+        var includeSet = Logins(manualDevelopers.Include);
+        var seenOwners = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int admittedTotal = 0, newProjects = 0;
+
+        foreach (var batch in candidates.Keys.Chunk(OwnersPerQuery))
+        {
+            var owners = await FetchOwners(github, batch);
+            foreach (var owner in owners)
+            {
+                var admitted = owner.Repos
+                    .Where(r => !blockedProjects.Contains(r.FullName))
+                    .Where(r => config.QualityBar.Passes(r.IsFork, r.IsArchived, r.Description, r.Stars, r.PushedAt, DateTimeOffset.UtcNow))
+                    .ToList();
+                if (admitted.Count == 0) continue;
+
+                seenOwners.Add(owner.Login);
+                developers.TryGetValue(owner.Login, out var existing);
+                developers[owner.Login] = new Developer
+                {
+                    Login = owner.Login,
+                    Id = owner.Id,
+                    Type = owner.Type,
+                    Name = owner.Name,
+                    Location = owner.Location,
+                    HtmlUrl = owner.HtmlUrl,
+                    MatchedTerm = candidates.GetValueOrDefault(owner.Login),
+                    Source = includeSet.Contains(owner.Login) ? "include" : "search",
+                    FirstSeenAt = existing?.FirstSeenAt ?? today.ToString("yyyy-MM-dd"),
+                };
+
+                foreach (var repo in admitted)
+                {
+                    var key = Project.KeyFor(repo.Id);
+                    if (!projects.TryGetValue(key, out var project))
+                    {
+                        project = new Project { Key = key, FirstSeenAt = today.ToString("yyyy-MM-dd") };
+                        projects[key] = project;
+                        newProjects++;
+                    }
+                    project.ApplyDiscovery(repo, owner.Type);
+                    project.Source = "discovered";
+                    admittedTotal++;
+                }
+            }
+        }
+
+        // 3. Drop anything blocked; on a full run also drop owners no longer found.
+        int removedDevelopers = 0, removedProjects = 0;
+        foreach (var login in developers.Keys.ToList())
+        {
+            if (blocked.Contains(login) || (isFullRun && !seenOwners.Contains(login)))
+            {
+                developers.Remove(login);
+                removedDevelopers++;
+            }
+        }
+        foreach (var project in projects.Values.ToList())
+        {
+            var ownerGone = project.Source == "discovered" && !developers.ContainsKey(project.Owner);
+            if (blocked.Contains(project.Owner) || blockedProjects.Contains(project.FullName) || ownerGone)
+            {
+                projects.Remove(project.Key);
+                removedProjects++;
+            }
+        }
+
+        Store.WriteList(paths.Developers, developers.Values.OrderBy(d => d.Login, StringComparer.OrdinalIgnoreCase));
+        Store.WriteList(paths.Projects, projects.Values.OrderBy(p => p.Id));
+        Log.Info($"Discovery done: {developers.Count} developers, {projects.Count} projects " +
+                 $"({newProjects} new, {admittedTotal} passed the bar, removed {removedDevelopers} developers / {removedProjects} projects)" +
+                 (isFullRun ? "" : " [partial run: owners not seen were kept]"));
+        github.LogUsage();
+    }
+
+    // GitHub search returns at most 1,000 results per query. When a query reports
+    // more than that, split its account-creation date range in half and recurse.
+    static async IAsyncEnumerable<SearchUser> SearchUsers(GitHub github, string term, DiscoveryConfig config)
+    {
+        var from = DateOnly.Parse(config.SearchCreatedFrom);
+        var to = DateOnly.FromDateTime(DateTime.UtcNow);
+        await foreach (var user in SearchRange(github, term, config.MinPublicRepos, from, to))
+            yield return user;
+    }
+
+    const string SearchQuery = """
+        query($q: String!, $after: String) {
+          search(type: USER, query: $q, first: 100, after: $after) {
+            userCount
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              ... on User { login location }
+              ... on Organization { login location }
+            }
+          }
+        }
+        """;
+
+    static async IAsyncEnumerable<SearchUser> SearchRange(GitHub github, string term, int minRepos, DateOnly from, DateOnly to)
+    {
+        var q = $"location:\"{term}\" repos:>={minRepos} created:{from:yyyy-MM-dd}..{to:yyyy-MM-dd}";
+        string? after = null;
+        var first = true;
+        while (true)
+        {
+            var data = await github.Search(SearchQuery, new() { ["q"] = q, ["after"] = after });
+            var search = data["search"]!;
+            if (first)
+            {
+                var count = search["userCount"]!.GetValue<int>();
+                if (count > 1000 && from < to)
+                {
+                    var mid = from.AddDays((to.DayNumber - from.DayNumber) / 2);
+                    Log.Info($"  {q}: {count} results, splitting at {mid:yyyy-MM-dd}");
+                    await foreach (var u in SearchRange(github, term, minRepos, from, mid)) yield return u;
+                    await foreach (var u in SearchRange(github, term, minRepos, mid.AddDays(1), to)) yield return u;
+                    yield break;
+                }
+                if (count > 1000)
+                    Log.Warn($"  {q}: {count} results in a single day; only the first 1,000 are reachable");
+                first = false;
+            }
+
+            foreach (var node in search["nodes"]!.AsArray())
+            {
+                var login = node?["login"]?.GetValue<string>();
+                if (login is not null)
+                    yield return new SearchUser(login, node!["location"]?.GetValue<string>());
+            }
+
+            var pageInfo = search["pageInfo"]!;
+            if (!pageInfo["hasNextPage"]!.GetValue<bool>()) yield break;
+            after = pageInfo["endCursor"]!.GetValue<string>();
+        }
+    }
+
+    const string OwnerFields = """
+        __typename login url
+        ... on User { databaseId name location }
+        ... on Organization { databaseId name location }
+        """;
+
+    const string RepoConnection = """
+        repositories(first: 100, after: $AFTER, privacy: PUBLIC, ownerAffiliations: [OWNER], isFork: false,
+                     orderBy: { field: PUSHED_AT, direction: DESC }) {
+          pageInfo { hasNextPage endCursor }
+          nodes { id databaseId nameWithOwner url description stargazerCount isFork isArchived pushedAt }
+        }
+        """;
+
+    // Owners with many large repos can make a batch time out; halve it until it fits.
+    static async Task<List<Owner>> FetchOwners(GitHub github, string[] logins)
+    {
+        try
+        {
+            return await FetchOwnersOnce(github, logins);
+        }
+        catch (GatewayTimeoutException) when (logins.Length > 1)
+        {
+            Log.Warn($"  batch of {logins.Length} owners timed out; splitting");
+            var half = logins.Length / 2;
+            var owners = await FetchOwners(github, logins[..half]);
+            owners.AddRange(await FetchOwners(github, logins[half..]));
+            return owners;
+        }
+    }
+
+    static async Task<List<Owner>> FetchOwnersOnce(GitHub github, string[] logins)
+    {
+        var query = new StringBuilder("query(");
+        query.Append(string.Join(", ", logins.Select((_, i) => $"$l{i}: String!")));
+        query.Append(") {\n");
+        var variables = new Dictionary<string, object?>();
+        for (var i = 0; i < logins.Length; i++)
+        {
+            query.Append($"o{i}: repositoryOwner(login: $l{i}) {{ {OwnerFields} {RepoConnection.Replace("$AFTER", "null")} }}\n");
+            variables[$"l{i}"] = logins[i];
+        }
+        query.Append('}');
+
+        var data = await github.GraphQL(query.ToString(), variables);
+        var owners = new List<Owner>();
+        for (var i = 0; i < logins.Length; i++)
+        {
+            var node = data[$"o{i}"];
+            if (node is null) { Log.Warn($"  owner '{logins[i]}' not found (renamed or deleted?)"); continue; }
+            var owner = Owner.From(node);
+            var connection = node["repositories"]!;
+            owner.Repos.AddRange(connection["nodes"]!.AsArray().Select(r => RepoSummary.From(r!)));
+            // Rare: owners with more than 100 non-fork repos need further pages.
+            while (connection["pageInfo"]!["hasNextPage"]!.GetValue<bool>())
+            {
+                var more = await github.GraphQL(
+                    $"query($l: String!, $after: String) {{ o: repositoryOwner(login: $l) {{ {RepoConnection.Replace("$AFTER", "$after")} }} }}",
+                    new() { ["l"] = owner.Login, ["after"] = connection["pageInfo"]!["endCursor"]!.GetValue<string>() });
+                connection = more["o"]!["repositories"]!;
+                owner.Repos.AddRange(connection["nodes"]!.AsArray().Select(r => RepoSummary.From(r!)));
+            }
+            owners.Add(owner);
+        }
+        return owners;
+    }
+
+    static HashSet<string> Logins(IEnumerable<string> logins) => new(logins, StringComparer.OrdinalIgnoreCase);
+
+    record SearchUser(string Login, string? Location);
+}
+
+// ---------------------------------------------------------------------------
+// Refresh: update every known repo's stats and write today's star snapshot.
+// ---------------------------------------------------------------------------
+
+static class Refresh
+{
+    const int ReposPerQuery = 100;
+
+    public static async Task Run(GitHub github, Paths paths)
+    {
+        var config = Store.Read<DiscoveryConfig>(paths.DiscoveryConfig);
+        var manualDevelopers = Store.Read<ManualDevelopers>(paths.ManualDevelopers);
+        var manualProjects = Store.Read<List<ManualProject>>(paths.ManualProjects);
+        var optOut = Store.Read<OptOut>(paths.OptOut);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
+
+        var blocked = new HashSet<string>(manualDevelopers.Exclude.Concat(optOut.Developers), StringComparer.OrdinalIgnoreCase);
+        var blockedProjects = new HashSet<string>(optOut.Projects, StringComparer.OrdinalIgnoreCase);
+        var projects = Store.ReadList<Project>(paths.Projects).ToDictionary(p => p.Key);
+
+        // Submitted GitHub projects that the bot doesn't know yet: resolve by name.
+        var known = new HashSet<string>(projects.Values.Select(p => p.FullName), StringComparer.OrdinalIgnoreCase);
+        var toResolve = manualProjects
+            .Where(m => m.FullName is not null && !known.Contains(m.FullName) && !blockedProjects.Contains(m.FullName))
+            .Select(m => m.FullName!)
+            .ToList();
+        foreach (var batch in toResolve.Chunk(50))
+        {
+            foreach (var (fullName, repo) in await ResolveByName(github, batch))
+            {
+                if (repo is null) { Log.Warn($"  submitted project '{fullName}' not found on GitHub"); continue; }
+                var key = Project.KeyFor(repo["databaseId"]!.GetValue<long>());
+                projects[key] = new Project { Key = key, NodeId = repo["id"]!.GetValue<string>(), Source = "submitted", FirstSeenAt = today };
+            }
+        }
+
+        foreach (var project in projects.Values.ToList())
+            if (blocked.Contains(project.Owner) || blockedProjects.Contains(project.FullName))
+                projects.Remove(project.Key);
+
+        // Refresh everything by node id, 100 repos per query.
+        var labels = config.HelpWantedLabels;
+        int updated = 0, removed = 0;
+        foreach (var batch in projects.Values.ToList().Chunk(ReposPerQuery))
+        {
+            var data = await github.GraphQL(RefreshQuery, new() { ["ids"] = batch.Select(p => p.NodeId).ToList(), ["labels"] = labels });
+            var nodes = data["nodes"]!.AsArray();
+            for (var i = 0; i < batch.Length; i++)
+            {
+                var node = nodes[i];
+                if (node is null)
+                {
+                    Log.Warn($"  {batch[i].FullName} no longer exists; removing");
+                    projects.Remove(batch[i].Key);
+                    removed++;
+                    continue;
+                }
+                batch[i].ApplyRefresh(node, today);
+                updated++;
+            }
+        }
+
+        // Renames can move a project onto an opted-out name/owner.
+        foreach (var project in projects.Values.ToList())
+            if (blocked.Contains(project.Owner) || blockedProjects.Contains(project.FullName))
+                projects.Remove(project.Key);
+
+        Store.WriteList(paths.Projects, projects.Values.OrderBy(p => p.Id));
+        Store.WriteSnapshot(Path.Combine(paths.DailySnapshots, $"{today}.json"), today, projects.Values);
+        Log.Info($"Refresh done: {updated} updated, {removed} removed, {toResolve.Count} submitted looked up; snapshot {today} written");
+        github.LogUsage();
+    }
+
+    const string RefreshQuery = """
+        query($ids: [ID!]!, $labels: [String!]) {
+          nodes(ids: $ids) {
+            ... on Repository {
+              id databaseId nameWithOwner url description
+              owner { __typename login }
+              stargazerCount forkCount isFork isArchived pushedAt createdAt
+              primaryLanguage { name }
+              repositoryTopics(first: 20) { nodes { topic { name } } }
+              openIssues: issues(states: OPEN) { totalCount }
+              helpWanted: issues(states: OPEN, labels: $labels) { totalCount }
+            }
+          }
+        }
+        """;
+
+    static async Task<List<(string FullName, JsonNode? Repo)>> ResolveByName(GitHub github, string[] fullNames)
+    {
+        var parameters = new List<string>();
+        var fields = new StringBuilder();
+        var variables = new Dictionary<string, object?>();
+        for (var i = 0; i < fullNames.Length; i++)
+        {
+            var split = fullNames[i].Split('/', 2);
+            parameters.Add($"$o{i}: String!, $n{i}: String!");
+            variables[$"o{i}"] = split[0];
+            variables[$"n{i}"] = split.Length > 1 ? split[1] : "";
+            fields.Append($"r{i}: repository(owner: $o{i}, name: $n{i}) {{ id databaseId }}\n");
+        }
+        var data = await github.GraphQL($"query({string.Join(", ", parameters)}) {{\n{fields}}}", variables);
+        return fullNames.Select((name, i) => (name, data[$"r{i}"])).ToList();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+sealed class DiscoveryConfig
+{
+    public List<string> Locations { get; set; } = [];
+    public string SearchCreatedFrom { get; set; } = "2008-01-01";
+    public int MinPublicRepos { get; set; } = 1;
+    public QualityBar QualityBar { get; set; } = new();
+    public List<string> HelpWantedLabels { get; set; } = [];
+}
+
+sealed class QualityBar
+{
+    public bool AllowForks { get; set; }
+    public bool AllowArchived { get; set; }
+    public bool RequireDescription { get; set; } = true;
+    public int MinStars { get; set; } = 3;
+    public int ActiveWithinMonths { get; set; } = 12;
+
+    public bool Passes(bool isFork, bool isArchived, string? description, int stars, DateTimeOffset? pushedAt, DateTimeOffset now)
+    {
+        if (isFork && !AllowForks) return false;
+        if (isArchived && !AllowArchived) return false;
+        if (RequireDescription && string.IsNullOrWhiteSpace(description)) return false;
+        return stars >= MinStars || (pushedAt is { } p && p >= now.AddMonths(-ActiveWithinMonths));
+    }
+}
+
+sealed class ManualDevelopers
+{
+    public List<string> Include { get; set; } = [];
+    public List<string> Exclude { get; set; } = [];
+}
+
+sealed class OptOut
+{
+    public List<string> Developers { get; set; } = [];
+    public List<string> Projects { get; set; } = [];
+}
+
+sealed class ManualProject
+{
+    public string? FullName { get; set; }
+    public string? Url { get; set; }
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public string? DescriptionKa { get; set; }
+    public string? Category { get; set; }
+    public bool? Featured { get; set; }
+    public bool? Verified { get; set; }
+}
+
+sealed class Developer
+{
+    public string Login { get; set; } = "";
+    public long Id { get; set; }
+    public string Type { get; set; } = "";
+    public string? Name { get; set; }
+    public string? Location { get; set; }
+    public string HtmlUrl { get; set; } = "";
+    public string? MatchedTerm { get; set; }
+    public string Source { get; set; } = "";
+    public string FirstSeenAt { get; set; } = "";
+}
+
+sealed class Project
+{
+    public string Key { get; set; } = "";
+    public long Id { get; set; }
+    public string NodeId { get; set; } = "";
+    public string FullName { get; set; } = "";
+    public string HtmlUrl { get; set; } = "";
+    public string? Description { get; set; }
+    public string Owner { get; set; } = "";
+    public string OwnerType { get; set; } = "";
+    public int Stars { get; set; }
+    public int? Forks { get; set; }
+    public int? OpenIssues { get; set; }
+    public int? HelpWantedIssues { get; set; }
+    public string? Language { get; set; }
+    public List<string>? Topics { get; set; }
+    public bool IsFork { get; set; }
+    public bool IsArchived { get; set; }
+    public DateTimeOffset? PushedAt { get; set; }
+    public DateTimeOffset? CreatedAt { get; set; }
+    public string Source { get; set; } = "";
+    public string FirstSeenAt { get; set; } = "";
+    public string? RefreshedAt { get; set; }
+
+    public static string KeyFor(long id) => $"gh:{id}";
+
+    public void ApplyDiscovery(RepoSummary repo, string ownerType)
+    {
+        Id = repo.Id;
+        NodeId = repo.NodeId;
+        FullName = repo.FullName;
+        HtmlUrl = repo.HtmlUrl;
+        Description = repo.Description;
+        Owner = repo.FullName.Split('/')[0];
+        OwnerType = ownerType;
+        Stars = repo.Stars;
+        IsFork = repo.IsFork;
+        IsArchived = repo.IsArchived;
+        PushedAt = repo.PushedAt;
+    }
+
+    public void ApplyRefresh(JsonNode repo, string today)
+    {
+        Id = repo["databaseId"]!.GetValue<long>();
+        NodeId = repo["id"]!.GetValue<string>();
+        FullName = repo["nameWithOwner"]!.GetValue<string>();
+        HtmlUrl = repo["url"]!.GetValue<string>();
+        Description = Json.NullIfBlank(repo["description"]?.GetValue<string>());
+        Owner = repo["owner"]!["login"]!.GetValue<string>();
+        OwnerType = OwnerTypeFrom(repo["owner"]!["__typename"]!.GetValue<string>());
+        Stars = repo["stargazerCount"]!.GetValue<int>();
+        Forks = repo["forkCount"]!.GetValue<int>();
+        OpenIssues = repo["openIssues"]!["totalCount"]!.GetValue<int>();
+        HelpWantedIssues = repo["helpWanted"]!["totalCount"]!.GetValue<int>();
+        Language = repo["primaryLanguage"]?["name"]?.GetValue<string>();
+        Topics = repo["repositoryTopics"]!["nodes"]!.AsArray().Select(t => t!["topic"]!["name"]!.GetValue<string>()).ToList();
+        IsFork = repo["isFork"]!.GetValue<bool>();
+        IsArchived = repo["isArchived"]!.GetValue<bool>();
+        PushedAt = Json.Date(repo["pushedAt"]);
+        CreatedAt = Json.Date(repo["createdAt"]);
+        RefreshedAt = today;
+    }
+
+    public static string OwnerTypeFrom(string typename) => typename == "Organization" ? "Organization" : "User";
+}
+
+sealed class Owner
+{
+    public string Login { get; init; } = "";
+    public long Id { get; init; }
+    public string Type { get; init; } = "";
+    public string? Name { get; init; }
+    public string? Location { get; init; }
+    public string HtmlUrl { get; init; } = "";
+    public List<RepoSummary> Repos { get; } = [];
+
+    public static Owner From(JsonNode node) => new()
+    {
+        Login = node["login"]!.GetValue<string>(),
+        Id = node["databaseId"]?.GetValue<long>() ?? 0,
+        Type = Project.OwnerTypeFrom(node["__typename"]!.GetValue<string>()),
+        Name = Json.NullIfBlank(node["name"]?.GetValue<string>()),
+        Location = Json.NullIfBlank(node["location"]?.GetValue<string>()),
+        HtmlUrl = node["url"]!.GetValue<string>(),
+    };
+}
+
+sealed record RepoSummary(long Id, string NodeId, string FullName, string HtmlUrl, string? Description,
+                          int Stars, bool IsFork, bool IsArchived, DateTimeOffset? PushedAt)
+{
+    public static RepoSummary From(JsonNode n) => new(
+        n["databaseId"]!.GetValue<long>(),
+        n["id"]!.GetValue<string>(),
+        n["nameWithOwner"]!.GetValue<string>(),
+        n["url"]!.GetValue<string>(),
+        Json.NullIfBlank(n["description"]?.GetValue<string>()),
+        n["stargazerCount"]!.GetValue<int>(),
+        n["isFork"]!.GetValue<bool>(),
+        n["isArchived"]!.GetValue<bool>(),
+        Json.Date(n["pushedAt"]));
+}
+
+// ---------------------------------------------------------------------------
+// Storage: sorted, one record per line, UTF-8 without escaping Georgian.
+// ---------------------------------------------------------------------------
+
+sealed class Paths(string root)
+{
+    public string DiscoveryConfig => Path.Combine(root, "config", "discovery.json");
+    public string ManualDevelopers => Path.Combine(root, "data", "manual", "developers.json");
+    public string ManualProjects => Path.Combine(root, "data", "manual", "projects.json");
+    public string OptOut => Path.Combine(root, "data", "optout.json");
+    public string BotData => Path.Combine(root, "data", "bot");
+    public string Developers => Path.Combine(BotData, "discovered", "developers.json");
+    public string Projects => Path.Combine(BotData, "discovered", "projects.json");
+    public string DailySnapshots => Path.Combine(BotData, "snapshots", "daily");
+}
+
+static class Json
+{
+    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+    };
+
+    public static string? NullIfBlank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
+
+    public static DateTimeOffset? Date(JsonNode? n) => n is null ? null : DateTimeOffset.Parse(n.GetValue<string>());
+}
+
+static class Store
+{
+    static readonly UTF8Encoding Utf8 = new(false);
+
+    public static T Read<T>(string path) where T : new() =>
+        File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json.Options) ?? new T() : new T();
+
+    public static List<T> ReadList<T>(string path) => Read<List<T>>(path);
+
+    public static void WriteList<T>(string path, IEnumerable<T> items)
+    {
+        var lines = items.Select(i => "  " + JsonSerializer.Serialize(i, Json.Options)).ToList();
+        Write(path, lines.Count == 0 ? "[]\n" : "[\n" + string.Join(",\n", lines) + "\n]\n");
+    }
+
+    public static void WriteSnapshot(string path, string date, IEnumerable<Project> projects)
+    {
+        var lines = projects.OrderBy(p => p.Id).Select(p => $"    \"{p.Id}\": {p.Stars}").ToList();
+        Write(path, $"{{\n  \"date\": \"{date}\",\n  \"stars\": {{\n{string.Join(",\n", lines)}\n  }}\n}}\n");
+    }
+
+    static void Write(string path, string content)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content, Utf8);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GitHub GraphQL client with rate-limit handling.
+// ---------------------------------------------------------------------------
+
+sealed class GitHub : IDisposable
+{
+    // Search is limited far more tightly than other calls (~30/minute).
+    static readonly TimeSpan SearchInterval = TimeSpan.FromSeconds(2.1);
+    const int LowWaterMark = 50;
+
+    readonly HttpClient http = new() { BaseAddress = new Uri("https://api.github.com/"), Timeout = TimeSpan.FromSeconds(60) };
+    readonly Stopwatch sinceLastSearch = Stopwatch.StartNew();
+    int requests;
+    int? remaining;
+    DateTimeOffset? resetAt;
+
+    public GitHub(string token)
+    {
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("git.ge-fetcher", "1.0"));
+    }
+
+    // GH_TOKEN for local development, GITHUB_TOKEN in Actions, else the GitHub CLI's login.
+    public static string ResolveToken()
+    {
+        foreach (var name in new[] { "GH_TOKEN", "GITHUB_TOKEN" })
+            if (Environment.GetEnvironmentVariable(name) is { Length: > 0 } token)
+                return token;
+        try
+        {
+            using var gh = Process.Start(new ProcessStartInfo("gh", "auth token") { RedirectStandardOutput = true, RedirectStandardError = true })!;
+            var output = gh.StandardOutput.ReadToEnd().Trim();
+            gh.WaitForExit();
+            if (gh.ExitCode == 0 && output.Length > 0) return output;
+        }
+        catch (System.ComponentModel.Win32Exception) { }
+        throw new InvalidOperationException("No GitHub token: set GH_TOKEN, or log in with 'gh auth login'.");
+    }
+
+    public async Task<JsonNode> Search(string query, Dictionary<string, object?> variables)
+    {
+        var wait = SearchInterval - sinceLastSearch.Elapsed;
+        if (wait > TimeSpan.Zero) await Task.Delay(wait);
+        try { return await GraphQL(query, variables); }
+        finally { sinceLastSearch.Restart(); }
+    }
+
+    public async Task<JsonNode> GraphQL(string query, Dictionary<string, object?> variables)
+    {
+        var body = JsonSerializer.Serialize(new { query, variables }, Json.Options);
+        for (var attempt = 1; ; attempt++)
+        {
+            await WaitIfLow();
+            using var response = await http.PostAsync("graphql", new StringContent(body, Encoding.UTF8, "application/json"));
+            requests++;
+            ReadRateLimit(response);
+            var text = await response.Content.ReadAsStringAsync();
+
+            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
+            {
+                if (attempt > 6) throw new HttpRequestException($"Rate limited too many times: {text}");
+                var delay = response.Headers.RetryAfter?.Delta
+                    ?? (remaining == 0 && resetAt is { } r ? r - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(60 * attempt));
+                Log.Warn($"  rate limited ({(int)response.StatusCode}); waiting {delay.TotalSeconds:F0}s");
+                await Task.Delay(delay);
+                continue;
+            }
+            if ((int)response.StatusCode >= 500)
+            {
+                // Repeated 502/504 usually means the query is too heavy; let the caller shrink it.
+                if (attempt > 1) throw new GatewayTimeoutException((int)response.StatusCode);
+                Log.Warn($"  GitHub {(int)response.StatusCode}; retrying");
+                await Task.Delay(TimeSpan.FromSeconds(5 * attempt));
+                continue;
+            }
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"GitHub returned {(int)response.StatusCode}: {text}");
+
+            var json = JsonNode.Parse(text)!;
+            var errors = json["errors"]?.AsArray() ?? [];
+            if (errors.Any(e => e?["type"]?.GetValue<string>() == "RATE_LIMITED"))
+            {
+                var delay = resetAt is { } r ? r - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(60);
+                Log.Warn($"  GraphQL rate limit; waiting {delay.TotalSeconds:F0}s");
+                await Task.Delay(delay);
+                continue;
+            }
+            // NOT_FOUND is expected for renamed/deleted owners and repos; callers see a null node.
+            foreach (var error in errors.Where(e => e?["type"]?.GetValue<string>() != "NOT_FOUND"))
+                Log.Warn($"  GraphQL error: {error?.ToJsonString()}");
+            return json["data"] ?? throw new HttpRequestException($"GraphQL returned no data: {text}");
+        }
+    }
+
+    void ReadRateLimit(HttpResponseMessage response)
+    {
+        if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var r) && int.TryParse(r.First(), out var rem))
+            remaining = rem;
+        if (response.Headers.TryGetValues("X-RateLimit-Reset", out var s) && long.TryParse(s.First(), out var epoch))
+            resetAt = DateTimeOffset.FromUnixTimeSeconds(epoch);
+    }
+
+    async Task WaitIfLow()
+    {
+        if (remaining is not { } rem || rem > LowWaterMark || resetAt is not { } reset) return;
+        var delay = reset - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+        if (delay <= TimeSpan.Zero) return;
+        Log.Warn($"  {rem} GraphQL points left; waiting {delay.TotalMinutes:F1} min for reset");
+        await Task.Delay(delay);
+    }
+
+    public void LogUsage() => Log.Info($"{requests} API requests; {remaining?.ToString() ?? "?"} GraphQL points left until {resetAt:HH:mm} UTC");
+
+    public void Dispose() => http.Dispose();
+}
+
+sealed class GatewayTimeoutException(int status) : HttpRequestException($"GitHub returned {status} repeatedly");
+
+sealed class Options
+{
+    public string? Only { get; private set; }
+    public int? MaxUsers { get; private set; }
+
+    public static Options Parse(string[] args)
+    {
+        var options = new Options();
+        for (var i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--only": options.Only = args[++i]; break;
+                case "--max-users": options.MaxUsers = int.Parse(args[++i]); break;
+                default: throw new ArgumentException($"Unknown option '{args[i]}'");
+            }
+        }
+        return options;
+    }
+}
+
+static class Log
+{
+    public static void Info(string message) => Console.Error.WriteLine($"{DateTime.UtcNow:HH:mm:ss} {message}");
+    public static void Warn(string message) => Console.Error.WriteLine($"{DateTime.UtcNow:HH:mm:ss} WARN {message}");
+    public static void Error(string message) => Console.Error.WriteLine($"{DateTime.UtcNow:HH:mm:ss} ERROR {message}");
+}
