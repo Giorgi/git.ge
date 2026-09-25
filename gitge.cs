@@ -110,9 +110,11 @@ static class Discovery
         var seenOwners = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int admittedTotal = 0, newProjects = 0;
 
+        var progress = new Progress("owners", candidates.Count);
         foreach (var batch in candidates.Keys.Chunk(OwnersPerQuery))
         {
             var owners = await FetchOwners(github, batch);
+            progress.Advance(batch.Length);
             foreach (var owner in owners)
             {
                 var admitted = owner.Repos
@@ -354,26 +356,24 @@ static class Refresh
             if (blocked.Contains(project.Owner) || blockedProjects.Contains(project.FullName))
                 projects.Remove(project.Key);
 
-        // Refresh everything by node id, 100 repos per query.
-        var labels = config.HelpWantedLabels;
+        // Refresh everything by node id, up to 100 repos per query.
         int updated = 0, removed = 0;
+        var progress = new Progress("repos", projects.Count);
         foreach (var batch in projects.Values.ToList().Chunk(ReposPerQuery))
         {
-            var data = await github.GraphQL(RefreshQuery, new() { ["ids"] = batch.Select(p => p.NodeId).ToList(), ["labels"] = labels });
-            var nodes = data["nodes"]!.AsArray();
-            for (var i = 0; i < batch.Length; i++)
+            foreach (var (project, node) in await FetchRepos(github, batch, config.HelpWantedLabels))
             {
-                var node = nodes[i];
                 if (node is null)
                 {
-                    Log.Warn($"  {batch[i].FullName} no longer exists; removing");
-                    projects.Remove(batch[i].Key);
+                    Log.Warn($"  {project.FullName} no longer exists; removing");
+                    projects.Remove(project.Key);
                     removed++;
                     continue;
                 }
-                batch[i].ApplyRefresh(node, today);
+                project.ApplyRefresh(node, today);
                 updated++;
             }
+            progress.Advance(batch.Length);
         }
 
         // Renames can move a project onto an opted-out name/owner.
@@ -385,6 +385,25 @@ static class Refresh
         Store.WriteSnapshot(Path.Combine(paths.DailySnapshots, $"{today}.json"), today, projects.Values);
         Log.Info($"Refresh done: {updated} updated, {removed} removed, {toResolve.Count} submitted looked up; snapshot {today} written");
         github.LogUsage();
+    }
+
+    // Repos with huge issue counts can make a batch time out; halve it until it fits.
+    static async Task<List<(Project Project, JsonNode? Node)>> FetchRepos(GitHub github, Project[] batch, List<string> labels)
+    {
+        try
+        {
+            var data = await github.GraphQL(RefreshQuery, new() { ["ids"] = batch.Select(p => p.NodeId).ToList(), ["labels"] = labels });
+            var nodes = data["nodes"]!.AsArray();
+            return batch.Select((p, i) => (p, nodes[i])).ToList();
+        }
+        catch (GatewayTimeoutException) when (batch.Length > 1)
+        {
+            Log.Warn($"  batch of {batch.Length} repos timed out; splitting");
+            var half = batch.Length / 2;
+            var result = await FetchRepos(github, batch[..half], labels);
+            result.AddRange(await FetchRepos(github, batch[half..], labels));
+            return result;
+        }
     }
 
     const string RefreshQuery = """
@@ -778,10 +797,23 @@ sealed class GitHub : IDisposable
         for (var attempt = 1; ; attempt++)
         {
             await WaitIfLow();
-            using var response = await http.PostAsync("graphql", new StringContent(body, Encoding.UTF8, "application/json"));
+            HttpResponseMessage response;
+            string text;
+            try
+            {
+                response = await http.PostAsync("graphql", new StringContent(body, Encoding.UTF8, "application/json"));
+                text = await response.Content.ReadAsStringAsync();
+            }
+            catch (TaskCanceledException)
+            {
+                // Client-side timeout: the query is too heavy, same as a 502/504.
+                if (attempt > 1) throw new GatewayTimeoutException(0);
+                Log.Warn("  request timed out; retrying");
+                continue;
+            }
+            using var _ = response;
             requests++;
             ReadRateLimit(response);
-            var text = await response.Content.ReadAsStringAsync();
 
             if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
             {
@@ -792,7 +824,8 @@ sealed class GitHub : IDisposable
                 await Task.Delay(delay);
                 continue;
             }
-            if ((int)response.StatusCode >= 500)
+            // GitHub sometimes answers a timed-out query with 200 and an empty body.
+            if ((int)response.StatusCode >= 500 || (response.IsSuccessStatusCode && string.IsNullOrWhiteSpace(text)))
             {
                 // Repeated 502/504 usually means the query is too heavy; let the caller shrink it.
                 if (attempt > 1) throw new GatewayTimeoutException((int)response.StatusCode);
@@ -863,6 +896,21 @@ sealed class Options
             }
         }
         return options;
+    }
+}
+
+// Logs "n / total" at most once a minute, so long runs show they are alive.
+sealed class Progress(string what, int total)
+{
+    readonly Stopwatch sinceLast = Stopwatch.StartNew();
+    int done;
+
+    public void Advance(int count)
+    {
+        done += count;
+        if (sinceLast.Elapsed < TimeSpan.FromMinutes(1) && done < total) return;
+        Log.Info($"  {done} / {total} {what}");
+        sinceLast.Restart();
     }
 }
 
