@@ -11,3 +11,7 @@ obj/
 .vscode/
 review.md
 _build/
+
+# Claude Code agent worktrees
+.claude/worktrees/
+*.tmp

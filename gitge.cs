@@ -1844,10 +1844,14 @@ static class Store
         Write(path, $"{{\n  \"date\": \"{date}\",\n  \"stars\": {{\n{string.Join(",\n", lines)}\n  }}\n}}\n");
     }
 
+    // Write to a temp file, then rename: a run killed mid-write (e.g. a CI timeout)
+    // leaves the previous complete file, never a truncated one.
     static void Write(string path, string content)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, content, Utf8);
+        var temp = path + ".tmp";
+        File.WriteAllText(temp, content, Utf8);
+        File.Move(temp, path, overwrite: true);
     }
 }
 

@@ -40,12 +40,6 @@ What this means in practice, honestly:
   not archived unless it has 10+ stars, and (≥ 3 stars or pushed in the last 12
   months). Repos without a description are never listed, whatever their stars.
 
-## Removal
-
-Anyone can ask to be removed by opening an issue or a PR that adds their login (or
-`owner/repo`) to [`data/optout.json`](data/optout.json). Opt-out beats everything
-else. The next refresh drops the entries from the data and from the site.
-
 ## Submissions and removals
 
 Two issue forms live in [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/):
