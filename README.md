@@ -36,8 +36,9 @@ What this means in practice, honestly:
   `exclude` for accounts that shouldn't be listed (wrong match, bots, etc.).
 - Only repos **owned** by the developer or org are found, not contributions to
   other repos.
-- Auto-discovered repos must pass a quality bar: not a fork, not archived, has a
-  description, and (≥ 3 stars or pushed in the last 12 months).
+- Auto-discovered repos must pass a quality bar: not a fork, has a description,
+  not archived unless it has 10+ stars, and (≥ 3 stars or pushed in the last 12
+  months). Repos without a description are never listed, whatever their stars.
 
 ## Removal
 

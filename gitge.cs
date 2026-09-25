@@ -585,7 +585,8 @@ sealed class DiscoveryConfig
 sealed class QualityBar
 {
     public bool AllowForks { get; set; }
-    public bool AllowArchived { get; set; }
+    // Archived repos are finished or retired projects; keep the well-starred ones.
+    public int ArchivedMinStars { get; set; } = 10;
     public bool AllowTemplateGenerated { get; set; }
     public bool RequireDescription { get; set; } = true;
     public int MinStars { get; set; } = 3;
@@ -600,7 +601,7 @@ sealed class QualityBar
                        int stars, DateTimeOffset? pushedAt, DateTimeOffset now)
     {
         if (isFork && !AllowForks) return false;
-        if (isArchived && !AllowArchived) return false;
+        if (isArchived && stars < ArchivedMinStars) return false;
         if (templateFrom is not null && !AllowTemplateGenerated) return false;
         if (RequireDescription && string.IsNullOrWhiteSpace(description)) return false;
         if (IsExercise(fullName.Split('/').Last(), description)) return false;

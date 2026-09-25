@@ -153,8 +153,9 @@ run on the same UTC day overwrites).
 ## Quality bar (auto-discovered repos only)
 
 Configurable in `config/discovery.json` → `qualityBar`. A repo is admitted when
-it is not a fork, not archived, not generated from a template, has a
-description, does not match any of `excludePatterns` (case-insensitive regexes
+it is not a fork, not generated from a template, not archived (unless it has
+at least `archivedMinStars` stars, default 10; the site badges it), has a
+description (always required, at any star count), does not match any of `excludePatterns` (case-insensitive regexes
 over name and description, aimed at homework, course exercises and test
 assignments), and has (≥ 3 stars **or** a push within the last 12 months).
 Submitted projects bypass the bar. A repo that later drops below the bar stays in

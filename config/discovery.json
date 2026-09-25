@@ -14,7 +14,7 @@
   "minPublicRepos": 1,
   "qualityBar": {
     "allowForks": false,
-    "allowArchived": false,
+    "archivedMinStars": 10,
     "allowTemplateGenerated": false,
     "requireDescription": true,
     "minStars": 3,
