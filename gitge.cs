@@ -461,8 +461,13 @@ static class Refresh
                 Store.WriteList(paths.Projects, projects.Values.OrderBy(p => p.Id));
                 sinceCheckpoint.Restart();
             }
-            foreach (var (project, node) in await FetchRepos(github, batch, config.HelpWantedLabels))
+            foreach (var (project, node, unavailable) in await FetchRepos(github, batch, config.HelpWantedLabels))
             {
+                if (node is null && unavailable)
+                {
+                    Log.Warn($"  {project.FullName} couldn't be read (access refused); keeping its previous data");
+                    continue;
+                }
                 if (node is null)
                 {
                     Log.Warn($"  {project.FullName} no longer exists; removing");
@@ -532,13 +537,22 @@ static class Refresh
     }
 
     // Repos with huge issue counts can make a batch time out; halve it until it fits.
-    static async Task<List<(Project Project, JsonNode? Node)>> FetchRepos(GitHub github, Project[] batch, List<string> labels)
+    // Node is null when the repo is gone (NOT_FOUND) or can't be read. Unavailable is
+    // true in the second case (e.g. an enterprise blocking the token), so the caller
+    // keeps the project instead of removing it.
+    static async Task<List<(Project Project, JsonNode? Node, bool Unavailable)>> FetchRepos(GitHub github, Project[] batch, List<string> labels)
     {
         try
         {
-            var data = await github.GraphQL(RefreshQuery, new() { ["ids"] = batch.Select(p => p.NodeId).ToList(), ["labels"] = labels });
+            var (data, errors) = await github.GraphQLWithErrors(RefreshQuery, new() { ["ids"] = batch.Select(p => p.NodeId).ToList(), ["labels"] = labels });
             var nodes = data["nodes"]!.AsArray();
-            return batch.Select((p, i) => (p, nodes[i])).ToList();
+            var unavailable = errors
+                .Where(e => e?["type"]?.GetValue<string>() != "NOT_FOUND")
+                .Select(e => e?["path"]?.AsArray())
+                .Where(p => p is { Count: >= 2 } && p[0]?.GetValue<string>() == "nodes")
+                .Select(p => p![1]!.GetValue<int>())
+                .ToHashSet();
+            return batch.Select((p, i) => (p, nodes[i], unavailable.Contains(i))).ToList();
         }
         catch (GatewayTimeoutException) when (batch.Length > 1)
         {
@@ -2082,7 +2096,12 @@ sealed class GitHub : IDisposable
         finally { sinceLastSearch.Restart(); }
     }
 
-    public async Task<JsonNode> GraphQL(string query, Dictionary<string, object?> variables)
+    public async Task<JsonNode> GraphQL(string query, Dictionary<string, object?> variables) =>
+        (await GraphQLWithErrors(query, variables)).Data;
+
+    // Like GraphQL, but also returns the per-field errors, for callers that must tell
+    // "doesn't exist" (NOT_FOUND) apart from "not allowed to see it" (FORBIDDEN, etc.).
+    public async Task<(JsonNode Data, JsonArray Errors)> GraphQLWithErrors(string query, Dictionary<string, object?> variables)
     {
         var body = JsonSerializer.Serialize(new { query, variables }, Json.Options);
         for (var attempt = 1; ; attempt++)
@@ -2139,7 +2158,7 @@ sealed class GitHub : IDisposable
             // NOT_FOUND is expected for renamed/deleted owners and repos; callers see a null node.
             foreach (var error in errors.Where(e => e?["type"]?.GetValue<string>() != "NOT_FOUND"))
                 Log.Warn($"  GraphQL error: {error?.ToJsonString()}");
-            return json["data"] ?? throw new HttpRequestException($"GraphQL returned no data: {text}");
+            return (json["data"] ?? throw new HttpRequestException($"GraphQL returned no data: {text}"), errors);
         }
     }
 
