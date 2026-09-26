@@ -37,8 +37,9 @@ What this means in practice, honestly:
 - Only repos **owned** by the developer or org are found, not contributions to
   other repos.
 - Auto-discovered repos must pass a quality bar: not a fork, has a description,
-  not archived unless it has 10+ stars, and (≥ 3 stars or pushed in the last 12
-  months). Repos without a description are never listed, whatever their stars.
+  not archived unless it has 10+ stars, and 3+ stars (or, for repos created in the
+  last 60 days, 1+ star). Repos without a description are never listed, whatever
+  their stars.
 
 ## Submissions and removals
 

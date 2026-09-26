@@ -140,7 +140,7 @@ static class Discovery
             {
                 var admitted = owner.Repos
                     .Where(r => !blockedProjects.Contains(r.FullName))
-                    .Where(r => config.QualityBar.Passes(r.FullName, r.Description, r.IsFork, r.IsArchived, r.TemplateFrom, r.Stars, r.PushedAt, DateTimeOffset.UtcNow))
+                    .Where(r => config.QualityBar.Passes(r.FullName, r.Description, r.IsFork, r.IsArchived, r.TemplateFrom, r.Stars, r.CreatedAt, DateTimeOffset.UtcNow))
                     .ToList();
                 if (admitted.Count == 0) continue;
 
@@ -343,7 +343,7 @@ static class Discovery
         repositories(first: 100, after: $AFTER, privacy: PUBLIC, ownerAffiliations: [OWNER], isFork: false,
                      orderBy: { field: PUSHED_AT, direction: DESC }) {
           pageInfo { hasNextPage endCursor }
-          nodes { id databaseId nameWithOwner url description stargazerCount isFork isArchived pushedAt
+          nodes { id databaseId nameWithOwner url description stargazerCount isFork isArchived pushedAt createdAt
                   templateRepository { nameWithOwner } }
         }
         """;
@@ -445,6 +445,19 @@ static class Refresh
         foreach (var project in projects.Values.ToList())
             if (blocked.Contains(project.Owner) || blockedProjects.Contains(project.FullName))
                 projects.Remove(project.Key);
+
+        // Drop discovered repos that no longer meet the quality bar (judged on their last
+        // known data), so the nightly run doesn't spend calls on repos the site never shows.
+        // Curated and submitted projects are always kept. A dropped repo that later grows
+        // is re-admitted by the weekly discovery.
+        var curated = new HashSet<string>(manualProjects.Where(m => m.FullName is not null).Select(m => m.FullName!), StringComparer.OrdinalIgnoreCase);
+        var now = DateTimeOffset.UtcNow;
+        var dropped = projects.Values
+            .Where(p => p.Source == "discovered" && !curated.Contains(p.FullName)
+                        && !config.QualityBar.Passes(p.FullName, p.Description, p.IsFork, p.IsArchived, p.TemplateFrom, p.Stars, p.CreatedAt, now))
+            .Select(p => p.Key).ToList();
+        foreach (var key in dropped) projects.Remove(key);
+        if (dropped.Count > 0) Log.Info($"{dropped.Count} repos below the quality bar dropped");
 
         // Refresh by node id, up to 100 repos per query. Repos already refreshed today
         // are skipped, so rerunning after a crash resumes instead of starting over.
@@ -760,6 +773,19 @@ static class SelfTest
         var d = Dates.Parse;
 
         SpotlightRules();
+
+        Log.Info("Quality bar (3+ stars, or 1+ star and created in the last 60 days)");
+        var bar = new QualityBar();
+        var at = new DateTimeOffset(2026, 9, 26, 0, 0, 0, TimeSpan.Zero);
+        bool Ok(int stars, int ageDays, bool archived = false, string? desc = "a tool") =>
+            bar.Passes("o/r", desc, false, archived, null, stars, at.AddDays(-ageDays), at);
+        Check(Ok(3, 2000), "3 stars passes, however old");
+        Check(!Ok(2, 2000), "2 stars on an old repo doesn't pass (recent pushes no longer count)");
+        Check(Ok(1, 30), "a new repo (30 days) with 1 star passes");
+        Check(!Ok(0, 10), "a new repo with 0 stars doesn't pass");
+        Check(!Ok(1, 61), "1 star after 60 days doesn't pass");
+        Check(!Ok(5, 100, archived: true), "archived needs 10+ stars");
+        Check(!Ok(50, 100, desc: null), "no description never passes");
         Submissions(paths);
 
         Log.Info("Baseline selection (latest 2026-06-30, window 30 ± 7 days, target 2026-05-31)");
@@ -978,7 +1004,7 @@ static class Prepare
             curation.TryGetValue(p.FullName, out var m);
             // Curated or submitted projects skip the bar; discovered ones are re-checked in case the bar changed.
             var curated = m is not null || p.Source == "submitted";
-            if (!curated && !discovery.QualityBar.Passes(p.FullName, p.Description, p.IsFork, p.IsArchived, p.TemplateFrom, p.Stars, p.PushedAt, now))
+            if (!curated && !discovery.QualityBar.Passes(p.FullName, p.Description, p.IsFork, p.IsArchived, p.TemplateFrom, p.Stars, p.CreatedAt, now))
                 continue;
 
             projects.Add(new SiteProject
@@ -1689,7 +1715,7 @@ static class Review
 
         var listed = Store.ReadList<Project>(paths.Projects)
             .Where(p => p.Stars >= site.ListingMinStars)
-            .Where(p => config.QualityBar.Passes(p.FullName, p.Description, p.IsFork, p.IsArchived, p.TemplateFrom, p.Stars, p.PushedAt, now))
+            .Where(p => config.QualityBar.Passes(p.FullName, p.Description, p.IsFork, p.IsArchived, p.TemplateFrom, p.Stars, p.CreatedAt, now))
             .GroupBy(p => p.Owner, StringComparer.OrdinalIgnoreCase)
             .Select(g => (Owner: g.Key, Stars: g.Sum(p => p.Stars), Repos: g.OrderByDescending(p => p.Stars).ToList()))
             .OrderByDescending(x => x.Stars)
@@ -1789,7 +1815,9 @@ sealed class QualityBar
     public bool AllowTemplateGenerated { get; set; }
     public bool RequireDescription { get; set; } = true;
     public int MinStars { get; set; } = 3;
-    public int ActiveWithinMonths { get; set; } = 12;
+    // New repos get a lower bar so "New projects" can show them before they collect stars.
+    public int NewRepoDays { get; set; } = 60;
+    public int NewRepoMinStars { get; set; } = 1;
     // Case-insensitive regexes matched against the repo name and description,
     // to drop course exercises and test assignments.
     public List<string> ExcludePatterns { get; set; } = [];
@@ -1797,14 +1825,15 @@ sealed class QualityBar
     Regex[]? excludeRegexes;
 
     public bool Passes(string fullName, string? description, bool isFork, bool isArchived, string? templateFrom,
-                       int stars, DateTimeOffset? pushedAt, DateTimeOffset now)
+                       int stars, DateTimeOffset? createdAt, DateTimeOffset now)
     {
         if (isFork && !AllowForks) return false;
         if (isArchived && stars < ArchivedMinStars) return false;
         if (templateFrom is not null && !AllowTemplateGenerated) return false;
         if (RequireDescription && string.IsNullOrWhiteSpace(description)) return false;
         if (IsExercise(fullName.Split('/').Last(), description)) return false;
-        return stars >= MinStars || (pushedAt is { } p && p >= now.AddMonths(-ActiveWithinMonths));
+        return stars >= MinStars
+            || (stars >= NewRepoMinStars && createdAt is { } c && c >= now.AddDays(-NewRepoDays));
     }
 
     bool IsExercise(string name, string? description)
@@ -1906,6 +1935,7 @@ sealed class Project
         IsArchived = repo.IsArchived;
         TemplateFrom = repo.TemplateFrom;
         PushedAt = repo.PushedAt;
+        CreatedAt ??= repo.CreatedAt;
     }
 
     public void ApplyRefresh(JsonNode repo, string today)
@@ -1956,7 +1986,7 @@ sealed class Owner
 }
 
 sealed record RepoSummary(long Id, string NodeId, string FullName, string HtmlUrl, string? Description,
-                          int Stars, bool IsFork, bool IsArchived, string? TemplateFrom, DateTimeOffset? PushedAt)
+                          int Stars, bool IsFork, bool IsArchived, string? TemplateFrom, DateTimeOffset? PushedAt, DateTimeOffset? CreatedAt)
 {
     public static RepoSummary From(JsonNode n) => new(
         n["databaseId"]!.GetValue<long>(),
@@ -1968,7 +1998,8 @@ sealed record RepoSummary(long Id, string NodeId, string FullName, string HtmlUr
         n["isFork"]!.GetValue<bool>(),
         n["isArchived"]!.GetValue<bool>(),
         n["templateRepository"]?["nameWithOwner"]?.GetValue<string>(),
-        Json.Date(n["pushedAt"]));
+        Json.Date(n["pushedAt"]),
+        Json.Date(n["createdAt"]));
 }
 
 // ---------------------------------------------------------------------------

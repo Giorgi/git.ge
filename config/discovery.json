@@ -18,7 +18,8 @@
     "allowTemplateGenerated": false,
     "requireDescription": true,
     "minStars": 3,
-    "activeWithinMonths": 12,
+    "newRepoDays": 60,
+    "newRepoMinStars": 1,
     "excludePatterns": [
       "^skills-",
       "home[ -]?work",

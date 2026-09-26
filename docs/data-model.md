@@ -166,10 +166,13 @@ it is not a fork, not generated from a template, not archived (unless it has
 at least `archivedMinStars` stars, default 10; the site badges it), has a
 description (always required, at any star count), does not match any of `excludePatterns` (case-insensitive regexes
 over name and description, aimed at homework, course exercises and test
-assignments), and has (≥ 3 stars **or** a push within the last 12 months).
-Submitted projects bypass the bar. A repo that later drops below the bar stays in
-the data file and is filtered at site-generation time, so the list doesn't
-flicker.
+assignments), and has **at least `minStars` stars (3)**, or is **new**: created
+in the last `newRepoDays` (60) days with at least `newRepoMinStars` (1) star, so it
+can appear under "New projects". Recent pushes alone don't count: most active
+0-star repos are personal work in progress, and the site never showed them.
+Curated and submitted projects bypass the bar. The nightly refresh drops
+discovered repos that no longer meet the bar, based on their last known data; the
+weekly discovery re-admits them if they grow.
 
 ## What is shown where
 
