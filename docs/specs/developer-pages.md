@@ -24,8 +24,8 @@ GitHub can't:
 
 ## Who gets a page
 
-Every owner (user or organization) with **at least one listed project** (10+
-stars, or curated/submitted). Excluded (`data/manual/developers.json`) and
+Every owner (user or organization) with **at least one published project**, listed
+(10+ stars, curated or submitted) or search-only (3+ stars): 861 pages. Excluded (`data/manual/developers.json`) and
 opted-out (`data/optout.json`) developers get no page and never appear on anyone
 else's page, in either direction: their projects never reach the published data,
 and every list on a page only contains people who have a page.
@@ -36,27 +36,39 @@ URL: `/u/<login>/`, with the login lower-cased. A renamed login's old URL return
 
 In this order; any section without content is left out.
 
-1. **Header:** avatar (96 px), name (or login), `github.com/<login>`, person or
-   organization, and a summary: "N projects · M★ · languages · categories".
-2. **Chips:**
-   - Category ranks: the developer's listed projects that rank within
-     `rankTopN` (10) in their category by stars, e.g. "#1 .NET of 53" plus the
-     project name.
-   - Spotlight weeks.
-   - Roundups that link to one of their projects.
-3. **git.ge developers on GitHub:** two rows, "Followed on GitHub by N developers
-   from git.ge" and "Follows M developers from git.ge". Each has up to 12 avatars
-   and then "and K more". Mutual follows are listed first, with a green ring, and a
-   note explains the ring. A row with 0 is hidden.
+1. **Header:** avatar (96 px), name (or login), `github.com/<login>` (opens in a
+   new tab, `rel="noopener"`), person or organization, a summary ("N projects · M★ ·
+   languages · categories"), and chips for Spotlight weeks and roundups.
+2. **Category ranking:** one sentence per listed project that ranks within
+   `rankTopN` (10) in its category by stars, project first:
+   - ka: "EntityFramework.Exceptions: ვარსკვლავებით 1-ელი კატეგორიაში „.NET“ (55 პროექტიდან)"
+   - en: "EntityFramework.Exceptions: 1st most-starred in .NET (of 55 projects)"
+
+   Both languages are rendered and toggled with `.l10n`. The ordinals come from
+   `Format.OrdinalKa` / `OrdinalEn`. Georgian follows grammar.emis.ge exercise 179:
+   - 1 → 1-ელი
+   - მე-N for 2–20, 40, 60, 80, 100–900 in whole hundreds, and 1000
+   - N-ე otherwise
+
+   These are checked by `dotnet run --project site -- selftest`.
+3. **git.ge developers on GitHub:** three disjoint rows, each with a count, up to
+   12 avatars and "and K more", hidden when empty:
+   - "Follow each other" (mutual)
+   - "Followed by" (followers who aren't mutual)
+   - "Follows" (following who aren't mutual)
 4. **Projects:** their listed projects as cards. On this page the card shows the
-   category instead of the owner. Smaller (unlisted but published) projects are
-   in a collapsed `<details>`.
-5. **Side column:**
-   - "Contributes to git.ge projects": projects owned by someone else where they
-     have at least `minCommits` commits.
+   category instead of the owner. Smaller (search-only) projects are in a
+   collapsed `<details>`, or shown directly when the developer has no listed project.
+5. **Side column,** with one row layout (avatar, text and note on one centered line):
+   - "Contributes to git.ge projects": the project owner's avatar, `owner/`
+     linking to their page, and the repo, where they have at least `minCommits`
+     commits.
    - "Contributors from git.ge": developers with pages who contributed to their
      projects, with commit counts.
    - "Help wanted": up to 5 of their open good-first/help-wanted issues.
+
+URLs from submissions (projects hosted outside GitHub) are linked with
+`rel="nofollow ugc"` everywhere they appear. GitHub links get no `nofollow`.
 
 Everywhere else, the owner part of a project card (`owner/`) links to `/u/<owner>/`
 when the owner has a page, otherwise to their GitHub profile. That covers every
@@ -64,18 +76,27 @@ list, and search results too, via `"w": 1` in `index.json`.
 
 ## Directory (`/u/`)
 
-- Everyone with a page, in a compact grid: avatar, name, login, number of listed
-  projects, and top categories.
-- **A–Z by default,** with sort buttons (app.js): A–Z, projects, followers from
-  git.ge, recent activity, and new on git.ge. There are no rank numbers.
-- Works without JavaScript (A–Z).
+- Everyone with a page, in a compact grid: avatar, name, login, number of
+  projects, and top categories. Cards in a row share one height with aligned
+  bottom borders. The meta line is one line with an ellipsis, and its full text is
+  in `title`.
+- **Default order (and the no-JavaScript view):**
+  - developers with a listed project, A–Z;
+  - then "სხვა დეველოპერები / More developers" (search-only projects), A–Z.
+- **Sort buttons (app.js):**
+  - A–Z, projects, "Most followed on git.ge", recent activity, new on git.ge.
+  - Any sort other than A–Z merges everyone into one list and hides the second
+    heading. Each card then shows that sort's metric instead of the normal meta
+    line: followers on git.ge, last change, or first seen.
+  - A–Z restores the two groups.
+  - There are no rank numbers.
 - In the main menu as "დეველოპერები / Developers".
 
 ## Data
 
 ### Weekly fetch: `gitge.cs social` (runs in `discover.yml`)
 
-- **`data/bot/discovered/contributors.json`,** one line per listed GitHub project:
+- **`data/bot/discovered/contributors.json`,** one line per published GitHub project:
   - `{ project, fullName, fetchedAt, contributors: [ { login, commits } ] }`
   - From REST `GET /repos/{owner}/{repo}/contributors` (top 100, all time).
   - Only `type: "User"`; `[bot]` logins and known bots are skipped, and anonymous
