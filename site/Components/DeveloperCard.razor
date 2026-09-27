@@ -1,31 +1,18 @@
-@* One card in the /u/ directory. data-* feed app.js's sort; each .m-* line is the
-   metric for one sort, and CSS shows the one matching the directory's data-metric
-   (the default line without JavaScript). *@
-<li class="dev-cell" data-name="@D.DisplayName.ToLowerInvariant()" data-projects="@Projects" data-followed="@Followers"
-    data-pushed="@Format.Date(D.LastPush)" data-first="@D.FirstSeenAt" data-stars="@D.Stars">
-    <a class="dev-card" href="@D.Path">
-        <Avatar Login="@D.Login" Size="36" />
-        <span class="dev-card-text">
-            <strong>@D.DisplayName</strong>
-            <span class="dev-card-login">@D.Login</span>
-            <span class="dev-card-meta m-default" title="@DefaultMeta" data-title-from-text><T K="devs.projects" Args="@([Projects])" />@foreach (var c in D.Categories.Take(2))
-                {<span> · </span><T K="@($"cat.{c}")" />}</span>
-            <span class="dev-card-meta m-followed"><T K="devs.metricFollowed" Args="@([Followers])" /></span>
-            <span class="dev-card-meta m-pushed"><T K="devs.metricPushed" Args="@([Format.Date(D.LastPush) is { Length: > 0 } p ? p : "—"])" /></span>
-            <span class="dev-card-meta m-first"><T K="devs.metricFirst" Args="@([D.FirstSeenAt ?? "—"])" /></span>
-        </span>
-    </a>
-</li>
+@* One card in the /developers/ directory, kept compact because there are ~900 of
+   them: one line of markup, the default meta line as plain Georgian text, and
+   data-* attributes that app.js uses to sort, to build the metric line for the
+   active sort, and to rebuild the meta line in English (data-cats). *@
+<li class="dev-cell" data-projects="@Projects" data-followed="@Followers" data-pushed="@Format.Date(D.LastPush)" data-first="@D.FirstSeenAt" data-stars="@D.Stars" data-cats="@string.Join(",", Categories)"><a class="dev-card" href="@D.Path"><Avatar Login="@D.Login" Size="36" /><span class="dev-card-text"><strong>@D.DisplayName</strong><span class="dev-card-login">@D.Login</span><span class="dev-card-meta m-default">@DefaultMeta</span></span></a></li>
 
 @code {
     [Parameter, EditorRequired] public SiteDeveloper D { get; set; } = default!;
 
     int Projects => D.Projects.Count + D.Smaller.Count;
     int Followers => D.Mutual.Count + D.FollowedBy.Count;
+    IEnumerable<string> Categories => D.Categories.Take(2);
 
-    // The meta line is one line with an ellipsis, so the full text also goes in the
-    // title (Georgian here; app.js copies the visible text after a language switch).
+    // One line with an ellipsis; app.js adds the full text as the tooltip (kept out
+    // of the HTML, where it would repeat the Georgian text on ~900 cards).
     string DefaultMeta => string.Join(" · ",
-        new[] { Site.Strings.Ka("devs.projects", Projects) }
-            .Concat(D.Categories.Take(2).Select(c => Site.Strings.Ka($"cat.{c}"))));
+        new[] { Site.Strings.Ka("devs.projects", Projects) }.Concat(Categories.Select(c => Site.Strings.Ka($"cat.{c}"))));
 }

@@ -183,9 +183,9 @@ a.p-owner:hover { color: var(--link); }
 .dev-card-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dev-group { margin-top: 2rem; }
 /* Which meta line a card shows follows the active sort (app.js sets data-metric). */
-.m-followed, .m-pushed, .m-first { display: none; }
+.m-metric { display: none; }
 .dev-dir[data-metric="followed"] .m-default, .dev-dir[data-metric="pushed"] .m-default, .dev-dir[data-metric="first"] .m-default { display: none; }
-.dev-dir[data-metric="followed"] .m-followed, .dev-dir[data-metric="pushed"] .m-pushed, .dev-dir[data-metric="first"] .m-first { display: block; }
+.dev-dir[data-metric="followed"] .m-metric, .dev-dir[data-metric="pushed"] .m-metric, .dev-dir[data-metric="first"] .m-metric { display: block; }
 
 /* Category overview */
 .catgrid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem 1.5rem; }
