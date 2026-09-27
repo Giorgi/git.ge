@@ -96,7 +96,7 @@
   "dev.person": "Developer",
   "dev.org": "Organization",
   "dev.summary": "{0} projects · {1} ★",
-  "dev.metaDescription": "{0}: {1} projects on git.ge, {2} ★",
+  "dev.metaDescription": "{0} (@{1}): {2} open-source projects on git.ge, {3} stars in total{4}.",
   "dev.ranking": "Category ranking",
   "dev.rankLine": "{0}: {1} most-starred in {2} (of {3} projects)",
   "dev.spotlight": "Spotlight: {0}",
@@ -115,5 +115,19 @@
   "dev.contributesTo": "Contributes to git.ge projects",
   "dev.contributors": "Contributors from git.ge",
   "dev.commits": "commits: {0}",
-  "dev.allIssues": "All ({0}) →"
+  "dev.allIssues": "All ({0}) →",
+
+  "projects.titlePage": "All projects, page {0}",
+  "meta.category": "{0}: {1} open-source projects by developers in Georgia, including {2}.",
+  "meta.sortedStars": " Sorted by stars.",
+  "meta.sortedTrend": " Sorted by trend.",
+  "meta.projects": "{0} open-source projects by developers in Georgia with at least {1} stars: search and sort by trend, stars and latest change.",
+  "meta.projectsPage": "Open-source projects by developers in Georgia, page {0} of {1}: projects {2}–{3} of {4}.",
+  "meta.helpWanted": "{0} open issues labelled “good first issue” or “help wanted” in {1} open-source projects by developers in Georgia: a good place for a first contribution.",
+  "meta.developers": "{0} developers and organizations from Georgia on git.ge: their open-source projects, categories and who follows whom on GitHub.",
+  "meta.roundups": "Monthly git.ge roundups: new and fastest-growing open-source projects by developers in Georgia, and new releases.",
+  "meta.roundup": "{0}: the monthly git.ge roundup of open-source projects by developers in Georgia.",
+  "meta.about": "How git.ge works: who is listed, which projects appear, how the trend is measured, removal requests, privacy and data.",
+  "meta.developerLanguages": "; mostly {0}",
+  "meta.developerCategories": "; categories: {0}"
 }

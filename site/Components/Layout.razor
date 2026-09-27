@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title data-i18n="@TitleKey" data-i18n-args="@TitleArgsJson" data-i18n-prefix="@(IsHome ? "git.ge · " : null)" data-i18n-suffix="@TitleSuffix">@PageTitle</title>
     <meta name="description" content="@MetaDescription">
+    @if (Robots is not null)
+    {
+        <meta name="robots" content="@Robots">
+    }
     <link rel="canonical" href="@Site.Url(Path)">
     <meta property="og:site_name" content="git.ge">
     <meta property="og:type" content="@OgType">
@@ -27,6 +31,11 @@
     <link rel="alternate" type="application/rss+xml" title="git.ge" href="/roundups/feed.xml">
     <script src="@Site.Asset("assets/i18n.js")" defer></script>
     <script src="@Site.Asset("assets/app.js")" defer></script>
+    @if (StructuredData is { } ld)
+    {
+        @* Written as markup: Seo.Serialize escapes < > & so the JSON can't close the element. *@
+        @((MarkupString)$"<script type=\"application/ld+json\">{ld}</script>")
+    }
 </head>
 <body>
     <a class="skip" href="#main"><T K="skip" /></a>
@@ -79,7 +88,24 @@
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string OgType { get; set; } = "website";
+    // e.g. "noindex" for the 404 page.
+    [Parameter] public string? Robots { get; set; }
+    // Breadcrumb trail after "git.ge" (the home page): (name, path) pairs ending with this page.
+    [Parameter] public IReadOnlyList<(string Name, string Path)>? Crumbs { get; set; }
+    // The page's own schema.org entities (see Seo); combined with the breadcrumbs.
+    [Parameter] public IReadOnlyList<object>? JsonLd { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    string? StructuredData
+    {
+        get
+        {
+            var nodes = new List<object>(JsonLd ?? []);
+            if (Crumbs is { Count: > 0 })
+                nodes.Add(Seo.Breadcrumbs(new[] { ("git.ge", "/") }.Concat(Crumbs)));
+            return nodes.Count == 0 ? null : Seo.Serialize(nodes);
+        }
+    }
 
     static readonly (string Href, string Key)[] Nav =
     [

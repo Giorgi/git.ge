@@ -2,7 +2,8 @@
    can show: category ranks, Spotlight weeks and roundups, who among git.ge
    developers they follow and who follows them, and contributions between git.ge
    projects. Empty sections are left out. See docs/specs/developer-pages.md. *@
-<Layout Path="@D.Path" Title="@D.DisplayName" Description="@Summary" OgType="profile">
+<Layout Path="@D.Path" Title="@PageTitle" Description="@Summary" OgType="profile"
+        Crumbs="@Crumbs" JsonLd="@(new object[] { Seo.Profile(D) })">
     <article class="dev">
         <header class="dev-head">
             <Avatar Login="@D.Login" Size="96" />
@@ -154,5 +155,22 @@
         Site.Data.Issues.Where(i => D.Projects.Contains(i.Project) || D.Smaller.Contains(i.Project))
             .OrderByDescending(i => i.CreatedAt).ToList();
 
-    string Summary => Site.Strings.Ka("dev.metaDescription", D.DisplayName, D.Projects.Count + D.Smaller.Count, D.Stars);
+    // e.g. "Giorgi Dalakishvili (@Giorgi): 20 ღია კოდის პროექტი git.ge-ზე, სულ 4,092 ვარსკვლავი; ძირითადად C#, TypeScript; კატეგორიები: .NET, მონაცემები და AI."
+    string Summary
+    {
+        get
+        {
+            var extra = "";
+            if (D.Languages.Count > 0) extra += Site.Strings.Ka("meta.developerLanguages", string.Join(", ", D.Languages.Take(3)));
+            if (D.Categories.Count > 0)
+                extra += Site.Strings.Ka("meta.developerCategories", string.Join(", ", D.Categories.Take(3).Select(c => Site.Strings.Ka($"cat.{c}"))));
+            return Site.Strings.Ka("dev.metaDescription", D.DisplayName, D.Login,
+                Format.Number(D.Projects.Count + D.Smaller.Count), Format.Number(D.Stars), extra);
+        }
+    }
+
+    // Unique even when two people share a display name: the login is part of it.
+    string PageTitle => D.DisplayName.Equals(D.Login, StringComparison.OrdinalIgnoreCase) ? $"@{D.Login}" : $"{D.DisplayName} (@{D.Login})";
+
+    IReadOnlyList<(string Name, string Path)> Crumbs => [(Site.Strings.Ka("devs.title"), "/developers/"), (D.DisplayName, D.Path)];
 }

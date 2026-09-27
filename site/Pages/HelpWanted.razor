@@ -1,4 +1,5 @@
-<Layout Path="/help-wanted/" TitleKey="hw.title">
+<Layout Path="/help-wanted/" TitleKey="hw.title" Crumbs="@([(Site.Strings.Ka("hw.title"), "/help-wanted/")])"
+        Description="@Site.Strings.Ka("meta.helpWanted", Format.Number(Site.Data.Issues.Count), Format.Number(Site.Data.Issues.Select(i => i.Project).Distinct().Count()))">
     <h1><T K="hw.title" /></h1>
     <p class="lead"><T K="hw.intro" /></p>
 

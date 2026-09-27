@@ -1,6 +1,6 @@
 @* Long-form text lives in content/pages/about.{ka,en}.md. Both are rendered;
    CSS shows the one matching <html lang>, so it works without JavaScript too. *@
-<Layout Path="/about/" TitleKey="about.title">
+<Layout Path="/about/" TitleKey="about.title" Crumbs="@([(Site.Strings.Ka("about.title"), "/about/")])" Description="@Site.Strings.Ka("meta.about")">
     <article class="prose">
         <div class="l10n" lang="ka">@((MarkupString)Site.Pages["about.ka"])</div>
         <div class="l10n" lang="en">@((MarkupString)Site.Pages["about.en"])</div>

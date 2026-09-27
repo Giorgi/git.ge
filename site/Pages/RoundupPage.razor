@@ -1,7 +1,8 @@
 @* Roundups are written by hand (or drafted with the /roundup skill and then
    reviewed) in content/roundups/. Georgian and English versions are both
    rendered; CSS shows the one matching <html lang>, so it works without JS. *@
-<Layout Path="@($"/roundups/{R.Slug}/")" Title="@R.Ka.Title" Description="@R.Ka.Summary" OgType="article">
+<Layout Path="@($"/roundups/{R.Slug}/")" Title="@R.Ka.Title" Description="@(R.Ka.Summary ?? Site.Strings.Ka("meta.roundup", R.Ka.Title))" OgType="article"
+        Crumbs="@([(Site.Strings.Ka("roundups.title"), "/roundups/"), (R.Ka.Title, $"/roundups/{R.Slug}/")])" JsonLd="@(new object[] { Seo.Article(R) })">
     <article class="prose">
         <p class="note"><a href="/roundups/"><T K="roundups.back" /></a></p>
         @foreach (var (lang, text) in Versions)

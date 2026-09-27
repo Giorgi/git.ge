@@ -1,4 +1,4 @@
-<Layout Path="/" TitleKey="site.tagline">
+<Layout Path="/" TitleKey="site.tagline" JsonLd="@(new object[] { Seo.WebSite() })">
     <section class="intro">
         <h1><T K="site.tagline" /></h1>
         <p class="stats"><T K="home.stats" Args="@([Format.Number(Site.Listed.Count()), Format.Number(Site.Data.Developers)])" /></p>

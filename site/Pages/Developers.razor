@@ -2,7 +2,8 @@
    then "More developers" with only search-only projects (A–Z). The sort buttons
    (app.js) re-sort everyone as one list and show each card's metric for that sort;
    choosing A–Z restores the two groups. No rank numbers. Works without JavaScript. *@
-<Layout Path="/developers/" TitleKey="devs.title">
+<Layout Path="/developers/" TitleKey="devs.title" Crumbs="@([(Site.Strings.Ka("devs.title"), "/developers/")])"
+        Description="@Site.Strings.Ka("meta.developers", Format.Number(All.Count))">
     <h1><T K="devs.title" /></h1>
     <p class="note"><T K="devs.intro" Args="@([Format.Number(All.Count)])" /></p>
 

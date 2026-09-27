@@ -1,6 +1,7 @@
 @* All listed projects, paginated for readers without JavaScript. With
    JavaScript, the search box loads /index.json and filters everything in it. *@
-<Layout Path="@PagePath(Page)" TitleKey="projects.title">
+<Layout Path="@PagePath(Page)" TitleKey="@(Page == 1 ? "projects.title" : "projects.titlePage")" TitleArgs="@(Page == 1 ? [] : [Page])"
+        Description="@Description" Crumbs="@Crumbs">
     <h1><T K="projects.title" /></h1>
     <p class="note"><T K="projects.note" Args="@([Site.Data.ListingMinStars])" /></p>
 
@@ -34,5 +35,24 @@
     [Parameter, EditorRequired] public int PageCount { get; set; }
     [Parameter, EditorRequired] public List<SiteProject> Items { get; set; } = [];
 
+    // Filled in by Program.cs: total listed projects and the page size, for the description.
+    [Parameter] public int Total { get; set; }
+    [Parameter] public int PageSize { get; set; } = 100;
+
     public static string PagePath(int page) => page == 1 ? "/projects/" : $"/projects/{page}/";
+
+    string Description => Page == 1
+        ? Site.Strings.Ka("meta.projects", Format.Number(Total), Site.Data.ListingMinStars)
+        : Site.Strings.Ka("meta.projectsPage", Page, PageCount, Format.Number((Page - 1) * PageSize + 1),
+                          Format.Number(Math.Min(Page * PageSize, Total)), Format.Number(Total));
+
+    IReadOnlyList<(string Name, string Path)> Crumbs
+    {
+        get
+        {
+            var list = new List<(string, string)> { (Site.Strings.Ka("projects.title"), "/projects/") };
+            if (Page > 1) list.Add((Site.Strings.Ka("projects.titlePage", Page), PagePath(Page)));
+            return list;
+        }
+    }
 }

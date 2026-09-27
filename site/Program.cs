@@ -78,11 +78,13 @@ var services = new ServiceCollection()
     .AddSingleton(HtmlEncoder.Create(UnicodeRanges.All))
     .BuildServiceProvider();
 await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
-var sitemap = new List<string>();
+// Sitemap entries with a real last-modified date where we have one.
+var sitemap = new List<(string Path, string? LastMod)>();
+var dataDate = Format.Date(Site.Data.GeneratedAt);
 
-await Page<Home>("/", []);
+await Page<Home>("/", [], lastmod: dataDate);
 foreach (var cat in Site.Data.Categories)
-    await Page<Category>($"/c/{cat}/", new() { ["Cat"] = cat });
+    await Page<Category>($"/c/{cat}/", new() { ["Cat"] = cat }, lastmod: dataDate);
 
 var listed = Site.DefaultOrder(Site.Listed).ToList();
 var pageCount = Math.Max(1, (listed.Count + PageSize - 1) / PageSize);
@@ -93,23 +95,35 @@ for (var page = 1; page <= pageCount; page++)
         ["Page"] = page,
         ["PageCount"] = pageCount,
         ["Items"] = listed.Skip((page - 1) * PageSize).Take(PageSize).ToList(),
-    });
+        ["Total"] = listed.Count,
+        ["PageSize"] = PageSize,
+    }, lastmod: dataDate);
 }
 
-await Page<HelpWanted>("/help-wanted/", []);
+await Page<HelpWanted>("/help-wanted/", [], lastmod: dataDate);
 await Page<Roundups>("/roundups/", []);
 foreach (var roundup in Site.Roundups)
-    await Page<RoundupPage>($"/roundups/{roundup.Slug}/", new() { ["R"] = roundup });
+    await Page<RoundupPage>($"/roundups/{roundup.Slug}/", new() { ["R"] = roundup }, lastmod: roundup.Date.ToString("yyyy-MM-dd"));
 await Page<About>("/about/", []);
-await Page<Developers>("/developers/", []);
+await Page<Developers>("/developers/", [], lastmod: dataDate);
 foreach (var developer in Site.Data.DeveloperPages)
-    await Page<Developer>(developer.Path, new() { ["D"] = developer });
+    await Page<Developer>(developer.Path, new() { ["D"] = developer }, lastmod: developer.LastPush is null ? null : Format.Date(developer.LastPush));
 await Page<NotFound>("/404.html", [], inSitemap: false);
 
 Write("index.json", SearchIndex());
 Write("roundups/feed.xml", Feed());
 Write("sitemap.xml", Sitemap());
+Write("_redirects", Redirects());
 Write("robots.txt", $"User-agent: *\nAllow: /\n\nSitemap: {Site.Url("/sitemap.xml")}\n");
+
+// Every page must have a unique title and description and valid structured data.
+var problems = BuiltSiteChecks.Run(output);
+foreach (var problem in problems.Take(20)) Console.Error.WriteLine($"  SEO: {problem}");
+if (problems.Count > 0)
+{
+    Console.Error.WriteLine($"{problems.Count} SEO problem(s) in the built site.");
+    return 1;
+}
 
 Console.Error.WriteLine($"Rendered {sitemap.Count} pages, {listed.Count} listed projects, " +
                         $"{Site.Data.DeveloperPages.Count} developer pages ({Site.Avatars.Count} avatars) → {output}");
@@ -121,12 +135,12 @@ if (args.FirstOrDefault() == "serve")
 }
 return 0;
 
-async Task Page<TPage>(string path, Dictionary<string, object?> parameters, bool inSitemap = true) where TPage : IComponent
+async Task Page<TPage>(string path, Dictionary<string, object?> parameters, bool inSitemap = true, string? lastmod = null) where TPage : IComponent
 {
     var html = await renderer.Dispatcher.InvokeAsync(async () =>
         (await renderer.RenderComponentAsync<TPage>(ParameterView.FromDictionary(parameters))).ToHtmlString());
     Write(path.EndsWith('/') ? path.TrimStart('/') + "index.html" : path.TrimStart('/'), "<!doctype html>\n" + html);
-    if (inSitemap) sitemap.Add(path);
+    if (inSitemap) sitemap.Add((path, lastmod));
 }
 
 void Write(string relativePath, string content)
@@ -199,9 +213,30 @@ string Feed()
 string Sitemap()
 {
     var sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
-    foreach (var path in sitemap)
-        sb.Append($"  <url><loc>{SecurityElement(Site.Url(path))}</loc></url>\n");
+    foreach (var (path, lastmod) in sitemap)
+        sb.Append(lastmod is { Length: > 0 }
+            ? $"  <url><loc>{SecurityElement(Site.Url(path))}</loc><lastmod>{lastmod}</lastmod></url>\n"
+            : $"  <url><loc>{SecurityElement(Site.Url(path))}</loc></url>\n");
     return sb.Append("</urlset>\n").ToString();
+}
+
+// Permanent redirects from "/about" to "/about/" and so on. Without them, Cloudflare's
+// asset handler (html_handling: auto-trailing-slash) answers with a temporary 307.
+// Per Cloudflare's docs (developers.cloudflare.com/workers/static-assets/redirects):
+// _redirects is parsed by Workers static assets and not served as a file; rules are
+// applied top-down, "redirects are always followed, regardless of whether or not an
+// asset matches the incoming request"; limits are 2,000 static + 100 dynamic rules.
+// Because a rule always wins over a matching asset, placeholders like /roundups/:slug
+// would also catch /roundups/feed.xml, so this writes one static rule per page instead.
+// "/@…" pages aren't listed: _redirects doesn't apply to requests the Worker script
+// handles, and the script already answers "/@login" with a 308 to "/@login/".
+string Redirects()
+{
+    var sb = new StringBuilder("# Generated by site/Program.cs: permanent redirects to the trailing-slash URL.\n");
+    foreach (var (path, _) in sitemap)
+        if (path.Length > 1 && path.EndsWith('/') && !path.StartsWith("/@"))
+            sb.Append($"{path.TrimEnd('/')} {path} 301\n");
+    return sb.ToString();
 }
 
 static string SecurityElement(string s) => System.Security.SecurityElement.Escape(s);
@@ -297,6 +332,25 @@ static int SiteSelfTest()
     };
     foreach (var (n, expected) in ka)
         Check(Format.OrdinalKa(n) == expected, $"Georgian ordinal {n} → {expected} (got {Format.OrdinalKa(n)})");
+
+    // JSON-LD must never be able to close its <script> element.
+    const string evil = "</script><script>alert(1)</script> & <!-- \"x\" 'y'";
+    var ld = Seo.Serialize([new Dictionary<string, object?> { ["@type"] = "Person", ["name"] = evil, ["alternateName"] = "ტესტი" }]);
+    Check(!ld.Contains('<') && !ld.Contains('>') && !ld.Contains('&'), "JSON-LD escapes < > & (no </script> possible)");
+    Check(JsonDocument.Parse(ld).RootElement.GetProperty("@graph")[0].GetProperty("name").GetString() == evil,
+          "escaped JSON-LD still parses back to the original text");
+    Check(ld.Contains("ტესტი"), "JSON-LD keeps Georgian readable (not \\u-escaped)");
+    Check(Seo.JoinKa(["a", "b", "c"]) == "a, b და c" && Seo.JoinKa(["a"]) == "a", "Georgian list joining");
+
+    // The built site, when there is one: unique titles/descriptions, valid JSON-LD.
+    var built = Path.Combine(Directory.GetCurrentDirectory(), "_site");
+    if (Directory.Exists(built))
+    {
+        var problems = BuiltSiteChecks.Run(built);
+        foreach (var p in problems.Take(10)) Console.Error.WriteLine($"    {p}");
+        Check(problems.Count == 0, $"built _site: unique titles and descriptions, valid JSON-LD ({problems.Count} problems)");
+    }
+    else Console.Error.WriteLine("  (no _site: skipping built-site checks)");
 
     Console.Error.WriteLine(failures == 0 ? "All site checks passed" : $"{failures} site check(s) FAILED");
     return failures == 0 ? 0 : 1;

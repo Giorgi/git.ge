@@ -1,14 +1,22 @@
-<Layout Path="@($"/c/{Cat}/")" TitleKey="@($"cat.{Cat}")">
+<Layout Path="@($"/c/{Cat}/")" TitleKey="@($"cat.{Cat}")" Description="@Description"
+        Crumbs="@([(Name, $"/c/{Cat}/")])" JsonLd="@(new object[] { Seo.ItemList(Name, Ordered.Take(50)) })">
     <h1><T K="@($"cat.{Cat}")" /></h1>
     <p class="note">
         <T K="category.count" Args="@([Projects.Count])" /> ·
         <T K="category.note" Args="@([Site.Data.ListingMinStars])" />
     </p>
-    <ProjectList Items="@Site.DefaultOrder(Projects)" Sortable="true" Id="list" />
+    <ProjectList Items="@Ordered" Sortable="true" Id="list" />
 </Layout>
 
 @code {
     [Parameter, EditorRequired] public string Cat { get; set; } = "";
 
     List<SiteProject> Projects => Site.Listed.Where(p => p.Category == Cat).ToList();
+    List<SiteProject> Ordered => Site.DefaultOrder(Projects).ToList();
+    string Name => Site.Strings.Ka($"cat.{Cat}");
+
+    // e.g. „ვები“: საქართველოს დეველოპერების 316 ღია კოდის პროექტი, მათ შორის databasus, sinopia და Musify. …
+    string Description =>
+        Site.Strings.Ka("meta.category", Name, Format.Number(Projects.Count), Seo.JoinKa(Ordered.Take(3).Select(p => p.Name)))
+        + Site.Strings.Ka(Site.Data.Trend.HasHistory ? "meta.sortedTrend" : "meta.sortedStars");
 }
