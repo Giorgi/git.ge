@@ -7,6 +7,35 @@
     <h1><T K="devs.title" /></h1>
     <p class="note"><T K="devs.intro" Args="@([Format.Number(All.Count)])" /></p>
 
+    @* Filters (app.js): one category and one language at a time, combined with AND;
+       a developer matches when any of their published projects does. Counts are
+       developers per chip. Hidden without JavaScript, where the full list shows. *@
+    <div class="dev-filters" id="devs-filters" hidden data-filter-for="devs-dir">
+        <div class="chips" data-filter="cat" role="group" aria-labelledby="devs-filter-cat">
+            <span class="chips-label" id="devs-filter-cat"><T K="devs.filterCategory" /></span>
+            @foreach (var (key, count) in DeveloperFilters.CategoryCounts(All).Where(c => c.Count > 0))
+            {
+                <button type="button" class="chip" data-value="@key" aria-pressed="false"><T K="@($"cat.{key}")" /> <span class="n">@count</span></button>
+            }
+        </div>
+        <div class="chips" data-filter="lang" role="group" aria-labelledby="devs-filter-lang">
+            <span class="chips-label" id="devs-filter-lang"><T K="devs.filterLanguage" /></span>
+            @foreach (var (language, count, i) in Languages)
+            {
+                <button type="button" class="chip" data-value="@language" aria-pressed="false" hidden="@(i >= DeveloperFilters.TopLanguages)" data-extra="@(i >= DeveloperFilters.TopLanguages ? "" : null)">@language <span class="n">@count</span></button>
+            }
+            @if (Languages.Count > DeveloperFilters.TopLanguages)
+            {
+                <button type="button" class="chip chip-more" data-more aria-expanded="false"><T K="devs.moreLanguages" /></button>
+            }
+        </div>
+        <p class="note dev-filter-status" aria-live="polite">
+            <span class="dev-filter-count"></span>
+            <button type="button" class="linklike dev-filter-clear" hidden><T K="devs.clearFilters" /></button>
+        </p>
+        <p class="note dev-filter-empty" hidden><T K="devs.noMatch" /></p>
+    </div>
+
     <div class="sort" hidden data-sort-for="devs" data-groups="devs-more" data-group-sort="name">
         <T K="sort.label" />
         @foreach (var (key, label) in SortOptions)
@@ -39,6 +68,10 @@
     List<SiteDeveloper> All => Site.Data.DeveloperPages;
     List<SiteDeveloper> Listed => All.Where(d => d.Projects.Count > 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
     List<SiteDeveloper> More => All.Where(d => d.Projects.Count == 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+
+    List<(string Language, int Count, int Index)>? languages;
+    List<(string Language, int Count, int Index)> Languages =>
+        languages ??= DeveloperFilters.LanguageCounts(All).Select((l, i) => (l.Language, l.Count, i)).ToList();
 
     static readonly (string Key, string Label)[] SortOptions =
     [

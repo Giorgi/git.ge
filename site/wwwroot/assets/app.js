@@ -142,7 +142,9 @@
       const rebuildMeta = () => {
         for (const li of metricHost.querySelectorAll("li[data-cats]")) {
           const meta = li.querySelector(".m-default");
-          const cats = li.dataset.cats ? li.dataset.cats.split(",") : [];
+          // data-cats is "shown,categories;other,categories": only the shown part goes on the card.
+          const shown = (li.dataset.cats || "").split(";")[0];
+          const cats = shown ? shown.split(",") : [];
           meta.textContent = [t("devs.projects", li.dataset.projects), ...cats.map(c => t("cat." + c))].join(" · ");
           meta.title = meta.textContent;
         }
@@ -172,6 +174,110 @@
       }
       sortList(list, key);
     });
+  }
+
+  // ---- Filters (/developers/) -------------------------------------------------
+  // One category and one language at a time (AND across the two). A card matches
+  // when its data-cats / data-langs contain the value. State lives in ?cat= & ?language= (not ?lang=, which
+  // switches the interface language).
+
+  const filters = document.querySelector(".dev-filters[data-filter-for]");
+  if (filters) {
+    const host = document.getElementById(filters.dataset.filterFor);
+    const rows = { cat: filters.querySelector('[data-filter="cat"]'), lang: filters.querySelector('[data-filter="lang"]') };
+    const count = filters.querySelector(".dev-filter-count");
+    const clear = filters.querySelector(".dev-filter-clear");
+    const empty = filters.querySelector(".dev-filter-empty");
+    const more = rows.lang.querySelector("[data-more]");
+    const active = { cat: null, lang: null };
+    const param = { cat: "cat", lang: "language" };   // URL parameter names
+    const valuesOf = (li, kind) => kind === "cat"
+      ? (li.dataset.cats || "").replace(";", ",").split(",")
+      : (li.dataset.langs || "").split(",");
+    filters.hidden = false;
+
+    const showMoreLanguages = open => {
+      if (!more) return;
+      for (const b of rows.lang.querySelectorAll("[data-extra]")) b.hidden = !open;
+      more.setAttribute("aria-expanded", String(open));
+      const label = more.querySelector("[data-i18n]");
+      label.dataset.i18n = open ? "devs.fewerLanguages" : "devs.moreLanguages";
+      label.dataset.ka = I18N.ka[label.dataset.i18n];   // what the language toggle restores
+      label.textContent = t(label.dataset.i18n);
+    };
+
+    const apply = () => {
+      let shown = 0;
+      for (const li of host.querySelectorAll("li[data-cats]")) {
+        const match = (!active.cat || valuesOf(li, "cat").includes(active.cat))
+          && (!active.lang || valuesOf(li, "lang").includes(active.lang));
+        li.hidden = !match;
+        if (match) shown++;
+      }
+      // In the grouped view, hide a group heading whose list has no visible cards.
+      for (const title of host.querySelectorAll("[data-group-title]")) {
+        const list = document.getElementById(title.dataset.groupTitle);
+        if (!list || list.hidden) continue;   // merged by a sort: the sort code hides it
+        title.hidden = ![...list.children].some(li => !li.hidden);
+      }
+      const filtering = Boolean(active.cat || active.lang);
+      count.textContent = filtering ? (shown === 1 ? t("devs.filterCountOne") : t("devs.filterCount", shown)) : "";
+      clear.hidden = !filtering;
+      empty.hidden = shown > 0;
+      for (const [kind, row] of Object.entries(rows))
+        for (const b of row.querySelectorAll("button[data-value]"))
+          b.setAttribute("aria-pressed", String(b.dataset.value === active[kind]));
+    };
+
+    const saveUrl = () => {
+      const params = new URLSearchParams(location.search);
+      for (const kind of ["cat", "lang"]) {
+        if (active[kind]) params.set(param[kind], active[kind]); else params.delete(param[kind]);
+      }
+      const query = params.toString();
+      history.replaceState(null, "", location.pathname + (query ? "?" + query : "") + location.hash);
+    };
+
+    for (const [kind, row] of Object.entries(rows)) {
+      row.addEventListener("click", e => {
+        if (e.target.closest("[data-more]")) {
+          showMoreLanguages(more.getAttribute("aria-expanded") !== "true");
+          return;
+        }
+        const button = e.target.closest("button[data-value]");
+        if (!button) return;
+        active[kind] = active[kind] === button.dataset.value ? null : button.dataset.value;
+        apply();
+        saveUrl();
+      });
+    }
+    clear.addEventListener("click", () => {
+      active.cat = active.lang = null;
+      apply();
+      saveUrl();
+    });
+
+    // Load state from the URL; unknown values are ignored.
+    const params = new URLSearchParams(location.search);
+    for (const kind of ["cat", "lang"]) {
+      const value = params.get(param[kind]);
+      const button = value && [...rows[kind].querySelectorAll("button[data-value]")].find(b => b.dataset.value === value);
+      if (!button) continue;
+      active[kind] = value;
+      if (button.hasAttribute("data-extra")) showMoreLanguages(true);
+    }
+
+    // Sorting regroups or merges the lists; re-apply so group headings stay right.
+    document.querySelector(`.sort[data-sort-for="${host.querySelector("ol")?.id}"]`)
+      ?.addEventListener("click", () => apply());
+    languageHooks.push(apply);
+    apply();
+
+    // On phones each chip row scrolls sideways: bring chips selected by the URL into view.
+    for (const row of Object.values(rows)) {
+      const on = row.querySelector('button[aria-pressed="true"]');
+      if (on && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, on.offsetLeft - row.offsetLeft - 16);
+    }
   }
 
   // ---- Search (/projects/) --------------------------------------------------

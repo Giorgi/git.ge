@@ -95,6 +95,22 @@ list, and search results too, via `"w": 1` in `index.json`.
     line: followers on git.ge, last change, or first seen.
   - A–Z restores the two groups.
   - There are no rank numbers.
+- **Filters (app.js):** two chip rows above the list.
+  - **Categories:** all categories in config order. **Languages:** the 12 most
+    common, then "სხვა ენები… / More languages…" reveals the rest. Each chip shows
+    how many developers it matches.
+  - One category and one language at a time, combined with AND; clicking the active
+    chip clears it. A developer matches when **any** of their published projects
+    (listed or search-only) has that category or primary language.
+  - Cards carry `data-cats` (the categories shown on the card, then `;` and the rest)
+    and `data-langs`. The filtered count and "clear filters" appear while filtering.
+  - Filters work with the sort buttons; in the grouped view an empty group's
+    heading is hidden.
+  - URL state: `?cat=<category>&language=<language>` (e.g. `language=C%23`), so a
+    filtered view can be shared. Not `?lang=`, which already switches the interface
+    language. Unknown values are ignored.
+  - Without JavaScript the chips are hidden and the full list shows. On phones each
+    chip row scrolls sideways; chips selected by the URL are scrolled into view.
 - In the main menu as "დეველოპერები / Developers".
 
 ## Data

@@ -1,8 +1,10 @@
 @* One card in the /developers/ directory, kept compact because there are ~900 of
    them: one line of markup, the default meta line as plain Georgian text, and
    data-* attributes that app.js uses to sort, to build the metric line for the
-   active sort, and to rebuild the meta line in English (data-cats). *@
-<li class="dev-cell" data-projects="@Projects" data-followed="@Followers" data-pushed="@Format.Date(D.LastPush)" data-first="@D.FirstSeenAt" data-stars="@D.Stars" data-cats="@string.Join(",", Categories)"><a class="dev-card" href="@D.Path"><Avatar Login="@D.Login" Size="36" /><span class="dev-card-text"><strong>@D.DisplayName</strong><span class="dev-card-login">@D.Login</span><span class="dev-card-meta m-default">@DefaultMeta</span></span></a></li>
+   active sort, and to rebuild the meta line in English (data-cats). data-cats also
+   feeds the category filter: the categories shown on the card, then ";" and the
+   rest of the developer's categories. data-langs feeds the language filter. *@
+<li class="dev-cell" data-projects="@Projects" data-followed="@Followers" data-pushed="@Format.Date(D.LastPush)" data-first="@D.FirstSeenAt" data-stars="@D.Stars" data-cats="@CatsAttribute" data-langs="@string.Join(",", DeveloperFilters.LanguagesOf(D))"><a class="dev-card" href="@D.Path"><Avatar Login="@D.Login" Size="36" /><span class="dev-card-text"><strong>@D.DisplayName</strong><span class="dev-card-login">@D.Login</span><span class="dev-card-meta m-default">@DefaultMeta</span></span></a></li>
 
 @code {
     [Parameter, EditorRequired] public SiteDeveloper D { get; set; } = default!;
@@ -10,6 +12,16 @@
     int Projects => D.Projects.Count + D.Smaller.Count;
     int Followers => D.Mutual.Count + D.FollowedBy.Count;
     IEnumerable<string> Categories => D.Categories.Take(2);
+
+    string CatsAttribute
+    {
+        get
+        {
+            var shown = Categories.ToList();
+            var rest = DeveloperFilters.CategoriesOf(D).Where(c => !shown.Contains(c)).ToList();
+            return rest.Count == 0 ? string.Join(",", shown) : string.Join(",", shown) + ";" + string.Join(",", rest);
+        }
+    }
 
     // One line with an ellipsis; app.js adds the full text as the tooltip (kept out
     // of the HTML, where it would repeat the Georgian text on ~900 cards).

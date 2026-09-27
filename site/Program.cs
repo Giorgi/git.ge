@@ -352,8 +352,46 @@ static int SiteSelfTest()
     }
     else Console.Error.WriteLine("  (no _site: skipping built-site checks)");
 
+    DeveloperFilterChecks(Check);
+
     Console.Error.WriteLine(failures == 0 ? "All site checks passed" : $"{failures} site check(s) FAILED");
     return failures == 0 ? 0 : 1;
+}
+
+// On the built /developers/ page (skipped if the site hasn't been built): every card
+// carries the filter attributes, and each chip's count equals the cards that match it.
+static void DeveloperFilterChecks(Action<bool, string> check)
+{
+    var file = Path.Combine(Directory.GetCurrentDirectory(), "_site", "developers", "index.html");
+    if (!File.Exists(file))
+    {
+        Console.Error.WriteLine("  skip developer filter checks: build the site first");
+        return;
+    }
+    var html = File.ReadAllText(file);
+    string Decode(string s) => System.Net.WebUtility.HtmlDecode(s);
+
+    var cards = Regex.Matches(html, "<li class=\"dev-cell\"[^>]*>").Select(m => m.Value).ToList();
+    string? Attr(string tag, string name) =>
+        Regex.Match(tag, $"\\s{name}=\"([^\"]*)\"") is { Success: true } m ? Decode(m.Groups[1].Value) : null;
+    check(cards.Count > 0, $"/developers/ has cards ({cards.Count})");
+    check(cards.All(c => Attr(c, "data-cats") is { Length: > 0 }), "every card has data-cats");
+    check(cards.All(c => Attr(c, "data-langs") is not null), "every card has data-langs");
+
+    var cats = cards.Select(c => Attr(c, "data-cats")!.Replace(';', ',').Split(',').ToHashSet()).ToList();
+    var langs = cards.Select(c => (Attr(c, "data-langs") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet()).ToList();
+
+    foreach (var (kind, sets) in new[] { ("cat", cats), ("lang", langs) })
+    {
+        var row = Regex.Match(html, $"<div class=\"chips\" data-filter=\"{kind}\".*?</div>", RegexOptions.Singleline).Value;
+        var chips = Regex.Matches(row, "data-value=\"([^\"]*)\".*?<span class=\"n\">(\\d+)</span>", RegexOptions.Singleline).ToList();
+        check(chips.Count > 0, $"{kind} chips rendered ({chips.Count})");
+        var wrong = chips
+            .Select(m => (Value: Decode(m.Groups[1].Value), Shown: int.Parse(m.Groups[2].Value)))
+            .Where(c => sets.Count(s => s.Contains(c.Value)) != c.Shown)
+            .Select(c => c.Value).ToList();
+        check(wrong.Count == 0, $"{kind} chip counts match the cards{(wrong.Count > 0 ? $" (wrong: {string.Join(", ", wrong)})" : "")}");
+    }
 }
 
 static void CopyDirectory(string from, string to)

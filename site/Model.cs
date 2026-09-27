@@ -235,3 +235,38 @@ public sealed class Strings(Dictionary<string, string> ka, Dictionary<string, st
         JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path))
         ?? throw new InvalidOperationException($"Could not read {path}");
 }
+
+// Category and language filters on /developers/. A developer matches a category or a
+// language when ANY of their published projects (listed or search-only) has it.
+public static class DeveloperFilters
+{
+    public const int TopLanguages = 12;
+
+    static IEnumerable<SiteProject> Published(SiteDeveloper d) =>
+        d.Projects.Concat(d.Smaller).Select(Site.Project);
+
+    // Categories in config order.
+    public static List<string> CategoriesOf(SiteDeveloper d)
+    {
+        var mine = Published(d).Select(p => p.Category).ToHashSet();
+        return Site.Data.Categories.Where(mine.Contains).ToList();
+    }
+
+    public static List<string> LanguagesOf(SiteDeveloper d) =>
+        Published(d).Select(p => p.Language).OfType<string>().Distinct().Order(StringComparer.Ordinal).ToList();
+
+    // Every category in config order, with the number of developers who have it.
+    public static List<(string Key, int Count)> CategoryCounts(IEnumerable<SiteDeveloper> developers)
+    {
+        var sets = developers.Select(CategoriesOf).ToList();
+        return Site.Data.Categories.Select(c => (c, sets.Count(s => s.Contains(c)))).ToList();
+    }
+
+    // Languages by number of developers, most common first.
+    public static List<(string Language, int Count)> LanguageCounts(IEnumerable<SiteDeveloper> developers) =>
+        developers.SelectMany(LanguagesOf)
+            .GroupBy(l => l)
+            .Select(g => (g.Key, g.Count()))
+            .OrderByDescending(x => x.Item2).ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+}

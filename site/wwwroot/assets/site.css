@@ -182,6 +182,24 @@ a.p-owner:hover { color: var(--link); }
 .dev-card-login, .dev-card-meta { font-size: .78rem; color: var(--muted); }
 .dev-card-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dev-group { margin-top: 2rem; }
+/* Category and language filters (app.js reveals them). */
+.dev-filters { margin: .5rem 0 .2rem; }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .4rem; font-size: .85rem; margin: .35rem 0; }
+.chips-label { color: var(--muted); margin-right: .3rem; flex: none; }
+.chip {
+  font: inherit; color: var(--fg); background: var(--soft); border: 1px solid var(--line);
+  border-radius: 999px; padding: .08rem .6rem; white-space: nowrap; cursor: pointer; flex: none;
+}
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip .n { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] .n { color: inherit; opacity: .7; }
+.chip-more { background: none; border-style: dashed; color: var(--muted); }
+.dev-filter-status { min-height: 1.3em; margin: .3rem 0 0; }
+.linklike { font: inherit; color: var(--link); background: none; border: 0; padding: 0; margin-left: .6rem; cursor: pointer; }
+.linklike:hover { text-decoration: underline; }
+/* Elements above set a display value, which would otherwise override [hidden]. */
+.dev-cell[hidden], .chip[hidden], .dev-group[hidden] { display: none; }
 /* Which meta line a card shows follows the active sort (app.js sets data-metric). */
 .m-metric { display: none; }
 .dev-dir[data-metric="followed"] .m-default, .dev-dir[data-metric="pushed"] .m-default, .dev-dir[data-metric="first"] .m-default { display: none; }
@@ -235,6 +253,9 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
   .cats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .cats::-webkit-scrollbar { display: none; }
   .cats-label { flex: none; }
+  /* Filter chips: one swipeable row each, like the category bar. */
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .chips::-webkit-scrollbar { display: none; }
   h1 { font-size: 1.35rem; }
   .bar { gap: .4rem 1rem; }
   .dev-head { gap: .8rem; }
