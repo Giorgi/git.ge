@@ -101,7 +101,7 @@ await Page<Roundups>("/roundups/", []);
 foreach (var roundup in Site.Roundups)
     await Page<RoundupPage>($"/roundups/{roundup.Slug}/", new() { ["R"] = roundup });
 await Page<About>("/about/", []);
-await Page<Developers>("/u/", []);
+await Page<Developers>("/developers/", []);
 foreach (var developer in Site.Data.DeveloperPages)
     await Page<Developer>(developer.Path, new() { ["D"] = developer });
 await Page<NotFound>("/404.html", [], inSitemap: false);
@@ -157,7 +157,7 @@ string SearchIndex()
         ["a"] = p.Archived ? 1 : null,
         ["v"] = p.Verified ? 1 : null,
         ["x"] = p.HelpWanted > 0 ? p.Anchor : null,
-        ["w"] = Site.Developer(p.Owner) is not null ? 1 : null,   // owner has a /u/ page
+        ["w"] = Site.Developer(p.Owner) is not null ? 1 : null,   // owner has a developer page (/@login/)
     }.Where(kv => kv.Value is not null).ToDictionary());
 
     return JsonSerializer.Serialize(new

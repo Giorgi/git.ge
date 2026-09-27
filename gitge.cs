@@ -1236,7 +1236,7 @@ static class Prepare
 }
 
 // ---------------------------------------------------------------------------
-// Developer pages (/u/<login>/): one per owner with at least one listed project.
+// Developer pages (/@<login>/): one per owner of a published project.
 // Built from data already collected (projects, contributors.json, follows.json,
 // Spotlight history, roundups). See docs/specs/developer-pages.md.
 // ---------------------------------------------------------------------------

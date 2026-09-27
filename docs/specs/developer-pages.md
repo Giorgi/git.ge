@@ -1,4 +1,4 @@
-# Spec: developer pages (`/u/<login>/`)
+# Spec: developer pages (`/@<login>/`) and the directory (`/developers/`)
 
 Status: v1 built. Owner: maintainer. Last updated 2026-09-27.
 
@@ -30,7 +30,7 @@ opted-out (`data/optout.json`) developers get no page and never appear on anyone
 else's page, in either direction: their projects never reach the published data,
 and every list on a page only contains people who have a page.
 
-URL: `/u/<login>/`, with the login lower-cased. A renamed login's old URL returns 404.
+URL: `/@<login>/`, with the login lower-cased (e.g. `/@giorgi/`); the output folder is `_site/@giorgi/`. A renamed login's old URL returns 404.
 
 ## Page content
 
@@ -70,16 +70,21 @@ In this order; any section without content is left out.
 URLs from submissions (projects hosted outside GitHub) are linked with
 `rel="nofollow ugc"` everywhere they appear. GitHub links get no `nofollow`.
 
-Everywhere else, the owner part of a project card (`owner/`) links to `/u/<owner>/`
+Everywhere else, the owner part of a project card (`owner/`) links to `/@<owner>/`
 when the owner has a page, otherwise to their GitHub profile. That covers every
 list, and search results too, via `"w": 1` in `index.json`.
 
-## Directory (`/u/`)
+## Directory (`/developers/`)
 
 - Everyone with a page, in a compact grid: avatar, name, login, number of
   projects, and top categories. Cards in a row share one height with aligned
-  bottom borders. The meta line is one line with an ellipsis, and its full text is
-  in `title`.
+  bottom borders. The meta line is one line with an ellipsis; app.js sets its full
+  text as `title`.
+- **Compact HTML** (about 860 cards): each card carries only the default meta line
+  as plain Georgian text plus `data-projects`, `data-followed`, `data-pushed`,
+  `data-first`, `data-stars` and `data-cats`. app.js builds the sort metric line,
+  the English meta line and the tooltips from those. That brought `/developers/`
+  from 1,135 KB to 442 KB raw, and from 56 KB to 36 KB gzipped.
 - **Default order (and the no-JavaScript view):**
   - developers with a listed project, A–Z;
   - then "სხვა დეველოპერები / More developers" (search-only projects), A–Z.
@@ -158,12 +163,12 @@ hide the section almost everywhere.
 - an opted-out developer appears nowhere, in either direction
 - bots are recognised
 
-CI builds the site and checks that `/u/` and the first developer page in the
+CI builds the site and checks that `/developers/` and the first developer page (`/@…/`) in the
 directory exist.
 
 ## Later
 
 - Star momentum, once trend data exists (from mid-October 2026).
-- A README badge (`/u/<login>/badge.svg`).
-- Short addresses (`git.ge/<login>` → `/u/<login>/`), where no site path collides.
+- A README badge (`/@<login>/badge.svg`).
+- Short addresses (`git.ge/<login>` → `/@<login>/`), where no site path collides.
 - "Claim your page": a Georgian and English bio, links, and an "open to work" flag.

@@ -1,8 +1,8 @@
-@* The developer directory (/u/). Default: developers with a listed project (A–Z),
+@* The developer directory (/developers/). Default: developers with a listed project (A–Z),
    then "More developers" with only search-only projects (A–Z). The sort buttons
    (app.js) re-sort everyone as one list and show each card's metric for that sort;
    choosing A–Z restores the two groups. No rank numbers. Works without JavaScript. *@
-<Layout Path="/u/" TitleKey="devs.title">
+<Layout Path="/developers/" TitleKey="devs.title">
     <h1><T K="devs.title" /></h1>
     <p class="note"><T K="devs.intro" Args="@([Format.Number(All.Count)])" /></p>
 

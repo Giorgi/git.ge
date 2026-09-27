@@ -48,7 +48,7 @@ not committed
                           CI keeps it with actions/cache)
 ```
 
-Developer pages (`/u/<login>/`) and the files behind them are described in
+Developer pages (`/@<login>/`, directory `/developers/`) and the files behind them are described in
 [`docs/specs/developer-pages.md`](specs/developer-pages.md).
 
 **One file per entity type, one record per line, sorted by key.** A changed star

@@ -122,7 +122,7 @@ shows "—", not its whole star count.
 ### Developer pages
 
 ```sh
-dotnet run gitge.cs -- social     # contributors + followers/following for /u/ pages (weekly)
+dotnet run gitge.cs -- social     # contributors + followers/following for developer pages (weekly)
 dotnet run gitge.cs -- prepare
 dotnet run gitge.cs -- avatars    # download avatars of developers with a page to _cache/avatars/
 dotnet run --project site -- serve --port 5081

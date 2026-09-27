@@ -14,6 +14,8 @@
 
   const format = (s, args) => s.replace(/\{(\d+)\}/g, (_, i) => args[i] ?? "");
   const args = (el, name) => JSON.parse(el.getAttribute(name) || "[]");
+  // Text that app.js builds itself re-renders through these after a language switch.
+  const languageHooks = [];
 
   function applyLanguage(lang) {
     root.lang = lang;
@@ -46,6 +48,7 @@
     for (const el of document.querySelectorAll("[data-title-from-text]")) {
       el.title = el.textContent.replace(/\s+/g, " ").trim();
     }
+    for (const hook of languageHooks) hook();
   }
 
   function storedLanguage() {
@@ -77,8 +80,8 @@
     stars: el => Number(el.dataset.stars || 0),
     pushed: el => el.dataset.pushed || "",
     created: el => el.dataset.created || "",
-    // Developer directory (/u/)
-    name: el => el.dataset.name || "",
+    // Developer directory (/developers/)
+    name: el => (el.querySelector("strong")?.textContent || "").toLowerCase(),
     projects: el => Number(el.dataset.projects || 0),
     followed: el => Number(el.dataset.followed || 0),
     first: el => el.dataset.first || "",
@@ -102,7 +105,7 @@
     if (!list) continue;
     bar.hidden = false;
 
-    // Grouped lists (the /u/ directory): the server renders a first list plus a second
+    // Grouped lists (the /developers/ directory): the server renders a first list plus a second
     // group (data-groups) in their default order. Any other sort merges everyone into
     // the first list; choosing the group sort again restores the original groups.
     const extra = bar.dataset.groups ? document.getElementById(bar.dataset.groups) : null;
@@ -110,13 +113,51 @@
     const original = extra ? { main: [...list.children], extra: [...extra.children] } : null;
     const metricHost = list.closest("[data-metric]");
 
+    // Developer cards: the metric line for the active sort, built from data-* so the
+    // HTML only carries the default meta line.
+    const metrics = {
+      followed: el => t("devs.metricFollowed", el.dataset.followed || "0"),
+      pushed: el => t("devs.metricPushed", el.dataset.pushed || "—"),
+      first: el => t("devs.metricFirst", el.dataset.first || "—"),
+    };
+    const showMetric = key => {
+      if (!metricHost) return;
+      metricHost.dataset.metric = key;
+      const make = metrics[key];
+      if (!make) return;
+      for (const li of metricHost.querySelectorAll("li[data-cats]")) {
+        let line = li.querySelector(".m-metric");
+        if (!line) {
+          line = document.createElement("span");
+          line.className = "dev-card-meta m-metric";
+          li.querySelector(".m-default").after(line);
+        }
+        line.textContent = make(li);
+        line.title = line.textContent;
+      }
+    };
+    if (metricHost) {
+      // The default meta line is plain Georgian in the HTML; rebuild it (and its
+      // tooltip) from data-projects and data-cats in the current language.
+      const rebuildMeta = () => {
+        for (const li of metricHost.querySelectorAll("li[data-cats]")) {
+          const meta = li.querySelector(".m-default");
+          const cats = li.dataset.cats ? li.dataset.cats.split(",") : [];
+          meta.textContent = [t("devs.projects", li.dataset.projects), ...cats.map(c => t("cat." + c))].join(" · ");
+          meta.title = meta.textContent;
+        }
+      };
+      languageHooks.push(rebuildMeta, () => showMetric(metricHost.dataset.metric));
+      rebuildMeta();   // also sets the tooltips
+    }
+
     bar.addEventListener("click", e => {
       const button = e.target.closest("button[data-sort]");
       if (!button) return;
       const key = button.dataset.sort;
       for (const b of bar.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b === button));
       bar.dataset.current = key;
-      if (metricHost) metricHost.dataset.metric = key;
+      showMetric(key);
       if (original && key === bar.dataset.groupSort) {
         list.replaceChildren(...original.main);
         extra.replaceChildren(...original.extra);
@@ -202,7 +243,7 @@
       const ownerLogin = p.n.slice(0, slash);
       const owner = el("a", "p-owner", ownerLogin + "/");
       // "w": the owner has a developer page on git.ge.
-      owner.href = p.w ? "/u/" + ownerLogin.toLowerCase() + "/" : "https://github.com/" + ownerLogin;
+      owner.href = p.w ? "/@" + ownerLogin.toLowerCase() + "/" : "https://github.com/" + ownerLogin;
       title.append(owner);
       name.textContent = p.n.slice(slash + 1);
     } else name.textContent = p.n;

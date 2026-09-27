@@ -24,7 +24,7 @@ public sealed class SiteData
     public List<SiteDeveloper> DeveloperPages { get; set; } = [];
 }
 
-// One developer page (/u/<login>/). Keep in step with SiteDeveloper in gitge.cs.
+// One developer page (/@<login>/). Keep in step with SiteDeveloper in gitge.cs.
 public sealed class SiteDeveloper
 {
     public string Login { get; set; } = "";
@@ -49,7 +49,7 @@ public sealed class SiteDeveloper
     public List<string> Mutual { get; set; } = [];
 
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Login : Name!;
-    public string Path => $"/u/{Login.ToLowerInvariant()}/";
+    public string Path => $"/@{Login.ToLowerInvariant()}/";
     public bool IsOrg => Type == "Organization";
 }
 
