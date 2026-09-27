@@ -63,6 +63,13 @@ try
         case "roundup":
             using (var github = new GitHub(GitHub.ResolveToken()))
                 return await Roundup.Run(github, paths, options);
+        case "social":
+            using (var github = new GitHub(GitHub.ResolveToken()))
+                await Social.Run(github, paths, options);
+            return 0;
+        case "avatars":
+            await Avatars.Run(paths, options);
+            return 0;
         default:
             Console.Error.WriteLine("usage: dotnet run gitge.cs -- <discover|refresh|review> [options]");
             Console.Error.WriteLine("  discover [--only <location term>] [--max-users <n>] [--restart]");
@@ -75,6 +82,8 @@ try
             Console.Error.WriteLine("  submit --issue <n>   Apply an accepted submission/removal issue to data/ (exit 3 = rejected)");
             Console.Error.WriteLine("  submit --body-file <f> --type <submission|removal> [--issue <n>] [--offline]");
             Console.Error.WriteLine("  roundup [--month YYYY-MM] [--force]   Write a bilingual roundup skeleton to content/roundups/");
+            Console.Error.WriteLine("  social [--force]     Fetch contributors and followers for developer pages (weekly)");
+            Console.Error.WriteLine("  avatars [--force]    Download avatars of developers with a page into the avatar cache");
             return 2;
     }
 }
@@ -773,6 +782,7 @@ static class SelfTest
         var d = Dates.Parse;
 
         SpotlightRules();
+        DeveloperPageRules();
 
         Log.Info("Quality bar (3+ stars, or 1+ star and created in the last 60 days)");
         var bar = new QualityBar();
@@ -833,6 +843,55 @@ static class SelfTest
 
         Log.Info(failures == 0 ? "All checks passed" : $"{failures} check(s) FAILED");
         return failures == 0 ? 0 : 1;
+    }
+
+    static void DeveloperPageRules()
+    {
+        Log.Info("Developer pages");
+        SiteProject P(string full, int stars, string cat = "web", bool listed = true) => new()
+        {
+            Key = "gh:" + full, FullName = full, Name = full.Split('/')[1], Owner = full.Split('/')[0],
+            Url = "https://github.com/" + full, Stars = stars, Category = cat, Listed = listed,
+        };
+        var published = new List<SiteProject>
+        {
+            P("alice/a1", 100), P("alice/a2", 50), P("bob/b1", 80), P("carol/c1", 12, "data"),
+            P("dan/d1", 5, listed: false),   // dan has no listed project, so no page
+        };
+        var contributors = new List<ContributorsEntry>
+        {
+            new() { Project = "gh:alice/a1", Contributors = [ new() { Login = "alice", Commits = 100 }, new() { Login = "bob", Commits = 5 },
+                                                              new() { Login = "carol", Commits = 1 }, new() { Login = "dan", Commits = 3 } ] },
+            new() { Project = "gh:bob/b1", Contributors = [ new() { Login = "alice", Commits = 2 } ] },
+        };
+        var follows = new List<FollowsEntry>
+        {
+            new() { Login = "alice", Followers = ["bob", "carol", "dan", "alice"], Following = ["bob"] },
+        };
+        var roundups = new Dictionary<string, string> { ["2026-10"] = "See https://github.com/alice/a1 and github.com/bob/b10." };
+        var spotlight = new List<SpotlightWeek> { new() { Week = "2026-W40", Picks = ["gh:bob/b1"] } };
+
+        List<SiteDeveloper> Build(List<SiteProject> ps, int minCommits = 1) =>
+            DeveloperPages.Build(ps, [], contributors, follows, spotlight, roundups, new DeveloperPagesConfig { MinCommits = minCommits, RankTopN = 2 });
+        var pages = Build(published).ToDictionary(d => d.Login);
+        var alice = pages["alice"];
+        var bob = pages["bob"];
+
+        Check(pages.Count == 3 && !pages.ContainsKey("dan"), "a page for each owner with a listed project, and only them");
+        Check(alice.ContributesTo.Select(c => c.Project).SequenceEqual(["gh:bob/b1"]), "own projects never count as 'contributes to'");
+        Check(alice.Contributors.Select(c => c.Login).SequenceEqual(["bob", "carol"]), "contributors from git.ge: people with pages only (dan has none)");
+        Check(Build(published, minCommits: 2).First(d => d.Login == "alice").Contributors.Select(c => c.Login).SequenceEqual(["bob"]), "minCommits drops smaller contributions");
+        Check(alice.FollowedBy.SequenceEqual(["bob", "carol"]) && alice.Follows.SequenceEqual(["bob"]), "follows are limited to people with pages, excluding oneself");
+        Check(alice.Mutual.SequenceEqual(["bob"]) && alice.FollowedBy[0] == "bob", "mutual follows are found and listed first");
+        Check(alice.Ranks.Select(r => (r.Project, r.Rank, r.Of)).SequenceEqual([("gh:alice/a1", 1, 3)]), "category ranks by stars, only within rankTopN (a2 is #3 of 3)");
+        Check(bob.Ranks.Single().Rank == 2 && bob.Spotlight.SequenceEqual(["2026-W40"]), "rank #2 and Spotlight weeks on bob's page");
+        Check(alice.Roundups.SequenceEqual(["2026-10"]) && bob.Roundups.Count == 0, "roundup mentions match the exact repo (b10 isn't b1)");
+
+        var withoutCarol = published.Where(p => p.Owner != "carol").ToList();   // carol excluded or opted out
+        var pagesWithoutCarol = Build(withoutCarol);
+        Check(pagesWithoutCarol.All(d => d.Login != "carol" && !d.FollowedBy.Contains("carol") && d.Contributors.All(c => c.Login != "carol")),
+              "an opted-out developer appears nowhere, in either direction");
+        Check(Social.IsBot("dependabot[bot]") && Social.IsBot("renovate-bot") && !Social.IsBot("alice"), "bots are recognised");
     }
 
     static void SpotlightRules()
@@ -1095,12 +1154,20 @@ static class Prepare
             RecentlyActive = recentlyActive.Select(p => p.Key).ToList(),
             Spotlight = PickSpotlight(published, now, spotlightHistory).Select(p => p.Key).ToList(),
             Issues = Store.ReadList<HelpWantedIssue>(paths.Issues).Where(i => publishedKeys.Contains(i.Project)).ToList(),
+            DeveloperPages = DeveloperPages.Build(
+                published,
+                Store.ReadList<Developer>(paths.Developers),
+                Store.ReadList<ContributorsEntry>(paths.Contributors),
+                Store.ReadList<FollowsEntry>(paths.Follows),
+                spotlightHistory,
+                DeveloperPages.ReadRoundups(Path.Combine(paths.Root, "content", "roundups")),
+                site.DeveloperPages),
         };
 
         Store.WriteList(paths.SpotlightHistory, spotlightHistory.OrderBy(h => h.Week));
         Directory.CreateDirectory(Path.GetDirectoryName(paths.SiteData)!);
         File.WriteAllText(paths.SiteData, JsonSerializer.Serialize(data, Json.Options), new UTF8Encoding(false));
-        Log.Info($"Prepared {published.Count} projects ({published.Count(p => p.Listed)} listed, {data.Developers} developers), " +
+        Log.Info($"Prepared {published.Count} projects ({published.Count(p => p.Listed)} listed, {data.Developers} developers, {data.DeveloperPages.Count} developer pages), " +
                  $"{data.Issues.Count} help-wanted issues, trend {(trend.HasHistory ? $"since {data.Trend.Baseline}" : "not available yet")} → {paths.SiteData}");
     }
 
@@ -1164,6 +1231,199 @@ static class Prepare
     }
 }
 
+// ---------------------------------------------------------------------------
+// Developer pages (/u/<login>/): one per owner with at least one listed project.
+// Built from data already collected (projects, contributors.json, follows.json,
+// Spotlight history, roundups). See docs/specs/developer-pages.md.
+// ---------------------------------------------------------------------------
+
+static class DeveloperPages
+{
+    public static List<SiteDeveloper> Build(
+        List<SiteProject> published, IEnumerable<Developer> developers, IEnumerable<ContributorsEntry> contributors,
+        IEnumerable<FollowsEntry> follows, IEnumerable<SpotlightWeek> spotlight, IReadOnlyDictionary<string, string> roundups,
+        DeveloperPagesConfig config)
+    {
+        var ic = StringComparer.OrdinalIgnoreCase;
+        var listed = published.Where(p => p.Listed && p.Owner.Length > 0).ToList();
+        // Only people with a page appear anywhere on developer pages, so excluded and
+        // opted-out developers (whose projects never reach `published`) never show up.
+        var owners = listed.Select(p => p.Owner).Distinct(ic).ToList();
+        var hasPage = owners.ToHashSet(ic);
+        var info = developers.GroupBy(d => d.Login, ic).ToDictionary(g => g.Key, g => g.First(), ic);
+        var byKey = published.ToDictionary(p => p.Key);
+
+        // Category rank by stars among listed projects.
+        var rankOf = new Dictionary<string, SiteRank>();
+        foreach (var g in listed.GroupBy(p => p.Category))
+        {
+            var ordered = g.OrderByDescending(p => p.Stars ?? 0).ThenBy(p => p.Key).ToList();
+            for (var i = 0; i < ordered.Count; i++)
+                rankOf[ordered[i].Key] = new SiteRank { Project = ordered[i].Key, Category = g.Key, Rank = i + 1, Of = ordered.Count };
+        }
+
+        // Contributions between git.ge developers (never to one's own projects).
+        var contributesTo = owners.ToDictionary(o => o, _ => new List<SiteContribution>(), ic);
+        var contributorsOf = owners.ToDictionary(o => o, _ => new Dictionary<string, int>(ic), ic);
+        foreach (var entry in contributors)
+        {
+            if (!byKey.TryGetValue(entry.Project, out var project) || project.Owner.Length == 0) continue;
+            foreach (var c in entry.Contributors)
+            {
+                if (c.Commits < config.MinCommits || c.Login.Equals(project.Owner, StringComparison.OrdinalIgnoreCase) || !hasPage.Contains(c.Login))
+                    continue;
+                contributesTo[c.Login].Add(new SiteContribution { Project = project.Key, Commits = c.Commits });
+                if (contributorsOf.TryGetValue(project.Owner, out var mine))
+                    mine[c.Login] = mine.GetValueOrDefault(c.Login) + c.Commits;
+            }
+        }
+
+        var followsOf = follows.GroupBy(f => f.Login, ic).ToDictionary(g => g.Key, g => g.First(), ic);
+        var spotlightWeeks = spotlight.SelectMany(w => w.Picks.Select(k => (Key: k, w.Week)))
+            .GroupBy(x => x.Key).ToDictionary(g => g.Key, g => g.Select(x => x.Week).ToList());
+
+        var pages = new List<SiteDeveloper>();
+        foreach (var owner in owners)
+        {
+            var mine = published.Where(p => p.Owner.Equals(owner, StringComparison.OrdinalIgnoreCase)).ToList();
+            var mineListed = mine.Where(p => p.Listed).OrderByDescending(p => p.Stars ?? 0).ThenBy(p => p.Key).ToList();
+            var mineSmaller = mine.Where(p => !p.Listed).OrderByDescending(p => p.Stars ?? 0).ThenBy(p => p.Key).ToList();
+            info.TryGetValue(owner, out var dev);
+            followsOf.TryGetValue(owner, out var f);
+            List<string> Among(IEnumerable<string>? logins) =>
+                (logins ?? []).Where(l => hasPage.Contains(l) && !l.Equals(owner, StringComparison.OrdinalIgnoreCase)).Distinct(ic).ToList();
+            var followedBy = Among(f?.Followers);
+            var followsList = Among(f?.Following);
+            var mutual = followedBy.Where(l => followsList.Contains(l, ic)).ToList();
+
+            pages.Add(new SiteDeveloper
+            {
+                Login = owner,
+                Name = dev?.Name,
+                Type = dev?.Type is { Length: > 0 } t ? t : "User",
+                Url = dev?.HtmlUrl is { Length: > 0 } u ? u : $"https://github.com/{owner}",
+                Projects = mineListed.Select(p => p.Key).ToList(),
+                Smaller = mineSmaller.Select(p => p.Key).ToList(),
+                Stars = mineListed.Sum(p => p.Stars ?? 0),
+                Languages = Top(mineListed.Select(p => p.Language)),
+                Categories = Top(mineListed.Select(p => (string?)p.Category)),
+                HelpWanted = mine.Sum(p => p.HelpWanted ?? 0),
+                FirstSeenAt = dev?.FirstSeenAt,
+                LastPush = mine.Max(p => p.PushedAt),
+                Ranks = mineListed.Select(p => rankOf.GetValueOrDefault(p.Key)).OfType<SiteRank>()
+                    .Where(r => r.Rank <= config.RankTopN).OrderBy(r => r.Rank).ToList(),
+                Spotlight = mine.SelectMany(p => spotlightWeeks.GetValueOrDefault(p.Key) ?? []).Distinct().Order().ToList(),
+                Roundups = roundups.Where(r => mine.Any(p => MentionsProject(r.Value, p))).Select(r => r.Key).Order().ToList(),
+                ContributesTo = contributesTo[owner].OrderByDescending(c => c.Commits).ThenBy(c => c.Project).ToList(),
+                Contributors = contributorsOf[owner].Select(kv => new SiteContributor { Login = kv.Key, Commits = kv.Value })
+                    .OrderByDescending(c => c.Commits).ThenBy(c => c.Login, ic).ToList(),
+                // Mutual follows first, then the rest.
+                FollowedBy = followedBy.OrderBy(l => mutual.Contains(l, ic) ? 0 : 1).ThenBy(l => l, ic).ToList(),
+                Follows = followsList.OrderBy(l => mutual.Contains(l, ic) ? 0 : 1).ThenBy(l => l, ic).ToList(),
+                Mutual = mutual.Order(ic).ToList(),
+            });
+        }
+        return pages.OrderBy(d => d.Login, ic).ToList();
+    }
+
+    static List<string> Top(IEnumerable<string?> values) =>
+        values.OfType<string>().GroupBy(v => v).OrderByDescending(g => g.Count()).ThenBy(g => g.Key).Take(3).Select(g => g.Key).ToList();
+
+    // A roundup mentions a project when it links to it (github.com/owner/repo, not a longer name).
+    internal static bool MentionsProject(string text, SiteProject p) =>
+        p.FullName is { } full
+            ? Regex.IsMatch(text, $@"github\.com/{Regex.Escape(full)}(?![\w.-])", RegexOptions.IgnoreCase)
+            : text.Contains(p.Url, StringComparison.OrdinalIgnoreCase);
+
+    // content/roundups/<slug>.ka.md and .en.md, keyed by slug, texts joined.
+    public static Dictionary<string, string> ReadRoundups(string dir)
+    {
+        if (!Directory.Exists(dir)) return [];
+        return Directory.GetFiles(dir, "*.md")
+            .Where(f => !Path.GetFileName(f).Equals("README.md", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(f => Regex.Replace(Path.GetFileNameWithoutExtension(f), @"\.(ka|en)$", ""))
+            .ToDictionary(g => g.Key, g => string.Join("\n", g.Select(File.ReadAllText)));
+    }
+}
+
+sealed class DeveloperPagesConfig
+{
+    public int MinCommits { get; set; } = 1;
+    public int RankTopN { get; set; } = 10;
+}
+
+// data/bot/discovered/contributors.json: one line per listed project.
+sealed class ContributorsEntry
+{
+    public string Project { get; set; } = "";
+    public string FullName { get; set; } = "";
+    public string FetchedAt { get; set; } = "";
+    public List<ContributorCount> Contributors { get; set; } = [];
+}
+
+sealed class ContributorCount
+{
+    public string Login { get; set; } = "";
+    public int Commits { get; set; }
+}
+
+// data/bot/discovered/follows.json: one line per developer with a page. Followers and
+// Following keep only git.ge developers; the counts are totals as fetched.
+sealed class FollowsEntry
+{
+    public string Login { get; set; } = "";
+    public string FetchedAt { get; set; } = "";
+    public int FollowerCount { get; set; }
+    public int FollowingCount { get; set; }
+    public bool Truncated { get; set; }
+    public List<string> Followers { get; set; } = [];
+    public List<string> Following { get; set; } = [];
+}
+
+sealed class SiteDeveloper
+{
+    public string Login { get; set; } = "";
+    public string? Name { get; set; }
+    public string Type { get; set; } = "User";
+    public string Url { get; set; } = "";
+    public List<string> Projects { get; set; } = [];
+    public List<string> Smaller { get; set; } = [];
+    public int Stars { get; set; }
+    public List<string> Languages { get; set; } = [];
+    public List<string> Categories { get; set; } = [];
+    public int HelpWanted { get; set; }
+    public string? FirstSeenAt { get; set; }
+    public DateTimeOffset? LastPush { get; set; }
+    public List<SiteRank> Ranks { get; set; } = [];
+    public List<string> Spotlight { get; set; } = [];
+    public List<string> Roundups { get; set; } = [];
+    public List<SiteContribution> ContributesTo { get; set; } = [];
+    public List<SiteContributor> Contributors { get; set; } = [];
+    public List<string> FollowedBy { get; set; } = [];
+    public List<string> Follows { get; set; } = [];
+    public List<string> Mutual { get; set; } = [];
+}
+
+sealed class SiteRank
+{
+    public string Project { get; set; } = "";
+    public string Category { get; set; } = "";
+    public int Rank { get; set; }
+    public int Of { get; set; }
+}
+
+sealed class SiteContribution
+{
+    public string Project { get; set; } = "";
+    public int Commits { get; set; }
+}
+
+sealed class SiteContributor
+{
+    public string Login { get; set; } = "";
+    public int Commits { get; set; }
+}
+
 sealed class SiteData
 {
     public DateTimeOffset GeneratedAt { get; set; }
@@ -1179,6 +1439,7 @@ sealed class SiteData
     public List<string> RecentlyActive { get; set; } = [];
     public List<string> Spotlight { get; set; } = [];
     public List<HelpWantedIssue> Issues { get; set; } = [];
+    public List<SiteDeveloper> DeveloperPages { get; set; } = [];
 }
 
 sealed class SpotlightWeek
@@ -1699,6 +1960,204 @@ static class Roundup
 }
 
 // ---------------------------------------------------------------------------
+// Social: the weekly fetch behind developer pages.
+//   contributors.json  all-time contributor lists (top 100, humans only) of listed projects
+//   follows.json       followers/following of each developer with a page, kept only
+//                      where the other side is a git.ge developer
+// Both use conditional requests (ETags in data/bot/state/), so unchanged lists cost
+// nothing, and both resume: entries fetched today are skipped unless --force.
+// ---------------------------------------------------------------------------
+
+static class Social
+{
+    const int MaxFollowPages = 30;   // 3,000 followers is plenty to find the git.ge ones
+
+    public static async Task Run(GitHub github, Paths paths, Options options)
+    {
+        Prepare.Run(paths);   // current listed projects and developers with pages
+        var data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(paths.SiteData), Json.Options)!;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
+        var ic = StringComparer.OrdinalIgnoreCase;
+        var manual = Store.Read<ManualDevelopers>(paths.ManualDevelopers);
+        var optOut = Store.Read<OptOut>(paths.OptOut);
+        var blocked = new HashSet<string>(manual.Exclude.Concat(optOut.Developers), ic);
+        var known = new HashSet<string>(Store.ReadList<Developer>(paths.Developers).Select(d => d.Login).Concat(manual.Include), ic);
+        known.ExceptWith(blocked);
+
+        await FetchContributors(github, paths, data, today, options.Force);
+        await FetchFollows(github, paths, data, known, today, options.Force);
+        github.LogUsage();
+    }
+
+    static async Task FetchContributors(GitHub github, Paths paths, SiteData data, string today, bool force)
+    {
+        var targets = data.Projects.Where(p => p.Listed && p.FullName is not null).ToDictionary(p => p.Key);
+        var entries = Store.ReadList<ContributorsEntry>(paths.Contributors).Where(e => targets.ContainsKey(e.Project)).ToDictionary(e => e.Project);
+        var etags = Store.Read<Dictionary<string, string>>(paths.ContributorsEtags);
+        var pending = targets.Values.Where(p => force || entries.GetValueOrDefault(p.Key)?.FetchedAt != today).ToList();
+        Log.Info($"Contributors: {pending.Count} of {targets.Count} listed projects to check");
+
+        int changed = 0, unchanged = 0, gone = 0;
+        var progress = new Progress("projects", pending.Count);
+        var sinceSave = Stopwatch.StartNew();
+        foreach (var p in pending)
+        {
+            var etag = !force && entries.ContainsKey(p.Key) ? etags.GetValueOrDefault(p.Key) : null;
+            var list = await github.RestGetAll($"repos/{p.FullName}/contributors?per_page=100", etag, maxPages: 1);
+            if (list.NotFound) { entries.Remove(p.Key); etags.Remove(p.Key); gone++; }
+            else if (list.NotModified)
+            {
+                if (entries.TryGetValue(p.Key, out var e)) e.FetchedAt = today;
+                unchanged++;
+            }
+            else
+            {
+                entries[p.Key] = new ContributorsEntry
+                {
+                    Project = p.Key,
+                    FullName = p.FullName!,
+                    FetchedAt = today,
+                    Contributors = list.Items
+                        .Where(n => n["type"]?.GetValue<string>() == "User" && n["login"]?.GetValue<string>() is { } l && !IsBot(l))
+                        .Select(n => new ContributorCount { Login = n["login"]!.GetValue<string>(), Commits = n["contributions"]?.GetValue<int>() ?? 0 })
+                        .ToList(),
+                };
+                if (list.ETag is not null) etags[p.Key] = list.ETag;
+                changed++;
+            }
+            progress.Advance(1);
+            if (sinceSave.Elapsed > TimeSpan.FromMinutes(1)) { Save(); sinceSave.Restart(); }
+        }
+        Save();
+        Log.Info($"Contributors done: {changed} fetched, {unchanged} unchanged (304), {gone} gone");
+
+        void Save()
+        {
+            Store.WriteList(paths.Contributors, entries.Values.OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase));
+            Store.WriteObject(paths.ContributorsEtags, new SortedDictionary<string, string>(etags));
+        }
+    }
+
+    static async Task FetchFollows(GitHub github, Paths paths, SiteData data, HashSet<string> known, string today, bool force)
+    {
+        var logins = data.DeveloperPages.Select(d => d.Login).ToList();
+        var wanted = logins.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var entries = Store.ReadList<FollowsEntry>(paths.Follows).Where(e => wanted.Contains(e.Login))
+            .ToDictionary(e => e.Login, StringComparer.OrdinalIgnoreCase);
+        var etags = Store.Read<Dictionary<string, string>>(paths.FollowsEtags);
+        var pending = logins.Where(l => force || entries.GetValueOrDefault(l)?.FetchedAt != today).ToList();
+        Log.Info($"Follows: {pending.Count} of {logins.Count} developers to check");
+
+        var progress = new Progress("developers", pending.Count);
+        var sinceSave = Stopwatch.StartNew();
+        foreach (var login in pending)
+        {
+            entries.TryGetValue(login, out var entry);
+            entry ??= new FollowsEntry { Login = login };
+            var truncated = false;
+            foreach (var kind in new[] { "followers", "following" })
+            {
+                var key = $"{kind}:{login}";
+                var etag = !force && entry.FetchedAt.Length > 0 ? etags.GetValueOrDefault(key) : null;
+                var list = await github.RestGetAll($"users/{login}/{kind}?per_page=100", etag, MaxFollowPages);
+                if (list.NotModified) continue;
+                var all = list.NotFound ? [] : list.Items.Select(n => n["login"]?.GetValue<string>()).OfType<string>().ToList();
+                var ours = all.Where(known.Contains).OrderBy(l => l, StringComparer.OrdinalIgnoreCase).ToList();
+                if (kind == "followers") { entry.Followers = ours; entry.FollowerCount = all.Count; }
+                else { entry.Following = ours; entry.FollowingCount = all.Count; }
+                truncated |= list.Truncated;
+                if (list.ETag is not null) etags[key] = list.ETag;
+            }
+            entry.Truncated = truncated;
+            entry.FetchedAt = today;
+            entries[login] = entry;
+            progress.Advance(1);
+            if (sinceSave.Elapsed > TimeSpan.FromMinutes(1)) { Save(); sinceSave.Restart(); }
+        }
+        Save();
+        Log.Info($"Follows done: {entries.Values.Count(e => e.Followers.Count > 0)} followed by, {entries.Values.Count(e => e.Following.Count > 0)} following git.ge developers");
+
+        void Save()
+        {
+            Store.WriteList(paths.Follows, entries.Values.OrderBy(e => e.Login, StringComparer.OrdinalIgnoreCase));
+            Store.WriteObject(paths.FollowsEtags, new SortedDictionary<string, string>(etags));
+        }
+    }
+
+    internal static bool IsBot(string login) =>
+        login.EndsWith("[bot]", StringComparison.OrdinalIgnoreCase)
+        || login.Equals("dependabot", StringComparison.OrdinalIgnoreCase)
+        || login.Equals("renovate-bot", StringComparison.OrdinalIgnoreCase);
+}
+
+// ---------------------------------------------------------------------------
+// Avatars: self-hosted 96px avatars of developers with a page, so the site loads
+// nothing from GitHub. Written to the avatar cache (default _cache/avatars/, not
+// committed); the site build copies them to _site/avatars/. Files older than a
+// week are re-downloaded; avatars of people without a page (e.g. after opting out)
+// are deleted. Needs _build/site-data.json (run prepare first).
+// ---------------------------------------------------------------------------
+
+static class Avatars
+{
+    static readonly TimeSpan MaxAge = TimeSpan.FromDays(7);
+
+    public static async Task Run(Paths paths, Options options)
+    {
+        if (!File.Exists(paths.SiteData)) throw new InvalidOperationException("Run 'prepare' first: avatars needs _build/site-data.json.");
+        var data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(paths.SiteData), Json.Options)!;
+        var ids = Store.ReadList<Developer>(paths.Developers).GroupBy(d => d.Login, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+        var dir = paths.AvatarCache;
+        Directory.CreateDirectory(dir);
+
+        var wanted = data.DeveloperPages.Select(d => d.Login.ToLowerInvariant()).ToHashSet();
+        var removed = 0;
+        foreach (var file in Directory.GetFiles(dir))
+            if (!wanted.Contains(Path.GetFileNameWithoutExtension(file))) { File.Delete(file); removed++; }
+
+        var existing = Directory.GetFiles(dir).ToDictionary(f => Path.GetFileNameWithoutExtension(f), f => f);
+        var todo = data.DeveloperPages.Where(d => options.Force
+            || !existing.TryGetValue(d.Login.ToLowerInvariant(), out var f)
+            || DateTime.UtcNow - File.GetLastWriteTimeUtc(f) > MaxAge).ToList();
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("git.ge-avatars", "1.0"));
+        int ok = 0, failed = 0;
+        await Parallel.ForEachAsync(todo, new ParallelOptions { MaxDegreeOfParallelism = 8 }, async (d, ct) =>
+        {
+            var url = ids.TryGetValue(d.Login, out var id) && id > 0
+                ? $"https://avatars.githubusercontent.com/u/{id}?s=96&v=4"
+                : $"https://github.com/{d.Login}.png?size=96";
+            try
+            {
+                using var response = await http.GetAsync(url, ct);
+                var ext = response.Content.Headers.ContentType?.MediaType switch
+                {
+                    "image/png" => "png", "image/jpeg" => "jpg", "image/gif" => "gif", "image/webp" => "webp", _ => null,
+                };
+                if (!response.IsSuccessStatusCode || ext is null) { Interlocked.Increment(ref failed); return; }
+                var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+                var name = d.Login.ToLowerInvariant();
+                foreach (var old in Directory.GetFiles(dir, name + ".*")) File.Delete(old);
+                var target = Path.Combine(dir, $"{name}.{ext}");
+                await File.WriteAllBytesAsync(target + ".tmp", bytes, ct);
+                File.Move(target + ".tmp", target, overwrite: true);
+                Interlocked.Increment(ref ok);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+            {
+                Interlocked.Increment(ref failed);
+            }
+        });
+
+        var files = Directory.GetFiles(dir);
+        Log.Info($"Avatars: {ok} downloaded, {failed} failed, {removed} removed; {files.Length} cached, " +
+                 $"{files.Sum(f => new FileInfo(f).Length) / 1024} KB in {dir}");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Review: the developers visitors will actually see, ranked by the stars of
 // their listed repos, so curation effort goes where it matters. Output is
 // Markdown on stdout; add unwanted logins to data/manual/developers.json.
@@ -1757,6 +2216,7 @@ sealed class SiteConfig
     // Repos below this appear only in "Recently active" and search, not in listings.
     public int ListingMinStars { get; set; } = 10;
     public string RepoUrl { get; set; } = "";
+    public DeveloperPagesConfig DeveloperPages { get; set; } = new();
 }
 
 sealed class HelpWantedIssue
@@ -2024,6 +2484,13 @@ sealed class Paths(string root)
     public string Snapshots => Path.Combine(BotData, "snapshots");
     public string DailySnapshots => Path.Combine(Snapshots, "daily");
     public string DiscoveryState => Path.Combine(BotData, "state", "discovery.json");
+    public string Contributors => Path.Combine(BotData, "discovered", "contributors.json");
+    public string Follows => Path.Combine(BotData, "discovered", "follows.json");
+    public string ContributorsEtags => Path.Combine(BotData, "state", "contributors-etags.json");
+    public string FollowsEtags => Path.Combine(BotData, "state", "follows-etags.json");
+    // Avatars are a cache, not data: kept outside the data branch (CI caches the folder).
+    public string AvatarCache => Environment.GetEnvironmentVariable("GITGE_AVATARS") is { Length: > 0 } dir
+        ? dir : Path.Combine(root, "_cache", "avatars");
 }
 
 static class Json
@@ -2193,6 +2660,109 @@ sealed class GitHub : IDisposable
         }
     }
 
+    // REST (core API) state, tracked separately from GraphQL points.
+    int restRequests;
+    int? coreRemaining;
+    DateTimeOffset? coreResetAt;
+
+    // All pages of a REST list endpoint (followers, contributors, …). Conditional on the
+    // first page's ETag: when GitHub answers 304 (which doesn't count against the rate
+    // limit), NotModified is true and Items is empty, so the caller keeps what it had.
+    public async Task<RestList> RestGetAll(string url, string? etag, int maxPages)
+    {
+        var items = new List<JsonNode>();
+        string? firstEtag = null;
+        var truncated = false;
+        for (var page = 1; url is not null; page++)
+        {
+            if (page > maxPages) { truncated = true; break; }
+            var (status, json, pageEtag, next) = await RestGet(url, page == 1 ? etag : null);
+            if (page == 1)
+            {
+                if (status == HttpStatusCode.NotModified) return new RestList([], etag, NotModified: true, NotFound: false, Truncated: false);
+                if (status == HttpStatusCode.NotFound) return new RestList([], null, NotModified: false, NotFound: true, Truncated: false);
+                firstEtag = pageEtag;
+            }
+            if (json is JsonArray array) items.AddRange(array.Where(n => n is not null)!);
+            url = next!;
+        }
+        return new RestList(items, firstEtag, NotModified: false, NotFound: false, truncated);
+    }
+
+    async Task<(HttpStatusCode Status, JsonNode? Json, string? ETag, string? Next)> RestGet(string url, string? etag)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            await WaitIfCoreLow();
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Accept.ParseAdd("application/vnd.github+json");
+            if (etag is not null) request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+            HttpResponseMessage response;
+            string text;
+            try
+            {
+                response = await http.SendAsync(request);
+                text = await response.Content.ReadAsStringAsync();
+            }
+            catch (TaskCanceledException) when (attempt < 4)
+            {
+                Log.Warn("  request timed out; retrying");
+                continue;
+            }
+            using var _ = response;
+            restRequests++;
+            if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var r) && int.TryParse(r.First(), out var rem)) coreRemaining = rem;
+            if (response.Headers.TryGetValues("X-RateLimit-Reset", out var s) && long.TryParse(s.First(), out var epoch)) coreResetAt = DateTimeOffset.FromUnixTimeSeconds(epoch);
+
+            var status = response.StatusCode;
+            if (status is HttpStatusCode.NotModified or HttpStatusCode.NotFound or HttpStatusCode.NoContent)
+                return (status, null, etag, null);
+            if (status is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests && attempt <= 6
+                && (coreRemaining == 0 || response.Headers.RetryAfter is not null || text.Contains("rate limit", StringComparison.OrdinalIgnoreCase)))
+            {
+                var delay = response.Headers.RetryAfter?.Delta
+                    ?? (coreRemaining == 0 && coreResetAt is { } reset ? reset - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(60 * attempt));
+                Log.Warn($"  rate limited ({(int)status}); waiting {delay.TotalSeconds:F0}s");
+                await Task.Delay(delay);
+                continue;
+            }
+            if (status is HttpStatusCode.Accepted || (int)status >= 500)
+            {
+                if (attempt > 4) throw new HttpRequestException($"GitHub returned {(int)status} for {url}");
+                await Task.Delay(TimeSpan.FromSeconds(5 * attempt));
+                continue;
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                // Access refused (e.g. an enterprise blocking the token): treat as "no data this time".
+                Log.Warn($"  GitHub returned {(int)status} for {url}; skipping");
+                return (HttpStatusCode.NotModified, null, etag, null);
+            }
+            var newEtag = response.Headers.ETag?.ToString();
+            return (status, JsonNode.Parse(text), newEtag, NextLink(response));
+        }
+    }
+
+    static string? NextLink(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues("Link", out var links)) return null;
+        foreach (var part in string.Join(",", links).Split(','))
+        {
+            var match = Regex.Match(part, "<([^>]+)>;\\s*rel=\"next\"");
+            if (match.Success) return match.Groups[1].Value;
+        }
+        return null;
+    }
+
+    async Task WaitIfCoreLow()
+    {
+        if (coreRemaining is not { } rem || rem > LowWaterMark || coreResetAt is not { } reset) return;
+        var delay = reset - DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+        if (delay <= TimeSpan.Zero) return;
+        Log.Warn($"  {rem} REST requests left; waiting {delay.TotalMinutes:F1} min for reset");
+        await Task.Delay(delay);
+    }
+
     void ReadRateLimit(HttpResponseMessage response)
     {
         if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var r) && int.TryParse(r.First(), out var rem))
@@ -2210,12 +2780,20 @@ sealed class GitHub : IDisposable
         await Task.Delay(delay);
     }
 
-    public void LogUsage() => Log.Info($"{requests} API requests; {remaining?.ToString() ?? "?"} GraphQL points left until {resetAt:HH:mm} UTC");
+    public void LogUsage()
+    {
+        if (requests > 0 || restRequests == 0)
+            Log.Info($"{requests} API requests; {remaining?.ToString() ?? "?"} GraphQL points left until {resetAt:HH:mm} UTC");
+        if (restRequests > 0)
+            Log.Info($"{restRequests} REST requests; {coreRemaining?.ToString() ?? "?"} left until {coreResetAt:HH:mm} UTC");
+    }
 
     public void Dispose() => http.Dispose();
 }
 
 sealed class GatewayTimeoutException(int status) : HttpRequestException($"GitHub returned {status} repeatedly");
+
+sealed record RestList(List<JsonNode> Items, string? ETag, bool NotModified, bool NotFound, bool Truncated);
 
 sealed class Options
 {

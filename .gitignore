@@ -15,3 +15,6 @@ _build/
 # Claude Code agent worktrees
 .claude/worktrees/
 *.tmp
+
+# Avatar cache for developer pages (see gitge.cs avatars); CI caches it, never committed
+_cache/

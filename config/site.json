@@ -4,5 +4,9 @@
   "trendWindowDays": 30,
   "trendToleranceDays": 7,
   "listingMinStars": 10,
-  "repoUrl": "https://github.com/Giorgi/git.ge"
+  "repoUrl": "https://github.com/Giorgi/git.ge",
+  "developerPages": {
+    "minCommits": 1,
+    "rankTopN": 10
+  }
 }
