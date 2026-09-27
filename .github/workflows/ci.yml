@@ -48,7 +48,11 @@ jobs:
         run: |
           dotnet run gitge.cs -- prepare
           dotnet run --project site --no-build
-          for page in index.html 404.html index.json sitemap.xml robots.txt projects/index.html help-wanted/index.html about/index.html roundups/feed.xml; do
+          for page in index.html 404.html index.json sitemap.xml robots.txt projects/index.html help-wanted/index.html about/index.html roundups/feed.xml u/index.html; do
             test -s "_site/$page" || { echo "::error::_site/$page is missing or empty"; exit 1; }
           done
+          # Every developer page listed in the directory must exist.
+          first=$(grep -o 'href="/u/[^"]*/"' _site/u/index.html | head -1 | sed 's/href="\(.*\)"/\1/')
+          test -n "$first" && test -s "_site${first}index.html" || { echo "::error::developer page ${first} is missing"; exit 1; }
+          echo "Developer pages: $(find _site/u -name index.html | wc -l)"
           echo "Built $(find _site -name '*.html' | wc -l) pages."

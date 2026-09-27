@@ -66,6 +66,23 @@ jobs:
         working-directory: data/bot
         run: bash ../../.github/scripts/commit-data.sh "Nightly refresh $(date -u +%F)"
 
+      - name: Week for the avatar cache
+        id: week
+        run: echo "id=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore avatars
+        # Avatars are a cache, not data: kept between runs, never committed.
+        uses: actions/cache@v6
+        with:
+          path: _cache/avatars
+          key: avatars-${{ steps.week.outputs.id }}
+          restore-keys: avatars-
+
+      - name: Download new or stale avatars
+        # Self-hosted avatars for developer pages; only missing or week-old files are fetched.
+        continue-on-error: true
+        run: dotnet run gitge.cs -- avatars
+
       - name: Build site
         run: dotnet run --project site
 
