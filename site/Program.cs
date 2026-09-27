@@ -28,6 +28,9 @@ var dataFile = Path.Combine(root, "_build", "site-data.json");
 var output = Path.Combine(root, "_site");
 var wwwroot = Path.Combine(root, "site", "wwwroot");
 
+if (args.FirstOrDefault() == "selftest")
+    return SiteSelfTest();
+
 if (!File.Exists(dataFile))
 {
     Console.Error.WriteLine($"Missing {dataFile}. Run `dotnet run gitge.cs -- prepare` from the repository root first.");
@@ -266,6 +269,37 @@ static Dictionary<string, string> LoadPages(string dir, MarkdownPipeline markdow
     return Directory.GetFiles(dir, "*.md").ToDictionary(
         f => Path.GetFileNameWithoutExtension(f),
         f => Markdown.ToHtml(values.Aggregate(File.ReadAllText(f), (text, kv) => text.Replace($"{{{{{kv.Key}}}}}", kv.Value)), markdown));
+}
+
+// `dotnet run --project site -- selftest`: checks for helpers used in rendering.
+static int SiteSelfTest()
+{
+    var failures = 0;
+    void Check(bool ok, string what)
+    {
+        if (!ok) failures++;
+        Console.Error.WriteLine($"  {(ok ? "ok  " : "FAIL")} {what}");
+    }
+
+    var en = new Dictionary<int, string>
+    {
+        [1] = "1st", [2] = "2nd", [3] = "3rd", [4] = "4th", [10] = "10th", [11] = "11th", [12] = "12th", [13] = "13th",
+        [21] = "21st", [22] = "22nd", [23] = "23rd", [101] = "101st", [111] = "111th", [112] = "112th",
+    };
+    foreach (var (n, expected) in en)
+        Check(Format.OrdinalEn(n) == expected, $"English ordinal {n} → {expected} (got {Format.OrdinalEn(n)})");
+    var ka = new Dictionary<int, string>
+    {
+        // grammar.emis.ge, exercise 179
+        [1] = "1-ელი", [2] = "მე-2", [4] = "მე-4", [12] = "მე-12", [20] = "მე-20", [21] = "21-ე", [22] = "22-ე",
+        [30] = "30-ე", [40] = "მე-40", [41] = "41-ე", [80] = "მე-80", [99] = "99-ე", [100] = "მე-100", [101] = "101-ე",
+        [107] = "107-ე", [120] = "120-ე", [200] = "მე-200", [203] = "203-ე", [1000] = "მე-1000",
+    };
+    foreach (var (n, expected) in ka)
+        Check(Format.OrdinalKa(n) == expected, $"Georgian ordinal {n} → {expected} (got {Format.OrdinalKa(n)})");
+
+    Console.Error.WriteLine(failures == 0 ? "All site checks passed" : $"{failures} site check(s) FAILED");
+    return failures == 0 ? 0 : 1;
 }
 
 static void CopyDirectory(string from, string to)

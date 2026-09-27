@@ -110,6 +110,10 @@ public sealed class SiteProject
     public bool Listed { get; set; }
     public string Source { get; set; } = "";
 
+    // A URL someone submitted (a project hosted outside GitHub): linked with
+    // rel="nofollow ugc", since git.ge doesn't vouch for it.
+    public bool IsSubmittedUrl => FullName is null;
+
     // Anchor on /help-wanted/ for this project's issues.
     public string Anchor => "p-" + Key.Replace(':', '-').Replace('/', '-');
 }
@@ -188,6 +192,21 @@ public static class Format
     };
 
     public static string Date(DateTimeOffset? d) => d?.UtcDateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+
+    // Georgian ordinals written with digits, per grammar.emis.ge (exercise 179):
+    // 1 → "1-ელი" (current norm); "მე-N" where the numeral word starts with მე-:
+    // 2–20 (მეორე … მეოცე), 40/60/80 (მეორმოცე …), 100, 200 … 900 (მეასე, მეორასე …)
+    // and 1000 (მეათასე); everything else ends in -ე: 21 → "21-ე" (ოცდამეერთე),
+    // 30 → "30-ე", 101 → "101-ე", 203 → "203-ე". Georgian ordinals are produced only
+    // here (rendered server-side); app.js never makes them.
+    public static string OrdinalKa(int n) =>
+        n == 1 ? "1-ელი"
+        : (n >= 2 && n <= 20) || n is 40 or 60 or 80 || (n % 100 == 0 && n >= 100 && n <= 1000) ? $"მე-{n}"
+        : $"{n}-ე";
+
+    // English ordinals: 1st, 2nd, 3rd, 4th, … 11th, 12th, 13th, … 21st, 22nd, 23rd, …
+    public static string OrdinalEn(int n) =>
+        n + ((n % 100) is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" });
 }
 
 // UI strings from i18n/ka.json and i18n/en.json. Pages are rendered in Georgian;

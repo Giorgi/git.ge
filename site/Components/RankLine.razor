@@ -1,0 +1,45 @@
+@* One category-rank sentence, e.g. "EntityFramework.Exceptions: ვარსკვლავებით
+   პირველი კატეგორიაში „.NET“ (53 პროექტიდან)". Both languages are rendered and
+   CSS shows the one matching <html lang>, because the sentence holds links and an
+   ordinal that differs per language. Template: i18n "dev.rankLine" with
+   {0} project, {1} ordinal, {2} category, {3} count. *@
+@foreach (var lang in new[] { "ka", "en" })
+{
+    <span class="l10n" lang="@lang">
+        @foreach (var part in Parts(lang))
+        {
+            @switch (part)
+            {
+                case "{0}":
+                    <a href="@Project.Url" rel="@(Project.IsSubmittedUrl ? "nofollow ugc" : null)">@Project.Name</a>
+                    break;
+                case "{1}":
+                    @(lang == "ka" ? Format.OrdinalKa(R.Rank) : Format.OrdinalEn(R.Rank))
+                    break;
+                case "{2}":
+                    <a href="/c/@R.Category/">@CategoryName(lang)</a>
+                    break;
+                case "{3}":
+                    @Format.Number(R.Of)
+                    break;
+                default:
+                    @part
+                    break;
+            }
+        }
+    </span>
+}
+
+@code {
+    [Parameter, EditorRequired] public SiteRank R { get; set; } = default!;
+
+    SiteProject Project => Site.Project(R.Project);
+
+    string CategoryName(string lang) =>
+        (lang == "ka" ? Site.Strings.Georgian : Site.Strings.English)[$"cat.{R.Category}"];
+
+    IEnumerable<string> Parts(string lang) =>
+        System.Text.RegularExpressions.Regex.Split(
+            (lang == "ka" ? Site.Strings.Georgian : Site.Strings.English)["dev.rankLine"], @"(\{[0-3]\})")
+        .Where(p => p.Length > 0);
+}

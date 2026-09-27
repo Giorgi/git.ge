@@ -13,7 +13,7 @@
         {
             <section class="hw-project" id="@project.Anchor">
                 <h2>
-                    <a href="@project.Url"><span class="p-owner">@(project.Owner)/</span>@project.Name</a>
+                    <a href="@project.Url" rel="@(project.IsSubmittedUrl ? "nofollow ugc" : null)"><span class="p-owner">@(project.Owner)/</span>@project.Name</a>
                     <span class="p-meta">
                         @if (project.Language is not null)
                         {

@@ -4,7 +4,7 @@
 <li class="p" data-stars="@(P.Stars ?? 0)" data-trend="@P.Trend" data-pushed="@Format.Date(P.PushedAt)" data-created="@Format.Date(P.CreatedAt)">
     <div class="p-head">
         <span class="p-title">@if (ShowOwner && P.FullName is not null)
-            {<a class="p-owner" href="@Site.OwnerHref(P.Owner)">@(P.Owner)/</a>}<a class="p-name" href="@P.Url">@P.Name</a></span>
+            {<a class="p-owner" href="@Site.OwnerHref(P.Owner)">@(P.Owner)/</a>}<a class="p-name" href="@P.Url" rel="@(P.IsSubmittedUrl ? "nofollow ugc" : null)">@P.Name</a></span>
         @if (!ShowOwner)
         {
             <a class="badge cat" href="/c/@P.Category/"><T K="@($"cat.{P.Category}")" /></a>

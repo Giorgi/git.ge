@@ -44,6 +44,9 @@ jobs:
       - name: Build the site project
         run: dotnet build site
 
+      - name: Site self-test (rendering helpers)
+        run: dotnet run --project site --no-build -- selftest
+
       - name: Build the site from current data
         run: |
           dotnet run gitge.cs -- prepare
