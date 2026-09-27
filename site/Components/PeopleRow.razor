@@ -1,0 +1,30 @@
+@* A row of linked avatars (followers, following, contributors): up to Max, then
+   "and N more". Mutual follows get a green ring. Hidden when empty. *@
+@if (Logins.Count > 0)
+{
+    <div class="people">
+        <p class="people-text"><T K="@TextKey" Args="@([Logins.Count])" /></p>
+        <ul class="people-list">
+            @foreach (var login in Logins.Take(Max))
+            {
+                var dev = Site.Developer(login);
+                <li>
+                    <a href="@Site.OwnerHref(login)" title="@(dev?.DisplayName ?? login)">
+                        <Avatar Login="@login" Size="36" Class="@(Mutual.Contains(login, StringComparer.OrdinalIgnoreCase) ? "mutual" : null)" />
+                    </a>
+                </li>
+            }
+            @if (Logins.Count > Max)
+            {
+                <li class="people-more"><T K="dev.andMore" Args="@([Logins.Count - Max])" /></li>
+            }
+        </ul>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<string> Logins { get; set; } = [];
+    [Parameter, EditorRequired] public string TextKey { get; set; } = "";
+    [Parameter] public List<string> Mutual { get; set; } = [];
+    [Parameter] public int Max { get; set; } = 12;
+}

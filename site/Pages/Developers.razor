@@ -1,0 +1,51 @@
+@* The developer directory (/u/): everyone with a page, A–Z. No rank numbers; the
+   sort buttons (app.js) only change the order. Works without JavaScript. *@
+<Layout Path="/u/" TitleKey="devs.title">
+    <h1><T K="devs.title" /></h1>
+    <p class="note"><T K="devs.intro" Args="@([Format.Number(People.Count)])" /></p>
+
+    <div class="sort" hidden data-sort-for="devs">
+        <T K="sort.label" />
+        @foreach (var (key, label) in SortOptions)
+        {
+            <button type="button" data-sort="@key" aria-pressed="@(key == "name" ? "true" : "false")"><T K="@label" /></button>
+        }
+    </div>
+
+    <ol class="dev-grid" id="devs">
+        @foreach (var d in People)
+        {
+            <li data-name="@d.DisplayName.ToLowerInvariant()" data-projects="@d.Projects.Count" data-followed="@d.FollowedBy.Count"
+                data-pushed="@Format.Date(d.LastPush)" data-first="@d.FirstSeenAt" data-stars="@d.Stars">
+                <a class="dev-card" href="@d.Path">
+                    <Avatar Login="@d.Login" Size="36" />
+                    <span class="dev-card-text">
+                        <strong>@d.DisplayName</strong>
+                        <span class="dev-card-login">@d.Login</span>
+                        <span class="dev-card-meta">
+                            <T K="devs.projects" Args="@([d.Projects.Count])" />
+                            @foreach (var cat in d.Categories.Take(2))
+                            {
+                                <span> · </span><T K="@($"cat.{cat}")" />
+                            }
+                        </span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ol>
+</Layout>
+
+@code {
+    List<SiteDeveloper> People => Site.Data.DeveloperPages
+        .OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+
+    static readonly (string Key, string Label)[] SortOptions =
+    [
+        ("name", "sort.name"),
+        ("projects", "sort.projects"),
+        ("followed", "sort.followed"),
+        ("pushed", "sort.recent"),
+        ("first", "sort.firstSeen"),
+    ];
+}

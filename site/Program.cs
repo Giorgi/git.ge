@@ -1,6 +1,6 @@
 // Renders the static site. Run from the repository root, after `gitge.cs prepare`:
 //   dotnet run --project site              build _site/ from _build/site-data.json
-//   dotnet run --project site -- serve     build, then serve _site/ on http://localhost:5080
+//   dotnet run --project site -- serve [--port 5080]   build, then serve _site/ on http://localhost:5080
 
 using System.Globalization;
 using System.Security.Cryptography;
@@ -53,6 +53,21 @@ Write("assets/i18n.js", "window.GITGE_I18N = " + JsonSerializer.Serialize(new { 
 foreach (var file in Directory.GetFiles(Path.Combine(output, "assets"), "*.*", SearchOption.TopDirectoryOnly))
     Site.AssetVersions[$"assets/{Path.GetFileName(file)}"] = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)))[..10];
 
+// Self-hosted avatars from the cache that `gitge.cs avatars` fills; only people with a page.
+var avatarCache = Environment.GetEnvironmentVariable("GITGE_AVATARS") is { Length: > 0 } avatarDir
+    ? avatarDir : Path.Combine(root, "_cache", "avatars");
+if (Directory.Exists(avatarCache))
+{
+    Directory.CreateDirectory(Path.Combine(output, "avatars"));
+    foreach (var file in Directory.GetFiles(avatarCache))
+    {
+        var login = Path.GetFileNameWithoutExtension(file);
+        if (!Site.Developers.ContainsKey(login)) continue;
+        File.Copy(file, Path.Combine(output, "avatars", Path.GetFileName(file)), overwrite: true);
+        Site.Avatars[login] = $"/avatars/{Path.GetFileName(file)}";
+    }
+}
+
 // Razor escapes all text; allow every Unicode range so Georgian stays readable UTF-8
 // instead of numeric entities, which would roughly triple its size.
 var services = new ServiceCollection()
@@ -83,6 +98,9 @@ await Page<Roundups>("/roundups/", []);
 foreach (var roundup in Site.Roundups)
     await Page<RoundupPage>($"/roundups/{roundup.Slug}/", new() { ["R"] = roundup });
 await Page<About>("/about/", []);
+await Page<Developers>("/u/", []);
+foreach (var developer in Site.Data.DeveloperPages)
+    await Page<Developer>(developer.Path, new() { ["D"] = developer });
 await Page<NotFound>("/404.html", [], inSitemap: false);
 
 Write("index.json", SearchIndex());
@@ -90,10 +108,14 @@ Write("roundups/feed.xml", Feed());
 Write("sitemap.xml", Sitemap());
 Write("robots.txt", $"User-agent: *\nAllow: /\n\nSitemap: {Site.Url("/sitemap.xml")}\n");
 
-Console.Error.WriteLine($"Rendered {sitemap.Count} pages, {listed.Count} listed projects → {output}");
+Console.Error.WriteLine($"Rendered {sitemap.Count} pages, {listed.Count} listed projects, " +
+                        $"{Site.Data.DeveloperPages.Count} developer pages ({Site.Avatars.Count} avatars) → {output}");
 
 if (args.FirstOrDefault() == "serve")
-    Serve(output);
+{
+    var portIndex = Array.IndexOf(args, "--port");
+    Serve(output, portIndex > 0 && portIndex + 1 < args.Length ? int.Parse(args[portIndex + 1]) : 5080);
+}
 return 0;
 
 async Task Page<TPage>(string path, Dictionary<string, object?> parameters, bool inSitemap = true) where TPage : IComponent
@@ -132,6 +154,7 @@ string SearchIndex()
         ["a"] = p.Archived ? 1 : null,
         ["v"] = p.Verified ? 1 : null,
         ["x"] = p.HelpWanted > 0 ? p.Anchor : null,
+        ["w"] = Site.Developer(p.Owner) is not null ? 1 : null,   // owner has a /u/ page
     }.Where(kv => kv.Value is not null).ToDictionary());
 
     return JsonSerializer.Serialize(new
@@ -255,10 +278,10 @@ static void CopyDirectory(string from, string to)
     }
 }
 
-static void Serve(string dir)
+static void Serve(string dir, int port)
 {
     var app = WebApplication.CreateBuilder().Build();
-    app.Urls.Add("http://localhost:5080");
+    app.Urls.Add($"http://localhost:{port}");
     var files = new PhysicalFileProvider(dir);
     app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
     app.UseStaticFiles(new StaticFileOptions { FileProvider = files });
@@ -270,6 +293,6 @@ static void Serve(string dir)
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.SendFileAsync(Path.Combine(dir, "404.html"));
     });
-    Console.Error.WriteLine("Serving _site/ on http://localhost:5080 (Ctrl+C to stop)");
+    Console.Error.WriteLine($"Serving _site/ on http://localhost:{port} (Ctrl+C to stop)");
     app.Run();
 }

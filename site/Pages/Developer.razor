@@ -1,0 +1,142 @@
+@* A developer's (or organization's) page: their listed projects plus what only
+   git.ge can show: category ranks, Spotlight weeks and roundups, who among
+   git.ge developers follows them and whom they follow, and contributions between
+   git.ge projects. Empty sections are left out. See docs/specs/developer-pages.md. *@
+<Layout Path="@D.Path" Title="@D.DisplayName" Description="@Summary" OgType="profile">
+    <article class="dev">
+        <header class="dev-head">
+            <Avatar Login="@D.Login" Size="96" />
+            <div class="dev-id">
+                <h1>@D.DisplayName</h1>
+                <p class="dev-login">
+                    <a href="@D.Url">github.com/@D.Login</a> ·
+                    <T K="@(D.IsOrg ? "dev.org" : "dev.person")" />
+                </p>
+                <p class="dev-summary">
+                    <T K="dev.summary" Args="@([Format.Number(D.Projects.Count), Format.Number(D.Stars)])" />
+                    @if (D.Languages.Count > 0)
+                    {
+                        <span> · @string.Join(", ", D.Languages)</span>
+                    }
+                    @foreach (var cat in D.Categories)
+                    {
+                        <span> · </span><a href="/c/@cat/"><T K="@($"cat.{cat}")" /></a>
+                    }
+                </p>
+                @if (D.Ranks.Count > 0 || D.Spotlight.Count > 0 || D.Roundups.Count > 0)
+                {
+                    <ul class="chips">
+                        @foreach (var r in D.Ranks)
+                        {
+                            var project = Site.Project(r.Project);
+                            <li class="chip" title="@Site.Strings.Ka("dev.rankTitle")" data-i18n-title="dev.rankTitle">
+                                <a href="/c/@r.Category/">#@r.Rank <T K="@($"cat.{r.Category}")" /> <T K="dev.rankOf" Args="@([r.Of])" /></a>
+                                <span class="chip-project">@project.Name</span>
+                            </li>
+                        }
+                        @foreach (var week in D.Spotlight)
+                        {
+                            <li class="chip"><T K="dev.spotlight" Args="@([week])" /></li>
+                        }
+                        @foreach (var slug in D.Roundups)
+                        {
+                            <li class="chip"><a href="/roundups/@slug/"><T K="dev.roundup" Args="@([slug])" /></a></li>
+                        }
+                    </ul>
+                }
+            </div>
+        </header>
+
+        @if (D.FollowedBy.Count > 0 || D.Follows.Count > 0)
+        {
+            <section class="dev-social" aria-label="@Site.Strings.Ka("dev.socialLabel")">
+                <PeopleRow Logins="@D.FollowedBy" TextKey="dev.followedBy" Mutual="@D.Mutual" />
+                <PeopleRow Logins="@D.Follows" TextKey="dev.follows" Mutual="@D.Mutual" />
+                @if (D.Mutual.Count > 0)
+                {
+                    <p class="note"><T K="dev.mutualNote" Args="@([D.Mutual.Count])" /></p>
+                }
+            </section>
+        }
+
+        <div class="dev-cols">
+            <section aria-labelledby="dev-projects">
+                <h2 id="dev-projects"><T K="dev.projects" /></h2>
+                <ProjectList Items="@D.Projects.Select(Site.Project)" ShowOwner="false" />
+                @if (D.Smaller.Count > 0)
+                {
+                    <details class="dev-smaller">
+                        <summary><T K="dev.smaller" Args="@([D.Smaller.Count])" /></summary>
+                        <ProjectList Items="@D.Smaller.Select(Site.Project)" ShowOwner="false" />
+                    </details>
+                }
+            </section>
+
+            @if (D.ContributesTo.Count > 0 || D.Contributors.Count > 0 || Issues.Count > 0)
+            {
+                <aside class="dev-side">
+                    @if (D.ContributesTo.Count > 0)
+                    {
+                        <section aria-labelledby="dev-contributes">
+                            <h2 id="dev-contributes"><T K="dev.contributesTo" /></h2>
+                            <ul class="dev-links">
+                                @foreach (var c in D.ContributesTo)
+                                {
+                                    var project = Site.Project(c.Project);
+                                    <li>
+                                        <a class="p-owner" href="@Site.OwnerHref(project.Owner)">@(project.Owner)/</a><a href="@project.Url">@project.Name</a>
+                                        <span class="note-inline"><T K="dev.commits" Args="@([c.Commits])" /></span>
+                                    </li>
+                                }
+                            </ul>
+                        </section>
+                    }
+                    @if (D.Contributors.Count > 0)
+                    {
+                        <section aria-labelledby="dev-contributors">
+                            <h2 id="dev-contributors"><T K="dev.contributors" /></h2>
+                            <ul class="dev-links">
+                                @foreach (var c in D.Contributors)
+                                {
+                                    var person = Site.Developer(c.Login);
+                                    <li>
+                                        <a class="person" href="@Site.OwnerHref(c.Login)"><Avatar Login="@c.Login" Size="24" /> @(person?.DisplayName ?? c.Login)</a>
+                                        <span class="note-inline"><T K="dev.commits" Args="@([c.Commits])" /></span>
+                                    </li>
+                                }
+                            </ul>
+                        </section>
+                    }
+                    @if (Issues.Count > 0)
+                    {
+                        <section aria-labelledby="dev-hw">
+                            <h2 id="dev-hw"><T K="hw.title" /></h2>
+                            <ul class="dev-links">
+                                @foreach (var issue in Issues.Take(MaxIssues))
+                                {
+                                    <li><a href="@issue.Url">@issue.Title</a> <span class="note-inline">@Site.Project(issue.Project).Name</span></li>
+                                }
+                            </ul>
+                            @if (Issues.Count > MaxIssues)
+                            {
+                                <p class="more"><a href="/help-wanted/#@Site.Project(Issues[0].Project).Anchor"><T K="dev.allIssues" Args="@([Issues.Count])" /></a></p>
+                            }
+                        </section>
+                    }
+                </aside>
+            }
+        </div>
+    </article>
+</Layout>
+
+@code {
+    const int MaxIssues = 5;
+
+    [Parameter, EditorRequired] public SiteDeveloper D { get; set; } = default!;
+
+    List<HelpWantedIssue> Issues =>
+        Site.Data.Issues.Where(i => D.Projects.Contains(i.Project) || D.Smaller.Contains(i.Project))
+            .OrderByDescending(i => i.CreatedAt).ToList();
+
+    string Summary => Site.Strings.Ka("dev.metaDescription", D.DisplayName, D.Projects.Count, D.Stars);
+}

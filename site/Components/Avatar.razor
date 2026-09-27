@@ -1,0 +1,20 @@
+@* A developer's avatar, self-hosted under /avatars/ (see `gitge.cs avatars`).
+   Without a cached image it falls back to the first letter in a neutral circle.
+   Decorative: the name is always next to it or in the link's title. *@
+@if (Site.Avatar(Login) is { } src)
+{
+    <img class="avatar avatar-@Size @Class" src="@src" width="@Size" height="@Size" alt="" loading="@(Size >= 96 ? "eager" : "lazy")" decoding="async">
+}
+else
+{
+    @* No inline style: the CSP (style-src 'self') would block it, so sizes are classes. *@
+    <span class="avatar avatar-@Size avatar-initial @Class" aria-hidden="true">@Initial</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Login { get; set; } = "";
+    [Parameter] public int Size { get; set; } = 36;
+    [Parameter] public string? Class { get; set; }
+
+    string Initial => Login.Length > 0 ? Login[..1].ToUpperInvariant() : "?";
+}

@@ -21,6 +21,56 @@ public sealed class SiteData
     public List<string> RecentlyActive { get; set; } = [];
     public List<string> Spotlight { get; set; } = [];
     public List<HelpWantedIssue> Issues { get; set; } = [];
+    public List<SiteDeveloper> DeveloperPages { get; set; } = [];
+}
+
+// One developer page (/u/<login>/). Keep in step with SiteDeveloper in gitge.cs.
+public sealed class SiteDeveloper
+{
+    public string Login { get; set; } = "";
+    public string? Name { get; set; }
+    public string Type { get; set; } = "User";
+    public string Url { get; set; } = "";
+    public List<string> Projects { get; set; } = [];
+    public List<string> Smaller { get; set; } = [];
+    public int Stars { get; set; }
+    public List<string> Languages { get; set; } = [];
+    public List<string> Categories { get; set; } = [];
+    public int HelpWanted { get; set; }
+    public string? FirstSeenAt { get; set; }
+    public DateTimeOffset? LastPush { get; set; }
+    public List<SiteRank> Ranks { get; set; } = [];
+    public List<string> Spotlight { get; set; } = [];
+    public List<string> Roundups { get; set; } = [];
+    public List<SiteContribution> ContributesTo { get; set; } = [];
+    public List<SiteContributor> Contributors { get; set; } = [];
+    public List<string> FollowedBy { get; set; } = [];
+    public List<string> Follows { get; set; } = [];
+    public List<string> Mutual { get; set; } = [];
+
+    public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Login : Name!;
+    public string Path => $"/u/{Login.ToLowerInvariant()}/";
+    public bool IsOrg => Type == "Organization";
+}
+
+public sealed class SiteRank
+{
+    public string Project { get; set; } = "";
+    public string Category { get; set; } = "";
+    public int Rank { get; set; }
+    public int Of { get; set; }
+}
+
+public sealed class SiteContribution
+{
+    public string Project { get; set; } = "";
+    public int Commits { get; set; }
+}
+
+public sealed class SiteContributor
+{
+    public string Login { get; set; } = "";
+    public int Commits { get; set; }
 }
 
 public sealed class SiteTrend
@@ -97,6 +147,20 @@ public static class Site
     public static SiteProject Project(string key) => (byKey ??= Data.Projects.ToDictionary(p => p.Key))[key];
 
     public static IEnumerable<SiteProject> Listed => Data.Projects.Where(p => p.Listed);
+
+    // Developer pages by lower-cased login, and self-hosted avatar URLs (/avatars/<login>.<ext>).
+    static Dictionary<string, SiteDeveloper>? developers;
+    public static Dictionary<string, SiteDeveloper> Developers =>
+        developers ??= Data.DeveloperPages.ToDictionary(d => d.Login.ToLowerInvariant());
+    public static Dictionary<string, string> Avatars { get; set; } = [];
+
+    public static SiteDeveloper? Developer(string login) => Developers.GetValueOrDefault(login.ToLowerInvariant());
+
+    // Where a project's owner links: their git.ge page when they have one, else GitHub.
+    public static string OwnerHref(string owner) =>
+        Developer(owner) is { } d ? d.Path : $"https://github.com/{owner}";
+
+    public static string? Avatar(string login) => Avatars.GetValueOrDefault(login.ToLowerInvariant());
 
     // Default order: trend when there is history to compute it from, stars otherwise.
     public static IEnumerable<SiteProject> DefaultOrder(IEnumerable<SiteProject> projects) =>

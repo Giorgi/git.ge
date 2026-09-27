@@ -115,8 +115,10 @@ h2 { font-size: 1.15rem; }
 .plist { list-style: none; margin: 0; padding: 0; }
 .p { padding: .55rem 0; border-bottom: 1px solid var(--line); }
 .p-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; }
+.p-title { overflow-wrap: anywhere; }
 .p-name { font-weight: 600; overflow-wrap: anywhere; }
 .p-owner { font-weight: 400; color: var(--muted); }
+a.p-owner:hover { color: var(--link); }
 .p-desc { margin: .1rem 0 .15rem; font-size: .93rem; }
 .p-meta { display: flex; flex-wrap: wrap; gap: .1rem .9rem; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .p-lang::before { content: ""; display: inline-block; width: .5em; height: .5em; border-radius: 50%; background: var(--muted); margin-right: .35em; vertical-align: .08em; }
@@ -126,6 +128,50 @@ h2 { font-size: 1.15rem; }
 .badge { font-size: .72rem; background: var(--badge); color: var(--fg); border-radius: 3px; padding: .05rem .4rem; white-space: nowrap; }
 .badge.hw { color: var(--up); }
 .badge.ok { color: var(--link); }
+.badge.cat { color: var(--muted); }
+
+/* Avatars (self-hosted; see gitge.cs avatars). Sizes are classes: the CSP forbids inline styles. */
+.avatar { display: inline-block; flex: none; border-radius: 50%; background: var(--soft); border: 1px solid var(--line); object-fit: cover; vertical-align: middle; }
+.avatar-24 { width: 24px; height: 24px; font-size: .7rem; }
+.avatar-36 { width: 36px; height: 36px; font-size: .95rem; }
+.avatar-96 { width: 96px; height: 96px; font-size: 2.4rem; }
+.avatar-initial { display: inline-grid; place-items: center; color: var(--muted); font-weight: 600; }
+.avatar.mutual { border: 2px solid var(--up); }
+
+/* Developer page */
+.dev-head { display: flex; gap: 1.25rem; align-items: flex-start; margin-top: 1.4rem; }
+.dev-id { min-width: 0; }
+.dev-id h1 { margin: 0 0 .15rem; }
+.dev-login, .dev-summary { margin: .1rem 0; color: var(--muted); font-size: .92rem; }
+.dev-login a { color: var(--muted); }
+.chips { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-wrap: wrap; gap: .35rem; }
+.chip { font-size: .8rem; background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: .08rem .6rem; }
+.chip a { color: var(--fg); }
+.chip-project { color: var(--muted); margin-left: .3rem; }
+.dev-social { display: flex; flex-wrap: wrap; gap: .6rem 2.5rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 1.2rem 0 .4rem; padding: .7rem 0 .5rem; }
+.dev-social .note { flex-basis: 100%; margin: 0; }
+.people-text { margin: 0 0 .35rem; font-size: .88rem; color: var(--muted); }
+.people-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
+.people-more { font-size: .82rem; color: var(--muted); margin-left: .3rem; }
+.dev-cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1.4fr); gap: 0 2.5rem; }
+.dev-cols > :only-child { grid-column: 1 / -1; }
+@media (max-width: 52rem) { .dev-cols { grid-template-columns: minmax(0, 1fr); } }
+.dev-smaller { margin-top: .8rem; }
+.dev-smaller summary { cursor: pointer; color: var(--muted); font-size: .92rem; }
+.dev-side h2 { font-size: 1rem; }
+.dev-links { list-style: none; padding: 0; margin: 0; font-size: .92rem; }
+.dev-links li { padding: .3rem 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.dev-links .person { display: inline-flex; align-items: center; gap: .4rem; color: var(--fg); }
+.note-inline { color: var(--muted); font-size: .8rem; margin-left: .3rem; }
+
+/* Developer directory (/u/) */
+.dev-grid { list-style: none; padding: 0; margin: .6rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .2rem 1.2rem; }
+.dev-card { display: flex; gap: .6rem; align-items: center; padding: .45rem 0; border-bottom: 1px solid var(--line); color: var(--fg); }
+.dev-card:hover { text-decoration: none; }
+.dev-card:hover strong { color: var(--link); }
+.dev-card-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.dev-card-text strong { overflow-wrap: anywhere; }
+.dev-card-login, .dev-card-meta { font-size: .78rem; color: var(--muted); }
 
 /* Category overview */
 .catgrid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem 1.5rem; }
@@ -177,4 +223,6 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
   .cats-label { flex: none; }
   h1 { font-size: 1.35rem; }
   .bar { gap: .4rem 1rem; }
+  .dev-head { gap: .8rem; }
+  .dev-head .avatar-96 { width: 64px; height: 64px; font-size: 1.6rem; }
 }

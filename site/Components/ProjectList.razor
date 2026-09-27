@@ -13,12 +13,13 @@
 <ol class="plist" id="@Id">
     @foreach (var p in Items)
     {
-        <ProjectCard P="p" />
+        <ProjectCard P="p" ShowOwner="ShowOwner" />
     }
 </ol>
 
 @code {
     [Parameter, EditorRequired] public IEnumerable<SiteProject> Items { get; set; } = [];
+    [Parameter] public bool ShowOwner { get; set; } = true;
     [Parameter] public bool Sortable { get; set; }
     [Parameter] public string? Id { get; set; }
 

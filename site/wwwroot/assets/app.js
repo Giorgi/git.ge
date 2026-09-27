@@ -73,14 +73,22 @@
     stars: el => Number(el.dataset.stars || 0),
     pushed: el => el.dataset.pushed || "",
     created: el => el.dataset.created || "",
+    // Developer directory (/u/)
+    name: el => el.dataset.name || "",
+    projects: el => Number(el.dataset.projects || 0),
+    followed: el => Number(el.dataset.followed || 0),
+    first: el => el.dataset.first || "",
   };
+  const ascending = new Set(["name"]);
 
   function sortList(list, key) {
     const value = sorters[key];
+    const dir = ascending.has(key) ? -1 : 1;
     const items = [...list.children];
     items.sort((a, b) => {
       const x = value(a), y = value(b);
-      return x < y ? 1 : x > y ? -1 : Number(b.dataset.stars || 0) - Number(a.dataset.stars || 0);
+      if (dir === -1 && typeof x === "string") return x.localeCompare(y);
+      return x < y ? dir : x > y ? -dir : Number(b.dataset.stars || 0) - Number(a.dataset.stars || 0);
     });
     list.append(...items);
   }
@@ -157,12 +165,20 @@
     li.dataset.created = p.r ?? "";
 
     const head = el("div", "p-head");
+    const title = el("span", "p-title");
     const name = el("a", "p-name");
     name.href = p.u || "https://github.com/" + p.n;
     const slash = p.n.indexOf("/");
-    if (slash > 0) name.append(el("span", "p-owner", p.n.slice(0, slash + 1)), p.n.slice(slash + 1));
-    else name.textContent = p.n;
-    head.append(name);
+    if (slash > 0) {
+      const ownerLogin = p.n.slice(0, slash);
+      const owner = el("a", "p-owner", ownerLogin + "/");
+      // "w": the owner has a developer page on git.ge.
+      owner.href = p.w ? "/u/" + ownerLogin.toLowerCase() + "/" : "https://github.com/" + ownerLogin;
+      title.append(owner);
+      name.textContent = p.n.slice(slash + 1);
+    } else name.textContent = p.n;
+    title.append(name);
+    head.append(title);
     if (p.a) head.append(el("span", "badge", t("card.archived")));
     if (p.h) {
       const hw = el("a", "badge hw", t("card.helpWanted", p.h));

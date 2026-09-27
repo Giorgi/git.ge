@@ -3,8 +3,12 @@
    with card() in wwwroot/assets/app.js, which renders search results. *@
 <li class="p" data-stars="@(P.Stars ?? 0)" data-trend="@P.Trend" data-pushed="@Format.Date(P.PushedAt)" data-created="@Format.Date(P.CreatedAt)">
     <div class="p-head">
-        <a class="p-name" href="@P.Url">@if (P.FullName is not null)
-            {<span class="p-owner">@(P.Owner)/</span>}@P.Name</a>
+        <span class="p-title">@if (ShowOwner && P.FullName is not null)
+            {<a class="p-owner" href="@Site.OwnerHref(P.Owner)">@(P.Owner)/</a>}<a class="p-name" href="@P.Url">@P.Name</a></span>
+        @if (!ShowOwner)
+        {
+            <a class="badge cat" href="/c/@P.Category/"><T K="@($"cat.{P.Category}")" /></a>
+        }
         @if (P.Archived)
         {
             <span class="badge"><T K="card.archived" /></span>
@@ -49,6 +53,8 @@
 
 @code {
     [Parameter, EditorRequired] public SiteProject P { get; set; } = default!;
+    // False on a developer's own page: the owner is obvious there, so show the category instead.
+    [Parameter] public bool ShowOwner { get; set; } = true;
 
     string TrendClass => P.Trend switch { > 0 => "up", < 0 => "down", _ => "" };
 }
