@@ -42,6 +42,10 @@
       if (el.dataset.ka === undefined) el.dataset.ka = el.textContent;
       el.textContent = en ? el.dataset.descEn : el.dataset.ka;
     }
+    // Truncated lines carry their full text as a tooltip; keep it in the shown language.
+    for (const el of document.querySelectorAll("[data-title-from-text]")) {
+      el.title = el.textContent.replace(/\s+/g, " ").trim();
+    }
   }
 
   function storedLanguage() {
@@ -97,12 +101,35 @@
     const list = document.getElementById(bar.dataset.sortFor);
     if (!list) continue;
     bar.hidden = false;
+
+    // Grouped lists (the /u/ directory): the server renders a first list plus a second
+    // group (data-groups) in their default order. Any other sort merges everyone into
+    // the first list; choosing the group sort again restores the original groups.
+    const extra = bar.dataset.groups ? document.getElementById(bar.dataset.groups) : null;
+    const extraTitle = extra ? document.querySelector(`[data-group-title="${extra.id}"]`) : null;
+    const original = extra ? { main: [...list.children], extra: [...extra.children] } : null;
+    const metricHost = list.closest("[data-metric]");
+
     bar.addEventListener("click", e => {
       const button = e.target.closest("button[data-sort]");
       if (!button) return;
+      const key = button.dataset.sort;
       for (const b of bar.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b === button));
-      bar.dataset.current = button.dataset.sort;
-      sortList(list, button.dataset.sort);
+      bar.dataset.current = key;
+      if (metricHost) metricHost.dataset.metric = key;
+      if (original && key === bar.dataset.groupSort) {
+        list.replaceChildren(...original.main);
+        extra.replaceChildren(...original.extra);
+        extra.hidden = false;
+        if (extraTitle) extraTitle.hidden = false;
+        return;
+      }
+      if (original) {
+        list.append(...extra.children);
+        extra.hidden = true;
+        if (extraTitle) extraTitle.hidden = true;
+      }
+      sortList(list, key);
     });
   }
 
@@ -168,6 +195,8 @@
     const title = el("span", "p-title");
     const name = el("a", "p-name");
     name.href = p.u || "https://github.com/" + p.n;
+    // "u" is only set for URLs from submissions (not GitHub): don't vouch for them.
+    if (p.u) name.rel = "nofollow ugc";
     const slash = p.n.indexOf("/");
     if (slash > 0) {
       const ownerLogin = p.n.slice(0, slash);

@@ -1,10 +1,12 @@
-@* The developer directory (/u/): everyone with a page, A–Z. No rank numbers; the
-   sort buttons (app.js) only change the order. Works without JavaScript. *@
+@* The developer directory (/u/). Default: developers with a listed project (A–Z),
+   then "More developers" with only search-only projects (A–Z). The sort buttons
+   (app.js) re-sort everyone as one list and show each card's metric for that sort;
+   choosing A–Z restores the two groups. No rank numbers. Works without JavaScript. *@
 <Layout Path="/u/" TitleKey="devs.title">
     <h1><T K="devs.title" /></h1>
-    <p class="note"><T K="devs.intro" Args="@([Format.Number(People.Count)])" /></p>
+    <p class="note"><T K="devs.intro" Args="@([Format.Number(All.Count)])" /></p>
 
-    <div class="sort" hidden data-sort-for="devs">
+    <div class="sort" hidden data-sort-for="devs" data-groups="devs-more" data-group-sort="name">
         <T K="sort.label" />
         @foreach (var (key, label) in SortOptions)
         {
@@ -12,33 +14,30 @@
         }
     </div>
 
-    <ol class="dev-grid" id="devs">
-        @foreach (var d in People)
+    <div class="dev-dir" data-metric="name" id="devs-dir">
+        <ol class="dev-grid" id="devs">
+            @foreach (var d in Listed)
+            {
+                <DeveloperCard D="d" />
+            }
+        </ol>
+        @if (More.Count > 0)
         {
-            <li data-name="@d.DisplayName.ToLowerInvariant()" data-projects="@d.Projects.Count" data-followed="@d.FollowedBy.Count"
-                data-pushed="@Format.Date(d.LastPush)" data-first="@d.FirstSeenAt" data-stars="@d.Stars">
-                <a class="dev-card" href="@d.Path">
-                    <Avatar Login="@d.Login" Size="36" />
-                    <span class="dev-card-text">
-                        <strong>@d.DisplayName</strong>
-                        <span class="dev-card-login">@d.Login</span>
-                        <span class="dev-card-meta">
-                            <T K="devs.projects" Args="@([d.Projects.Count])" />
-                            @foreach (var cat in d.Categories.Take(2))
-                            {
-                                <span> · </span><T K="@($"cat.{cat}")" />
-                            }
-                        </span>
-                    </span>
-                </a>
-            </li>
+            <h2 class="dev-group" id="devs-more-title" data-group-title="devs-more"><T K="devs.more" Args="@([Format.Number(More.Count)])" /></h2>
+            <ol class="dev-grid" id="devs-more">
+                @foreach (var d in More)
+                {
+                    <DeveloperCard D="d" />
+                }
+            </ol>
         }
-    </ol>
+    </div>
 </Layout>
 
 @code {
-    List<SiteDeveloper> People => Site.Data.DeveloperPages
-        .OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+    List<SiteDeveloper> All => Site.Data.DeveloperPages;
+    List<SiteDeveloper> Listed => All.Where(d => d.Projects.Count > 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+    List<SiteDeveloper> More => All.Where(d => d.Projects.Count == 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
 
     static readonly (string Key, string Label)[] SortOptions =
     [
