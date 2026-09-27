@@ -856,17 +856,18 @@ static class SelfTest
         var published = new List<SiteProject>
         {
             P("alice/a1", 100), P("alice/a2", 50), P("bob/b1", 80), P("carol/c1", 12, "data"),
-            P("dan/d1", 5, listed: false),   // dan has no listed project, so no page
+            P("dan/d1", 5, listed: false),   // dan has only a search-only project: still a page
         };
+        // erin owns nothing published, so she has no page and appears nowhere.
         var contributors = new List<ContributorsEntry>
         {
             new() { Project = "gh:alice/a1", Contributors = [ new() { Login = "alice", Commits = 100 }, new() { Login = "bob", Commits = 5 },
-                                                              new() { Login = "carol", Commits = 1 }, new() { Login = "dan", Commits = 3 } ] },
+                                                              new() { Login = "carol", Commits = 1 }, new() { Login = "erin", Commits = 3 } ] },
             new() { Project = "gh:bob/b1", Contributors = [ new() { Login = "alice", Commits = 2 } ] },
         };
         var follows = new List<FollowsEntry>
         {
-            new() { Login = "alice", Followers = ["bob", "carol", "dan", "alice"], Following = ["bob"] },
+            new() { Login = "alice", Followers = ["bob", "carol", "erin", "alice"], Following = ["bob", "dan"] },
         };
         var roundups = new Dictionary<string, string> { ["2026-10"] = "See https://github.com/alice/a1 and github.com/bob/b10." };
         var spotlight = new List<SpotlightWeek> { new() { Week = "2026-W40", Picks = ["gh:bob/b1"] } };
@@ -877,12 +878,15 @@ static class SelfTest
         var alice = pages["alice"];
         var bob = pages["bob"];
 
-        Check(pages.Count == 3 && !pages.ContainsKey("dan"), "a page for each owner with a listed project, and only them");
+        Check(pages.Count == 4 && pages.ContainsKey("dan") && !pages.ContainsKey("erin"), "a page for each owner of a published project (listed or search-only), and only them");
+        Check(pages["dan"].Projects.Count == 0 && pages["dan"].Smaller.SequenceEqual(["gh:dan/d1"]) && pages["dan"].Stars == 5, "a search-only developer's page has their smaller projects and stars");
         Check(alice.ContributesTo.Select(c => c.Project).SequenceEqual(["gh:bob/b1"]), "own projects never count as 'contributes to'");
-        Check(alice.Contributors.Select(c => c.Login).SequenceEqual(["bob", "carol"]), "contributors from git.ge: people with pages only (dan has none)");
+        Check(alice.Contributors.Select(c => c.Login).SequenceEqual(["bob", "carol"]), "contributors from git.ge: people with pages only (erin has none)");
         Check(Build(published, minCommits: 2).First(d => d.Login == "alice").Contributors.Select(c => c.Login).SequenceEqual(["bob"]), "minCommits drops smaller contributions");
-        Check(alice.FollowedBy.SequenceEqual(["bob", "carol"]) && alice.Follows.SequenceEqual(["bob"]), "follows are limited to people with pages, excluding oneself");
-        Check(alice.Mutual.SequenceEqual(["bob"]) && alice.FollowedBy[0] == "bob", "mutual follows are found and listed first");
+        Check(alice.Mutual.SequenceEqual(["bob"]), "mutual follows: bob follows alice and alice follows bob");
+        Check(alice.FollowedBy.SequenceEqual(["carol"]) && alice.Follows.SequenceEqual(["dan"]), "one-way rows exclude mutuals, people without pages and oneself");
+        Check(!alice.Mutual.Intersect(alice.FollowedBy).Any() && !alice.Mutual.Intersect(alice.Follows).Any() && !alice.FollowedBy.Intersect(alice.Follows).Any(),
+              "nobody appears in two follow rows");
         Check(alice.Ranks.Select(r => (r.Project, r.Rank, r.Of)).SequenceEqual([("gh:alice/a1", 1, 3)]), "category ranks by stars, only within rankTopN (a2 is #3 of 3)");
         Check(bob.Ranks.Single().Rank == 2 && bob.Spotlight.SequenceEqual(["2026-W40"]), "rank #2 and Spotlight weeks on bob's page");
         Check(alice.Roundups.SequenceEqual(["2026-10"]) && bob.Roundups.Count == 0, "roundup mentions match the exact repo (b10 isn't b1)");
@@ -1246,9 +1250,10 @@ static class DeveloperPages
     {
         var ic = StringComparer.OrdinalIgnoreCase;
         var listed = published.Where(p => p.Listed && p.Owner.Length > 0).ToList();
-        // Only people with a page appear anywhere on developer pages, so excluded and
+        // Every owner of a published project (listed, or search-only) gets a page. Only
+        // people with a page appear anywhere on developer pages, so excluded and
         // opted-out developers (whose projects never reach `published`) never show up.
-        var owners = listed.Select(p => p.Owner).Distinct(ic).ToList();
+        var owners = published.Where(p => p.Owner.Length > 0).Select(p => p.Owner).Distinct(ic).ToList();
         var hasPage = owners.ToHashSet(ic);
         var info = developers.GroupBy(d => d.Login, ic).ToDictionary(g => g.Key, g => g.First(), ic);
         var byKey = published.ToDictionary(p => p.Key);
@@ -1295,6 +1300,8 @@ static class DeveloperPages
             var followedBy = Among(f?.Followers);
             var followsList = Among(f?.Following);
             var mutual = followedBy.Where(l => followsList.Contains(l, ic)).ToList();
+            // Summaries use listed projects when there are any, otherwise the search-only ones.
+            var basis = mineListed.Count > 0 ? mineListed : mineSmaller;
 
             pages.Add(new SiteDeveloper
             {
@@ -1304,9 +1311,9 @@ static class DeveloperPages
                 Url = dev?.HtmlUrl is { Length: > 0 } u ? u : $"https://github.com/{owner}",
                 Projects = mineListed.Select(p => p.Key).ToList(),
                 Smaller = mineSmaller.Select(p => p.Key).ToList(),
-                Stars = mineListed.Sum(p => p.Stars ?? 0),
-                Languages = Top(mineListed.Select(p => p.Language)),
-                Categories = Top(mineListed.Select(p => (string?)p.Category)),
+                Stars = mine.Sum(p => p.Stars ?? 0),
+                Languages = Top(basis.Select(p => p.Language)),
+                Categories = Top(basis.Select(p => (string?)p.Category)),
                 HelpWanted = mine.Sum(p => p.HelpWanted ?? 0),
                 FirstSeenAt = dev?.FirstSeenAt,
                 LastPush = mine.Max(p => p.PushedAt),
@@ -1317,10 +1324,10 @@ static class DeveloperPages
                 ContributesTo = contributesTo[owner].OrderByDescending(c => c.Commits).ThenBy(c => c.Project).ToList(),
                 Contributors = contributorsOf[owner].Select(kv => new SiteContributor { Login = kv.Key, Commits = kv.Value })
                     .OrderByDescending(c => c.Commits).ThenBy(c => c.Login, ic).ToList(),
-                // Mutual follows first, then the rest.
-                FollowedBy = followedBy.OrderBy(l => mutual.Contains(l, ic) ? 0 : 1).ThenBy(l => l, ic).ToList(),
-                Follows = followsList.OrderBy(l => mutual.Contains(l, ic) ? 0 : 1).ThenBy(l => l, ic).ToList(),
+                // Three disjoint groups: mutual, followers only, following only.
                 Mutual = mutual.Order(ic).ToList(),
+                FollowedBy = followedBy.Where(l => !mutual.Contains(l, ic)).Order(ic).ToList(),
+                Follows = followsList.Where(l => !mutual.Contains(l, ic)).Order(ic).ToList(),
             });
         }
         return pages.OrderBy(d => d.Login, ic).ToList();
@@ -1991,11 +1998,11 @@ static class Social
 
     static async Task FetchContributors(GitHub github, Paths paths, SiteData data, string today, bool force)
     {
-        var targets = data.Projects.Where(p => p.Listed && p.FullName is not null).ToDictionary(p => p.Key);
+        var targets = data.Projects.Where(p => p.FullName is not null).ToDictionary(p => p.Key);
         var entries = Store.ReadList<ContributorsEntry>(paths.Contributors).Where(e => targets.ContainsKey(e.Project)).ToDictionary(e => e.Project);
         var etags = Store.Read<Dictionary<string, string>>(paths.ContributorsEtags);
         var pending = targets.Values.Where(p => force || entries.GetValueOrDefault(p.Key)?.FetchedAt != today).ToList();
-        Log.Info($"Contributors: {pending.Count} of {targets.Count} listed projects to check");
+        Log.Info($"Contributors: {pending.Count} of {targets.Count} published projects to check");
 
         int changed = 0, unchanged = 0, gone = 0;
         var progress = new Progress("projects", pending.Count);
