@@ -371,7 +371,9 @@ static void DeveloperFilterChecks(Action<bool, string> check)
     var html = File.ReadAllText(file);
     string Decode(string s) => System.Net.WebUtility.HtmlDecode(s);
 
-    var cards = Regex.Matches(html, "<li class=\"dev-cell\"[^>]*>").Select(m => m.Value).ToList();
+    // Each card: its start tag (the data-* attributes) and its login (from the link).
+    var cardMatches = Regex.Matches(html, "(<li class=\"dev-cell\"[^>]*>)<a class=\"dev-card\" href=\"/@([^/\"]+)/\"").ToList();
+    var cards = cardMatches.Select(m => m.Groups[1].Value).ToList();
     string? Attr(string tag, string name) =>
         Regex.Match(tag, $"\\s{name}=\"([^\"]*)\"") is { Success: true } m ? Decode(m.Groups[1].Value) : null;
     check(cards.Count > 0, $"/developers/ has cards ({cards.Count})");
@@ -380,17 +382,68 @@ static void DeveloperFilterChecks(Action<bool, string> check)
 
     var cats = cards.Select(c => Attr(c, "data-cats")!.Replace(';', ',').Split(',').ToHashSet()).ToList();
     var langs = cards.Select(c => (Attr(c, "data-langs") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet()).ToList();
+    // data-pairs "mobile:Kotlin,Swift|web:C#": category → languages of its projects.
+    var pairs = cards.Select(c => Attr(c, "data-pairs") is { Length: > 0 } p
+        ? p.Split('|').ToDictionary(e => e[..e.IndexOf(':')], e => e[(e.IndexOf(':') + 1)..].Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet())
+        : null).ToList();
 
+    // The same rule as app.js: either filter alone = any project; both = one project with both.
+    bool Matches(int i, string? cat, string? lang) =>
+        (cat is null || cats[i].Contains(cat)) && (lang is null || langs[i].Contains(lang))
+        && (cat is null || lang is null || pairs[i] is null || (pairs[i]!.TryGetValue(cat, out var ls) && ls.Contains(lang)));
+
+    // Chips rendered with the totals (no filter active). The category row runs up to the
+    // language group; the language group (top row + extra row) up to the sort bar.
+    var catStart = html.IndexOf("data-filter=\"cat\"", StringComparison.Ordinal);
+    var langStart = html.IndexOf("data-filter=\"lang\"", StringComparison.Ordinal);
+    var sortStart = html.IndexOf("class=\"sort\"", langStart, StringComparison.Ordinal);
+    var segments = new Dictionary<string, string>
+    {
+        ["cat"] = catStart >= 0 && langStart > catStart ? html[catStart..langStart] : "",
+        ["lang"] = langStart >= 0 && sortStart > langStart ? html[langStart..sortStart] : "",
+    };
     foreach (var (kind, sets) in new[] { ("cat", cats), ("lang", langs) })
     {
-        var row = Regex.Match(html, $"<div class=\"chips\" data-filter=\"{kind}\".*?</div>", RegexOptions.Singleline).Value;
-        var chips = Regex.Matches(row, "data-value=\"([^\"]*)\".*?<span class=\"n\">(\\d+)</span>", RegexOptions.Singleline).ToList();
+        var chips = Regex.Matches(segments[kind], "data-value=\"([^\"]*)\"[^>]*>.*?<span class=\"n\">(\\d+)</span>", RegexOptions.Singleline).ToList();
         check(chips.Count > 0, $"{kind} chips rendered ({chips.Count})");
         var wrong = chips
             .Select(m => (Value: Decode(m.Groups[1].Value), Shown: int.Parse(m.Groups[2].Value)))
             .Where(c => sets.Count(s => s.Contains(c.Value)) != c.Shown)
             .Select(c => c.Value).ToList();
         check(wrong.Count == 0, $"{kind} chip counts match the cards{(wrong.Count > 0 ? $" (wrong: {string.Join(", ", wrong)})" : "")}");
+    }
+
+    // data-pairs against the data itself: for every category × language, a card matches
+    // exactly when the developer has one published project in both.
+    var dataFile = Path.Combine(Directory.GetCurrentDirectory(), "_build", "site-data.json");
+    if (!File.Exists(dataFile)) { Console.Error.WriteLine("  skip data-pairs checks: no _build/site-data.json"); return; }
+    var data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(dataFile), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+    var projects = data.Projects.ToDictionary(p => p.Key);
+    var byLogin = data.DeveloperPages.ToDictionary(d => d.Login.ToLowerInvariant());
+    var truth = cardMatches.Select(m => byLogin.TryGetValue(Decode(m.Groups[2].Value).ToLowerInvariant(), out var d)
+        ? d.Projects.Concat(d.Smaller).Select(k => projects[k]).Where(p => p.Language is not null)
+              .Select(p => (p.Category, Language: p.Language!)).ToHashSet()
+        : null).ToList();
+    check(truth.All(t => t is not null), "every card's developer is in site-data");
+    if (truth.Any(t => t is null)) return;
+
+    var allCats = data.Categories;
+    var allLangs = langs.SelectMany(l => l).Distinct().ToList();
+    var mismatches = new List<string>();
+    for (var i = 0; i < cards.Count && mismatches.Count < 5; i++)
+        foreach (var c in allCats)
+            foreach (var l in allLangs)
+                if (Matches(i, c, l) != truth[i]!.Contains((c, l)))
+                    mismatches.Add($"{cardMatches[i].Groups[2].Value} {c}+{l}");
+    check(mismatches.Count == 0, $"category + language = one project with both, for every card{(mismatches.Count > 0 ? $" (e.g. {string.Join(", ", mismatches)})" : "")}");
+    check(pairs.Count(p => p is not null) < cards.Count, $"data-pairs only where needed ({pairs.Count(p => p is not null)} of {cards.Count} cards)");
+
+    foreach (var (c, l) in new[] { ("mobile", "C#"), ("web", "TypeScript"), ("data", "Python"), ("dotnet", "C#"), ("tools", "Go") })
+    {
+        var facet = Enumerable.Range(0, cards.Count).Count(i => Matches(i, c, l));
+        var expected = truth.Count(t => t!.Contains((c, l)));
+        var anyProject = Enumerable.Range(0, cards.Count).Count(i => cats[i].Contains(c) && langs[i].Contains(l));
+        check(facet == expected, $"{c} + {l}: {facet} developers (same project; any project would be {anyProject})");
     }
 }
 

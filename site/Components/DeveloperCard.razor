@@ -3,8 +3,9 @@
    data-* attributes that app.js uses to sort, to build the metric line for the
    active sort, and to rebuild the meta line in English (data-cats). data-cats also
    feeds the category filter: the categories shown on the card, then ";" and the
-   rest of the developer's categories. data-langs feeds the language filter. *@
-<li class="dev-cell" data-projects="@Projects" data-followed="@Followers" data-pushed="@Format.Date(D.LastPush)" data-first="@D.FirstSeenAt" data-stars="@D.Stars" data-cats="@CatsAttribute" data-langs="@string.Join(",", DeveloperFilters.LanguagesOf(D))"><a class="dev-card" href="@D.Path"><Avatar Login="@D.Login" Size="36" /><span class="dev-card-text"><strong>@D.DisplayName</strong><span class="dev-card-login">@D.Login</span><span class="dev-card-meta m-default">@DefaultMeta</span></span></a></li>
+   rest of the developer's categories. data-langs feeds the language filter, and
+   data-pairs (only where needed) the category + language combination. *@
+<li class="dev-cell" data-projects="@Projects" data-followed="@Followers" data-pushed="@Format.Date(D.LastPush)" data-first="@D.FirstSeenAt" data-stars="@D.Stars" data-cats="@CatsAttribute" data-langs="@string.Join(",", DeveloperFilters.LanguagesOf(D))" data-pairs="@DeveloperFilters.PairsOf(D)"><a class="dev-card" href="@D.Path"><Avatar Login="@D.Login" Size="36" /><span class="dev-card-text"><strong>@D.DisplayName</strong><span class="dev-card-login">@D.Login</span><span class="dev-card-meta m-default">@DefaultMeta</span></span></a></li>
 
 @code {
     [Parameter, EditorRequired] public SiteDeveloper D { get; set; } = default!;

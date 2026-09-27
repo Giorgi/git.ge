@@ -157,7 +157,7 @@
       const button = e.target.closest("button[data-sort]");
       if (!button) return;
       const key = button.dataset.sort;
-      for (const b of bar.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b === button));
+      for (const b of bar.querySelectorAll("button[data-sort]")) b.setAttribute("aria-pressed", String(b === button));
       bar.dataset.current = key;
       showMetric(key);
       if (original && key === bar.dataset.groupSort) {
@@ -177,41 +177,72 @@
   }
 
   // ---- Filters (/developers/) -------------------------------------------------
-  // One category and one language at a time (AND across the two). A card matches
-  // when its data-cats / data-langs contain the value. State lives in ?cat= & ?language= (not ?lang=, which
-  // switches the interface language).
+  // One category and one language at a time (AND across the two). Either alone
+  // matches when ANY of a developer's projects has it (data-cats / data-langs); both
+  // together need ONE project with both (data-pairs, or data-cats × data-langs when
+  // the server left data-pairs out because they're equivalent). Chip counts are
+  // recounted against the other active filter; chips with 0 are dimmed and inert.
+  // State lives in ?cat= & ?language= (not ?lang=, which switches the interface language).
 
   const filters = document.querySelector(".dev-filters[data-filter-for]");
   if (filters) {
     const host = document.getElementById(filters.dataset.filterFor);
     const rows = { cat: filters.querySelector('[data-filter="cat"]'), lang: filters.querySelector('[data-filter="lang"]') };
-    const count = filters.querySelector(".dev-filter-count");
-    const clear = filters.querySelector(".dev-filter-clear");
-    const empty = filters.querySelector(".dev-filter-empty");
+    const count = document.querySelector(".dev-filter-count");
+    const clear = document.querySelector(".dev-filter-clear");
+    const empty = document.querySelector(".dev-filter-empty");
     const more = rows.lang.querySelector("[data-more]");
+    const extraRow = rows.lang.querySelector("[data-extra-row]");
+    const chips = { cat: [...rows.cat.querySelectorAll("button[data-value]")], lang: [...rows.lang.querySelectorAll("button[data-value]")] };
     const active = { cat: null, lang: null };
     const param = { cat: "cat", lang: "language" };   // URL parameter names
-    const valuesOf = (li, kind) => kind === "cat"
-      ? (li.dataset.cats || "").replace(";", ",").split(",")
-      : (li.dataset.langs || "").split(",");
+    let languagesOpen = false;
     filters.hidden = false;
+
+    // Parse each card once. data-pairs: "mobile:Kotlin,Swift|web:C#,TypeScript".
+    const split = s => (s ? s.split(",") : []);
+    const cards = [...host.querySelectorAll("li[data-cats]")].map(li => ({
+      li,
+      cats: new Set(split((li.dataset.cats || "").replace(";", ","))),
+      langs: new Set(split(li.dataset.langs)),
+      pairs: li.dataset.pairs
+        ? new Map(li.dataset.pairs.split("|").map(e => [e.slice(0, e.indexOf(":")), new Set(split(e.slice(e.indexOf(":") + 1)))]))
+        : null,
+    }));
+    const matches = (card, cat, lang) => {
+      if (cat && !card.cats.has(cat)) return false;
+      if (lang && !card.langs.has(lang)) return false;
+      if (cat && lang && card.pairs) return card.pairs.get(cat)?.has(lang) === true;
+      return true;
+    };
 
     const showMoreLanguages = open => {
       if (!more) return;
-      for (const b of rows.lang.querySelectorAll("[data-extra]")) b.hidden = !open;
+      languagesOpen = open;
       more.setAttribute("aria-expanded", String(open));
       const label = more.querySelector("[data-i18n]");
       label.dataset.i18n = open ? "devs.fewerLanguages" : "devs.moreLanguages";
       label.dataset.ka = I18N.ka[label.dataset.i18n];   // what the language toggle restores
       label.textContent = t(label.dataset.i18n);
+      showExtra();
+    };
+    // Extra languages: all of them when open; otherwise only an active one, so a
+    // filter set by a link stays visible and can be cleared.
+    const showExtra = () => {
+      if (!extraRow) return;
+      let any = false;
+      for (const b of extraRow.querySelectorAll("button[data-value]")) {
+        b.hidden = !languagesOpen && b.dataset.value !== active.lang;
+        any ||= !b.hidden;
+      }
+      extraRow.hidden = !any;
     };
 
     const apply = () => {
       let shown = 0;
-      for (const li of host.querySelectorAll("li[data-cats]")) {
-        const match = (!active.cat || valuesOf(li, "cat").includes(active.cat))
-          && (!active.lang || valuesOf(li, "lang").includes(active.lang));
-        li.hidden = !match;
+      for (const card of cards) {
+        const match = matches(card, active.cat, active.lang);
+        card.li.hidden = !match;
         if (match) shown++;
       }
       // In the grouped view, hide a group heading whose list has no visible cards.
@@ -220,13 +251,25 @@
         if (!list || list.hidden) continue;   // merged by a sort: the sort code hides it
         title.hidden = ![...list.children].some(li => !li.hidden);
       }
+      // Each chip counts the developers it would show together with the other filter.
+      for (const [kind, list] of Object.entries(chips)) {
+        const other = kind === "cat" ? "lang" : "cat";
+        for (const b of list) {
+          const value = b.dataset.value;
+          const n = cards.reduce((sum, card) =>
+            sum + (matches(card, kind === "cat" ? value : active.cat, kind === "lang" ? value : active.lang) ? 1 : 0), 0);
+          b.querySelector(".n").textContent = n;
+          const on = value === active[kind];
+          b.setAttribute("aria-pressed", String(on));
+          const inert = n === 0 && !on && Boolean(active[other]);
+          if (inert) b.setAttribute("aria-disabled", "true"); else b.removeAttribute("aria-disabled");
+        }
+      }
+      showExtra();
       const filtering = Boolean(active.cat || active.lang);
       count.textContent = filtering ? (shown === 1 ? t("devs.filterCountOne") : t("devs.filterCount", shown)) : "";
       clear.hidden = !filtering;
       empty.hidden = shown > 0;
-      for (const [kind, row] of Object.entries(rows))
-        for (const b of row.querySelectorAll("button[data-value]"))
-          b.setAttribute("aria-pressed", String(b.dataset.value === active[kind]));
     };
 
     const saveUrl = () => {
@@ -241,11 +284,11 @@
     for (const [kind, row] of Object.entries(rows)) {
       row.addEventListener("click", e => {
         if (e.target.closest("[data-more]")) {
-          showMoreLanguages(more.getAttribute("aria-expanded") !== "true");
+          showMoreLanguages(!languagesOpen);
           return;
         }
         const button = e.target.closest("button[data-value]");
-        if (!button) return;
+        if (!button || button.getAttribute("aria-disabled") === "true") return;
         active[kind] = active[kind] === button.dataset.value ? null : button.dataset.value;
         apply();
         saveUrl();
@@ -257,26 +300,30 @@
       saveUrl();
     });
 
-    // Load state from the URL; unknown values are ignored.
+    // Load state from the URL; unknown values are ignored. A combination with no
+    // matches still loads: the empty message shows and the chips can clear it.
     const params = new URLSearchParams(location.search);
     for (const kind of ["cat", "lang"]) {
       const value = params.get(param[kind]);
-      const button = value && [...rows[kind].querySelectorAll("button[data-value]")].find(b => b.dataset.value === value);
-      if (!button) continue;
-      active[kind] = value;
-      if (button.hasAttribute("data-extra")) showMoreLanguages(true);
+      if (value && chips[kind].some(b => b.dataset.value === value)) active[kind] = value;
     }
 
     // Sorting regroups or merges the lists; re-apply so group headings stay right.
     document.querySelector(`.sort[data-sort-for="${host.querySelector("ol")?.id}"]`)
-      ?.addEventListener("click", () => apply());
+      ?.addEventListener("click", e => { if (e.target.closest("button[data-sort]")) apply(); });
     languageHooks.push(apply);
     apply();
 
-    // On phones each chip row scrolls sideways: bring chips selected by the URL into view.
-    for (const row of Object.values(rows)) {
+    // Chip rows scroll sideways: center chips selected by the URL, and fade the right
+    // edge while more chips lie beyond it.
+    for (const row of filters.querySelectorAll(".filter-row")) {
       const on = row.querySelector('button[aria-pressed="true"]');
-      if (on && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, on.offsetLeft - row.offsetLeft - 16);
+      if (on && row.scrollWidth > row.clientWidth)
+        row.scrollLeft = Math.max(0, on.offsetLeft - row.offsetLeft - (row.clientWidth - on.offsetWidth) / 2);
+      const fade = () => row.classList.toggle("fade-end", row.scrollLeft + row.clientWidth < row.scrollWidth - 2);
+      row.addEventListener("scroll", fade, { passive: true });
+      window.addEventListener("resize", fade);
+      fade();
     }
   }
 

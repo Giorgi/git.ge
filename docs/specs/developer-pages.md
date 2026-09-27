@@ -97,20 +97,28 @@ list, and search results too, via `"w": 1` in `index.json`.
   - There are no rank numbers.
 - **Filters (app.js):** two chip rows above the list.
   - **Categories:** all categories in config order. **Languages:** the 12 most
-    common, then "სხვა ენები… / More languages…" reveals the rest. Each chip shows
-    how many developers it matches.
+    common, then "სხვა ენები… / More languages…" reveals the rest in a wrapping row.
   - One category and one language at a time, combined with AND; clicking the active
-    chip clears it. A developer matches when **any** of their published projects
-    (listed or search-only) has that category or primary language.
-  - Cards carry `data-cats` (the categories shown on the card, then `;` and the rest)
-    and `data-langs`. The filtered count and "clear filters" appear while filtering.
+    chip clears it. Either filter alone matches when **any** of a developer's
+    published projects (listed or search-only) has that category or primary language;
+    **both together need one project with both** (e.g. a mobile app written in C#).
+  - Chip counts are live: each chip shows how many developers it would show together
+    with the other active filter. Chips with 0 are dimmed and inert (`aria-disabled`),
+    but stay in place; the active chip never is.
+  - Cards carry `data-cats` (the categories shown on the card, then `;` and the rest),
+    `data-langs`, and `data-pairs` ("mobile:Kotlin,Swift|web:C#": each category's
+    languages) only where `data-cats` × `data-langs` would give a different answer
+    (about a third of the cards).
+  - The filtered count and "clear filters" sit on the sort line, right-aligned.
   - Filters work with the sort buttons; in the grouped view an empty group's
     heading is hidden.
   - URL state: `?cat=<category>&language=<language>` (e.g. `language=C%23`), so a
     filtered view can be shared. Not `?lang=`, which already switches the interface
-    language. Unknown values are ignored.
-  - Without JavaScript the chips are hidden and the full list shows. On phones each
-    chip row scrolls sideways; chips selected by the URL are scrolled into view.
+    language. Unknown values are ignored; a combination with no results shows the
+    no-match message and can be cleared.
+  - Without JavaScript the chips are hidden and the full list shows. The category row
+    and the top-languages row stay on one line and scroll sideways (label fixed,
+    right edge faded while more chips follow); chips selected by the URL are centred.
 - In the main menu as "დეველოპერები / Developers".
 
 ## Data

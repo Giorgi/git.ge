@@ -255,6 +255,28 @@ public static class DeveloperFilters
     public static List<string> LanguagesOf(SiteDeveloper d) =>
         Published(d).Select(p => p.Language).OfType<string>().Distinct().Order(StringComparer.Ordinal).ToList();
 
+    // Category + language filtering needs ONE project with both. This encodes which
+    // languages each category's projects use: "mobile:Kotlin,Swift|web:C#,TypeScript"
+    // (category ids have no ':' and GitHub language names contain no ',' ':' or '|').
+    // Null when data-cats × data-langs already gives the right answer, which keeps the
+    // page small: a single category (every project is in it), or a single language on
+    // every project.
+    public static string? PairsOf(SiteDeveloper d)
+    {
+        var projects = Published(d).ToList();
+        var categories = projects.Select(p => p.Category).Distinct().ToList();
+        var languages = projects.Select(p => p.Language).OfType<string>().Distinct().ToList();
+        var allHaveLanguage = projects.All(p => p.Language is not null);
+        if (categories.Count <= 1 || languages.Count == 0 || (languages.Count == 1 && allHaveLanguage))
+            return null;
+        return string.Join("|", Site.Data.Categories
+            .Where(categories.Contains)
+            .Select(c => (Category: c, Languages: projects.Where(p => p.Category == c).Select(p => p.Language).OfType<string>()
+                                                          .Distinct().Order(StringComparer.Ordinal).ToList()))
+            .Where(x => x.Languages.Count > 0)
+            .Select(x => x.Category + ":" + string.Join(",", x.Languages)));
+    }
+
     // Every category in config order, with the number of developers who have it.
     public static List<(string Key, int Count)> CategoryCounts(IEnumerable<SiteDeveloper> developers)
     {
