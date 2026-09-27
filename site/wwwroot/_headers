@@ -9,3 +9,10 @@
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Data files for the site itself, not pages to index.
+/index.json
+  X-Robots-Tag: noindex
+
+/roundups/feed.xml
+  X-Robots-Tag: noindex

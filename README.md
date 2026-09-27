@@ -136,6 +136,24 @@ a cache: `_cache/` is git-ignored, and CI keeps it between runs. See
 Commit the results in the worktree (`cd data/bot && git add -A && git commit`),
 not on `main`.
 
+### Search engines
+
+The site build generates, from the data:
+
+- a unique Georgian `<title>` and meta description for every page (developer pages
+  include the login, so two people with the same name never clash);
+- one schema.org JSON-LD block per page (`site/Seo.cs`): `WebSite` on the home page,
+  `ProfilePage` with a `Person` or `Organization` on developer pages, `BlogPosting`
+  on roundups, `ItemList` on category pages, and `BreadcrumbList` everywhere else;
+- `sitemap.xml` with `lastmod` where there is a real date, and `_redirects` with
+  permanent redirects from `/about` to `/about/` and so on (Cloudflare applies it;
+  the local preview doesn't).
+
+The build fails if two indexable pages share a title or description, or if any
+JSON-LD block doesn't parse (`BuiltSiteChecks`); `dotnet run --project site --
+selftest` runs the same checks on an existing `_site/`. The 404 page is `noindex`,
+and `/index.json` and the RSS feed get `X-Robots-Tag: noindex` via `_headers`.
+
 ## What's manual
 
 - Georgian descriptions (`descriptionKa`), categories, `featured` and `verified`
