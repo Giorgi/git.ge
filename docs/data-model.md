@@ -32,13 +32,24 @@ data branch (worktree at data/bot/)
   discovered/
     developers.json
     projects.json
+    issues.json           open help-wanted issues of projects that have any
+    contributors.json     contributor lists of listed projects (weekly, `social`)
+    follows.json          followers/following among git.ge developers (weekly, `social`)
   snapshots/
     daily/YYYY-MM-DD.json
     monthly/YYYY-MM.json
   state/
     discovery.json        checkpoint of an unfinished discovery run (absent otherwise)
+    contributors-etags.json, follows-etags.json   ETags for conditional requests
   spotlight.json          past Spotlight picks by ISO week (written by `prepare`)
+
+not committed
+  _cache/avatars/         self-hosted 96px avatars of developers with a page (`avatars`;
+                          CI keeps it with actions/cache)
 ```
+
+Developer pages (`/u/<login>/`) and the files behind them are described in
+[`docs/specs/developer-pages.md`](specs/developer-pages.md).
 
 **One file per entity type, one record per line, sorted by key.** A changed star
 count is a one-line diff, the same as with per-record files, without thousands of

@@ -119,6 +119,20 @@ Trend = stars gained since the snapshot closest to 30 days before the latest one
 trend and the site sorts by stars instead. A repo missing from that older snapshot
 shows "—", not its whole star count.
 
+### Developer pages
+
+```sh
+dotnet run gitge.cs -- social     # contributors + followers/following for /u/ pages (weekly)
+dotnet run gitge.cs -- prepare
+dotnet run gitge.cs -- avatars    # download avatars of developers with a page to _cache/avatars/
+dotnet run --project site -- serve --port 5081
+```
+
+`social` makes about 1,100 conditional REST requests the first time. Later runs
+mostly get "not modified", which doesn't count against the rate limit. Avatars are
+a cache: `_cache/` is git-ignored, and CI keeps it between runs. See
+[`docs/specs/developer-pages.md`](docs/specs/developer-pages.md).
+
 Commit the results in the worktree (`cd data/bot && git add -A && git commit`),
 not on `main`.
 
@@ -135,8 +149,8 @@ GitHub Actions runs everything; the workflows are in `.github/workflows/`.
 
 | Workflow | When | What it does |
 |---|---|---|
-| `nightly.yml` | daily, 02:17 UTC | `refresh` → `prune` → `prepare`, commits bot data to the `data` branch, builds the site, deploys it |
-| `discover.yml` | Mondays 03:23 UTC; daily 04:41 UTC only to resume | full `discover`, then `refresh` for the new repos, commits bot data |
+| `nightly.yml` | daily, 02:17 UTC | `refresh` → `prune` → `prepare`, commits bot data to the `data` branch, downloads new avatars, builds the site, deploys it |
+| `discover.yml` | Mondays 03:23 UTC; daily 04:41 UTC only to resume | full `discover`, then `refresh` for the new repos, then `social` (contributors and follows for developer pages), commits bot data |
 | `deploy.yml` | called by `nightly.yml`; or run by hand | publishes `_site/` to Cloudflare Workers (static assets). The only file that knows the host |
 | `submission.yml` | an issue labelled `submission` or `removal` gets the `accepted` label | runs `gitge.cs submit` and opens a PR, or comments why the issue was rejected |
 | `ci.yml` | pushes to `main`, pull requests | `selftest`, builds the site project, builds the whole site from the `data` branch |
