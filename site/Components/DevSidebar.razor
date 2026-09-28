@@ -2,6 +2,8 @@
    grid; above the grid the sort links and the result ("5 დეველოპერი · გასუფთავება").
    On narrow screens the column is replaced by a "ფილტრები" button that opens the same
    lists as a panel above the grid, with the active filters as removable tags under it.
+   On desktop "‹ დამალვა" folds the column away (remembered in localStorage); the same
+   button and tags then sit above the full-width grid, and the button brings it back.
    Without JavaScript the lists, the button and the sort are hidden: just the grid. *@
 <div class="dev-filters devs-layout" data-filter-for="devs-dir" data-count-always>
     <div class="devs-phonebar" hidden>
@@ -9,6 +11,7 @@
         <span class="devs-tags"></span>
     </div>
     <div class="devs-side" id="devs-filter-panel" hidden>
+        <button type="button" class="linklike devs-side-hide" aria-expanded="true" aria-controls="devs-filter-panel"><span aria-hidden="true">‹ <T K="devs.hide" /></span><span class="visually-hidden"><T K="devs.hideFilters" /></span></button>
         <div class="devs-panel-head">
             <strong><T K="devs.filters" /></strong>
             <button type="button" class="devs-panel-close" data-panel-close><span aria-hidden="true">✕</span><span class="visually-hidden"><T K="devs.closeFilters" /></span></button>

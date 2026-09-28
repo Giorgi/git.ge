@@ -122,6 +122,8 @@
   "devs.allLanguages": "All languages…",
   "devs.fewerLanguages": "Fewer",
   "devs.done": "Done",
+  "devs.hide": "Hide",
+  "devs.hideFilters": "Hide filters",
   "devs.closeFilters": "Close filters",
   "devs.removeFilter": "Remove filter: {0}",
   "sort.followedShort": "Followers",

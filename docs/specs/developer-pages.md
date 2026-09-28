@@ -111,6 +111,11 @@ list, and search results too, via `"w": 1` in `index.json`.
     typical desktop. Below 56rem the column is replaced by a "ფილტრები (2)" button that
     opens the same lists as a panel above the grid (✕, "მზადაა" or Esc closes it), with
     the active filters as removable tags ("მობილური ✕") next to the button. No `<select>`.
+    On desktop the column starts **folded**: the same button and tags sit above a
+    full-width grid (4 columns), and the button unfolds the column; "‹ დამალვა" at its
+    top folds it again. The choice is kept in localStorage (`gitge.devSidebar`,
+    "expanded"/"collapsed"; no cookies) and wins over the default; app.js applies it
+    to `<html>` (`devs-collapsed`) before revealing the column, so there is no jump.
   - Every option (chip, list entry or `<option>`) carries `data-kind`, `data-value`
     ("" = all) and `data-count`. Categories in config order; languages by number of
     developers, then A–Z.

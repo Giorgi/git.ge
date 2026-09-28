@@ -122,6 +122,8 @@
   "devs.allLanguages": "ყველა ენა…",
   "devs.fewerLanguages": "ნაკლები",
   "devs.done": "მზადაა",
+  "devs.hide": "დამალვა",
+  "devs.hideFilters": "ფილტრების დამალვა",
   "devs.closeFilters": "ფილტრების დახურვა",
   "devs.removeFilter": "ფილტრის მოხსნა: {0}",
   "sort.followedShort": "გამომწერები",

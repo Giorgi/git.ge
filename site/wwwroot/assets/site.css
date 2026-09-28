@@ -271,20 +271,32 @@ a.p-owner:hover { color: var(--link); }
 .devs-topbar .dev-filter-status:has(.dev-filter-clear:not([hidden])) .dev-filter-count::after { content: " ·"; }
 .devs-main .dev-filter-empty { margin: .8rem 0; }
 .devs-main .dev-grid { margin-top: .3rem; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); }
+/* "‹ დამალვა" at the top of the column folds it away (desktop; remembered by app.js
+   as html.devs-collapsed); the "ფილტრები" button and the filter tags then take its
+   place above the grid, which gets the full width back. */
+.linklike.devs-side-hide { display: block; margin: 0 0 .7rem .3rem; font-size: .8rem; color: var(--muted); }
+.devs-filter-toggle {
+  font: inherit; font-size: .9rem; color: var(--fg); background: var(--soft); border: 1px solid var(--line);
+  border-radius: 6px; padding: .25rem .8rem; cursor: pointer;
+}
+.devs-filter-toggle:hover { border-color: var(--muted); }
+.devs-filter-toggle[aria-expanded="true"] { border-color: var(--fg); }
+.devs-tags { display: contents; }
+.devs-tag {
+  font: inherit; font-size: .8rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 999px; padding: .08rem .55rem; cursor: pointer;
+}
+.devs-tag:hover { border-color: var(--muted); }
+@media (min-width: 56.0625rem) {
+  html.devs-collapsed .devs-layout.ready { display: block; }
+  html.devs-collapsed .devs-side { display: none; }
+  html.devs-collapsed .devs-layout.ready .devs-phonebar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: 0 0 .6rem; }
+  html.devs-collapsed .devs-main .dev-grid { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+}
 @media (max-width: 56rem) {
   .devs-layout.ready { display: block; }
   .devs-layout.ready .devs-phonebar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: 0 0 .5rem; }
-  .devs-filter-toggle {
-    font: inherit; font-size: .9rem; color: var(--fg); background: var(--soft); border: 1px solid var(--line);
-    border-radius: 6px; padding: .25rem .8rem; cursor: pointer;
-  }
-  .devs-filter-toggle[aria-expanded="true"] { border-color: var(--fg); }
-  .devs-tags { display: contents; }
-  .devs-tag {
-    font: inherit; font-size: .8rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
-    border-radius: 999px; padding: .08rem .55rem; cursor: pointer;
-  }
-  .devs-tag:hover { border-color: var(--muted); }
+  .linklike.devs-side-hide { display: none; }
   .devs-topbar .dev-filter-status { margin-left: 0; }
   /* The panel: closed until the button opens it, then in the flow above the grid. */
   .devs-layout:not(.open) .devs-side { display: none; }

@@ -7,6 +7,13 @@
   const I18N = window.GITGE_I18N || { ka: {}, en: {} };
   const EN = I18N.en;
   const root = document.documentElement;
+
+  // /developers/ sidebar on desktop: folded unless the visitor expanded it before.
+  // Set first thing so the directory never renders in the other state (the column
+  // itself only appears once app.js reveals it).
+  const sidebarKey = "gitge.devSidebar";
+  const storedSidebar = () => { try { return localStorage.getItem(sidebarKey); } catch { return null; } };
+  root.classList.toggle("devs-collapsed", storedSidebar() !== "expanded");
   // A UI string in the current language.
   const t = (key, ...a) => format((root.lang === "en" ? I18N.en : I18N.ka)[key] ?? key, a);
 
@@ -345,11 +352,26 @@
 
       // The panel on narrow screens: opens right after the button (next in tab order),
       // closes with ✕, "მზადაა" or Esc.
+      const narrow = matchMedia("(max-width: 56rem)");
       const openPanel = open => {
         filters.classList.toggle("open", open);
         toggle.setAttribute("aria-expanded", String(open));
       };
-      toggle.addEventListener("click", () => openPanel(!filters.classList.contains("open")));
+      // On desktop the button unfolds the column that "‹ დამალვა" folded; the choice
+      // is remembered (default: folded).
+      const hide = side.querySelector(".devs-side-hide");
+      const setCollapsed = collapsed => {
+        root.classList.toggle("devs-collapsed", collapsed);
+        hide.setAttribute("aria-expanded", String(!collapsed));
+        if (!narrow.matches) toggle.setAttribute("aria-expanded", String(!collapsed));
+        try { localStorage.setItem(sidebarKey, collapsed ? "collapsed" : "expanded"); } catch { /* private mode: fine */ }
+      };
+      hide.setAttribute("aria-expanded", String(!root.classList.contains("devs-collapsed")));
+      hide.addEventListener("click", () => { setCollapsed(true); toggle.focus(); });
+      toggle.addEventListener("click", () => {
+        if (narrow.matches) openPanel(!filters.classList.contains("open"));
+        else { setCollapsed(false); hide.focus(); }
+      });
       for (const b of side.querySelectorAll("[data-panel-close]"))
         b.addEventListener("click", () => { openPanel(false); toggle.focus(); });
       side.addEventListener("keydown", e => {
