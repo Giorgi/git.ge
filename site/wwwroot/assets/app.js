@@ -352,7 +352,7 @@
 
       // Desktop: the column is shown or hidden (default hidden, the choice remembered).
       // Narrow screens: the panel opens under the toolbar and closes with the button,
-      // ✕, "მზადაა" or Esc.
+      // ×, "მზადაა" or Esc.
       const narrow = matchMedia("(max-width: 56rem)");
       const shown = () => narrow.matches ? filters.classList.contains("open") : !root.classList.contains("devs-collapsed");
       const activeCount = () => ["cat", "lang"].filter(kind => active[kind]).length;
@@ -386,12 +386,28 @@
       });
       narrow.addEventListener?.("change", sync);
 
+      // The "×" on a tag: the same small SVG as the panel's close button (a text ✕
+      // renders from different fonts, even in colour, next to Georgian and Latin).
+      const closeIcon = () => {
+        const ns = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("class", "icon-x");
+        svg.setAttribute("viewBox", "0 0 12 12");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+        const path = document.createElementNS(ns, "path");
+        path.setAttribute("d", "M3 3l6 6M9 3L3 9");
+        svg.append(path);
+        return svg;
+      };
+
       afterApply.push(() => {
         tags.replaceChildren(...["cat", "lang"].filter(kind => active[kind]).map(kind => {
           const tag = document.createElement("button");
           tag.type = "button";
           tag.className = "devs-tag";
-          tag.textContent = `${label(kind, active[kind])} ✕`;
+          tag.textContent = label(kind, active[kind]);
+          tag.append(closeIcon());
           tag.setAttribute("aria-label", t("devs.removeFilter", label(kind, active[kind])));
           tag.addEventListener("click", () => { set(kind, null); toggle.focus(); });
           return tag;

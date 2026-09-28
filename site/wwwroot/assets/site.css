@@ -268,9 +268,14 @@ a.p-owner:hover { color: var(--link); }
 }
 .devs-tags { display: contents; }
 .devs-tag {
+  display: inline-flex; align-items: center; gap: .3rem;
   font: inherit; font-size: .8rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
-  border-radius: 999px; padding: .08rem .55rem; cursor: pointer;
+  border-radius: 999px; padding: .08rem .5rem .08rem .55rem; cursor: pointer;
 }
+/* A small "×" icon (tags, the phone panel's close button): two strokes in currentColor. */
+.icon-x { flex: none; width: .7rem; height: .7rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.devs-tag .icon-x { color: var(--muted); }
+.devs-tag:hover .icon-x { color: var(--fg); }
 .devs-tag:hover { border-color: var(--muted); }
 
 .devs-facet + .devs-facet { margin-top: 1.1rem; }
@@ -327,7 +332,9 @@ a.p-owner:hover { color: var(--link); }
   .devs-layout:not(.open) .devs-side { display: none; }
   .devs-side { position: static; max-height: none; overflow: visible; border: 1px solid var(--line); border-radius: 8px; padding: .5rem .8rem .8rem; margin: 0 0 .9rem; background: var(--bg); }
   .devs-panel-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 .5rem; }
-  .devs-panel-close { font: inherit; font-size: 1.1rem; line-height: 1; color: var(--fg); background: none; border: 0; padding: .3rem .4rem; cursor: pointer; }
+  .devs-panel-close { display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; min-height: 2rem; color: var(--fg); background: none; border: 0; border-radius: 6px; padding: 0; cursor: pointer; }
+  .devs-panel-close:hover { background: var(--soft); }
+  .devs-panel-close .icon-x { width: .9rem; height: .9rem; }
   .devs-panel-done { display: block; width: 100%; margin: 1rem 0 0; font: inherit; color: var(--bg); background: var(--fg); border: 0; border-radius: 6px; padding: .45rem; cursor: pointer; }
   .devs-facet-item { padding: .3rem .3rem; }
 }

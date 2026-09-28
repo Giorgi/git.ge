@@ -23,7 +23,7 @@
     <div class="devs-side" id="devs-filter-panel" hidden>
         <div class="devs-panel-head">
             <strong><T K="devs.filters" /></strong>
-            <button type="button" class="devs-panel-close" data-panel-close><span aria-hidden="true">✕</span><span class="visually-hidden"><T K="devs.closeFilters" /></span></button>
+            <button type="button" class="devs-panel-close" data-panel-close><svg class="icon-x" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M3 3l6 6M9 3L3 9" /></svg><span class="visually-hidden"><T K="devs.closeFilters" /></span></button>
         </div>
         <DevFacet Kind="cat" TitleKey="devs.facetCategory" Options="@DeveloperFilters.CategoryOptions(Developers).ToList()" Total="@Developers.Count" />
         <DevFacet Kind="lang" TitleKey="devs.facetLanguage" Options="@DeveloperFilters.LanguageOptions(Developers).ToList()" Total="@Developers.Count" Top="12" />
