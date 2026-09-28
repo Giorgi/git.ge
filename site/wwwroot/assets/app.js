@@ -160,13 +160,10 @@
       rebuildMeta();   // also sets the tooltips
     }
 
-    // Sort by buttons (project lists) or by a <select data-sort-select> (the directory).
-    const sortSelect = bar.querySelector("select[data-sort-select]");
     bar.addEventListener("click", e => {
       const button = e.target.closest("button[data-sort]");
       if (button) choose(button.dataset.sort);
     });
-    sortSelect?.addEventListener("change", () => choose(sortSelect.value));
 
     function choose(key) {
       for (const b of bar.querySelectorAll("button[data-sort]")) b.setAttribute("aria-pressed", String(b.dataset.sort === key));
@@ -194,10 +191,10 @@
   // One category and one language at a time (AND across the two). Either alone
   // matches when ANY of a developer's projects has it (data-cats / data-langs); both
   // together need ONE project with both (data-pairs, or data-cats × data-langs when
-  // the server left data-pairs out because they're equivalent). Each control is
-  // either a row of chips (buttons) or a <select>; every option carries data-value
-  // ("" = all). Counts are recounted against the other active filter; options with 0
-  // are disabled. State lives in ?cat= & ?language= (not ?lang=, which switches the
+  // the server left data-pairs out because they're equivalent). Each control is a
+  // list of buttons with aria-pressed; every entry carries data-value ("" = all).
+  // Counts are recounted against the other active filter; entries with 0 are dimmed
+  // and inert. State lives in ?cat= & ?language= (not ?lang=, which switches the
   // interface language).
 
   const filters = document.querySelector(".dev-filters[data-filter-for]");
@@ -208,16 +205,12 @@
     const empty = document.querySelector(".dev-filter-empty");
     const active = { cat: null, lang: null };
     const param = { cat: "cat", lang: "language" };   // URL parameter names
-    filters.hidden = false;
 
-    // The two controls, whatever their form.
+    // The two lists (category, language).
     const controls = {};
     for (const kind of ["cat", "lang"]) {
       const el = filters.querySelector(`[data-filter="${kind}"]`);
-      if (!el) continue;
-      controls[kind] = el.tagName === "SELECT"
-        ? { kind, el, select: true, items: [...el.options] }
-        : { kind, el, select: false, items: [...el.querySelectorAll("button[data-value]")] };
+      if (el) controls[kind] = { kind, el, items: [...el.querySelectorAll("button[data-value]")] };
     }
     const label = (kind, value) => kind === "cat" ? t("cat." + value) : value;
 
@@ -253,28 +246,18 @@
         title.hidden = ![...list.children].some(li => !li.hidden);
       }
       // Each option counts the developers it would show together with the other filter.
-      for (const control of Object.values(controls)) {
-        const { kind, select } = control;
-        const other = kind === "cat" ? "lang" : "cat";
-        for (const item of control.items) {
+      for (const { kind, items } of Object.values(controls)) {
+        for (const item of items) {
           const value = item.dataset.value || null;
           const n = countFor(kind === "cat" ? value : active.cat, kind === "lang" ? value : active.lang);
           const on = value === active[kind];
-          const inert = n === 0 && !on && value !== null && Boolean(active[other]);
-          if (select) {
-            item.textContent = value === null ? t("devs.filterAll") : `${label(kind, value)} (${n})`;
-            item.disabled = inert;
-          } else {
-            item.querySelector(".n").textContent = n;
-            item.setAttribute("aria-pressed", String(on));
-            if (inert) item.setAttribute("aria-disabled", "true"); else item.removeAttribute("aria-disabled");
-          }
+          item.querySelector(".n").textContent = n;
+          item.setAttribute("aria-pressed", String(on));
+          if (n === 0 && !on && value !== null) item.setAttribute("aria-disabled", "true"); else item.removeAttribute("aria-disabled");
         }
-        if (select) control.el.value = active[kind] || "";
       }
       const filtering = Boolean(active.cat || active.lang);
-      const showCount = filtering || "countAlways" in filters.dataset;
-      count.textContent = showCount ? (shown === 1 ? t("devs.filterCountOne") : t("devs.filterCount", shown)) : "";
+      count.textContent = shown === 1 ? t("devs.filterCountOne") : t("devs.filterCount", shown);
       clear.hidden = !filtering;
       empty.hidden = shown > 0;
       for (const hook of afterApply) hook();
@@ -296,14 +279,10 @@
     };
 
     for (const control of Object.values(controls)) {
-      if (control.select) {
-        control.el.addEventListener("change", () => set(control.kind, control.el.value));
-        continue;
-      }
       control.el.addEventListener("click", e => {
         const button = e.target.closest("button[data-value]");
         if (!button || button.getAttribute("aria-disabled") === "true") return;
-        const value = button.dataset.value || null;   // "" is the "all" chip
+        const value = button.dataset.value || null;   // "" is "ყველა"
         set(control.kind, value === null || value === active[control.kind] ? null : value);
       });
     }
@@ -321,7 +300,7 @@
       if (value && control.items.some(i => i.dataset.value === value)) active[kind] = value;
     }
 
-    // Sidebar layout: the lists sit in a column beside the grid, shown or hidden by one
+    // The lists sit in a sidebar column beside the grid, shown or hidden by one
     // icon button at the start of the toolbar (a panel above the grid on narrow screens,
     // where the button also says "ფილტრები"). The long language list folds after the top
     // entries; while the column is hidden, the active filters show as removable tags.
@@ -420,18 +399,6 @@
     filters.querySelector(".sort[data-sort-for]")?.addEventListener("sorted", apply);
     languageHooks.push(apply);
     apply();
-
-    // Chip rows scroll sideways: center a chip selected by the URL, and fade the right
-    // edge while more chips lie beyond it.
-    for (const row of filters.querySelectorAll(".filter-row")) {
-      const on = row.querySelector('button[aria-pressed="true"]');
-      if (on && row.scrollWidth > row.clientWidth)
-        row.scrollLeft = Math.max(0, on.offsetLeft - row.offsetLeft - (row.clientWidth - on.offsetWidth) / 2);
-      const fade = () => row.classList.toggle("fade-end", row.scrollLeft + row.clientWidth < row.scrollWidth - 2);
-      row.addEventListener("scroll", fade, { passive: true });
-      window.addEventListener("resize", fade);
-      fade();
-    }
   }
 
   // ---- Search (/projects/) --------------------------------------------------

@@ -182,54 +182,7 @@ a.p-owner:hover { color: var(--link); }
 .dev-card-login, .dev-card-meta { font-size: .78rem; color: var(--muted); }
 .dev-card-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dev-group { margin-top: 2rem; }
-/* Category and language filters (app.js reveals them). */
-.dev-filters { margin: .5rem 0 .2rem; }
-.chips { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .4rem; font-size: .85rem; margin: .35rem 0; }
-.chips-label { color: var(--muted); margin-right: .3rem; flex: none; }
-.chip {
-  font: inherit; color: var(--fg); background: var(--soft); border: 1px solid var(--line);
-  border-radius: 999px; padding: .08rem .6rem; white-space: nowrap; cursor: pointer; flex: none;
-}
-.chip:hover { border-color: var(--muted); }
-.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.chip .n { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
-.chip[aria-pressed="true"] .n { color: inherit; opacity: .7; }
-/* No match with the other active filter: dimmed and inert (still in place, so the row doesn't jump). */
-.chip[aria-disabled="true"] { opacity: .4; cursor: default; }
-.chip[aria-disabled="true"]:hover { border-color: var(--line); }
-/* The category row and the top-languages row stay one line and scroll sideways;
-   the extra languages ("სხვა ენები…") wrap. A fade marks the edge with more chips. */
-.dev-filters .filter-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.dev-filters .filter-row::-webkit-scrollbar { display: none; }
-.dev-filters .filter-row.fade-end { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); }
-/* The row's label stays put while its chips scroll underneath. */
-.dev-filters .filter-row .chips-label { position: sticky; left: 0; z-index: 1; background: var(--bg); padding-right: .4rem; margin-right: 0; }
-/* Filter result on the sort line, right-aligned; wraps under the sort buttons on phones. */
-.dev-filter-status { margin-left: auto; display: inline-flex; align-items: baseline; gap: .6rem; }
-/* A link, not another sort option (`.sort button` would otherwise style it). */
-.sort .dev-filter-status .linklike { margin-left: 0; border: 0; background: none; padding: 0; color: var(--link); }
-.dev-filter-empty { margin: .6rem 0; }
-
-/* Directory toolbar: native selects for the filters and the sort order, the result on
-   the right. On phones the selects wrap and open the system picker. */
-.dev-toolbar { gap: .45rem .9rem; margin: .5rem 0 .6rem; }
-.dev-select { display: inline-flex; align-items: center; gap: .35rem; }
-.dev-select select {
-  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
-  border-radius: 4px; padding: .15rem .3rem; cursor: pointer;
-  /* As wide as the chosen option, not the longest one (where supported). */
-  field-sizing: content; min-width: 4.5rem; max-width: 14rem;
-}
-.dev-select select:hover { border-color: var(--muted); }
-.dev-select select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.dev-controls > .filter-row { margin: .4rem 0 0; }
-@media (max-width: 36rem) {
-  /* Phones: one full-width select per line, labels aligned. */
-  .dev-toolbar .dev-select { flex: 1 1 100%; min-width: 0; }
-  .dev-toolbar .dev-select-label { min-width: 6.5rem; }
-  .dev-toolbar .dev-select select { flex: 1; min-width: 0; max-width: none; field-sizing: fixed; }
-}
-/* Directory, sidebar layout: a toolbar across the top (the panel-left toggle, the
+/* Directory filters: a toolbar across the top (the panel-left toggle, the
    filter tags while the column is hidden, the sort links, the result), then the
    category and language lists in a narrow left column (sticky, scrolls on its own)
    beside the grid. The toolbar spans both columns, so the toggle never moves.
@@ -308,7 +261,7 @@ a.p-owner:hover { color: var(--link); }
 .sort.devs-sort button:hover { text-decoration: underline; }
 .sort.devs-sort button[aria-pressed="true"] { background: none; color: var(--fg); border: 0; font-weight: 600; text-decoration: underline; text-underline-offset: .2em; }
 .devs-sort-sep { color: var(--muted); }
-.devs-topbar .dev-filter-status { color: var(--muted); gap: .35rem; white-space: nowrap; }
+.devs-topbar .dev-filter-status { margin-left: auto; display: inline-flex; align-items: baseline; color: var(--muted); gap: .35rem; white-space: nowrap; }
 .devs-topbar .dev-filter-status .linklike { margin-left: 0; }
 .devs-topbar .dev-filter-status:has(.dev-filter-clear:not([hidden])) .dev-filter-count::after { content: " ·"; }
 .devs-main .dev-filter-empty { margin: .3rem 0 .8rem; }
@@ -341,7 +294,7 @@ a.p-owner:hover { color: var(--link); }
 .linklike { font: inherit; color: var(--link); background: none; border: 0; padding: 0; margin-left: .6rem; cursor: pointer; }
 .linklike:hover { text-decoration: underline; }
 /* Elements above set a display value, which would otherwise override [hidden]. */
-.dev-cell[hidden], .chip[hidden], .dev-group[hidden], .chips[hidden], .sort[hidden], .devs-side[hidden] { display: none; }
+.dev-cell[hidden], .dev-group[hidden], .sort[hidden], .devs-side[hidden] { display: none; }
 /* Which meta line a card shows follows the active sort (app.js sets data-metric). */
 .m-metric { display: none; }
 .dev-dir[data-metric="followed"] .m-default, .dev-dir[data-metric="pushed"] .m-default, .dev-dir[data-metric="first"] .m-default { display: none; }

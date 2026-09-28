@@ -1,8 +1,7 @@
 // Renders the static site. Run from the repository root, after `gitge.cs prepare`:
 //   dotnet run --project site              build _site/ from _build/site-data.json
 //   dotnet run --project site -- serve [--port 5080]   build, then serve _site/ on http://localhost:5080
-// Options: --out <dir> (instead of _site/, e.g. to compare two builds side by side) and
-// --filter-layout dropdowns|hybrid (overrides "developerFilterLayout" in config/site.json).
+// Option: --out <dir> (instead of _site/, e.g. to preview a branch next to a running _site/).
 //   dotnet run --project site -- selftest [--site <dir>]   checks; built-site checks on <dir> (default _site)
 
 using System.Globalization;
@@ -44,14 +43,7 @@ if (!File.Exists(dataFile))
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 Site.Data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(dataFile), json)!;
 Site.Strings = Strings.Load(Path.Combine(root, "i18n"));
-var siteConfig = Path.Combine(root, "config", "site.json");
-Site.FilterLayout = Option("--filter-layout") ?? FilterLayoutFromConfig(siteConfig);
-Site.FirstSeenSortMin = FirstSeenSortMinFromConfig(siteConfig);
-if (Site.FilterLayout is not ("dropdowns" or "hybrid" or "sidebar"))
-{
-    Console.Error.WriteLine($"Unknown developer filter layout '{Site.FilterLayout}' (expected dropdowns, hybrid or sidebar).");
-    return 1;
-}
+Site.FirstSeenSortMin = FirstSeenSortMinFromConfig(Path.Combine(root, "config", "site.json"));
 
 var markdown = new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
 Site.Roundups = LoadRoundups(Path.Combine(root, "content", "roundups"), markdown);
@@ -318,14 +310,7 @@ static Dictionary<string, string> LoadPages(string dir, MarkdownPipeline markdow
         f => Markdown.ToHtml(values.Aggregate(File.ReadAllText(f), (text, kv) => text.Replace($"{{{{{kv.Key}}}}}", kv.Value)), markdown));
 }
 
-// `dotnet run --project site -- selftest`: checks for helpers used in rendering.
-static string FilterLayoutFromConfig(string file)
-{
-    if (!File.Exists(file)) return "dropdowns";
-    using var doc = JsonDocument.Parse(File.ReadAllText(file));
-    return doc.RootElement.TryGetProperty("developerFilterLayout", out var v) && v.GetString() is { Length: > 0 } s ? s : "dropdowns";
-}
-
+// config/site.json developerPages.firstSeenSortMin (default 20).
 static int FirstSeenSortMinFromConfig(string file)
 {
     if (!File.Exists(file)) return 20;
@@ -334,6 +319,7 @@ static int FirstSeenSortMinFromConfig(string file)
         && v.TryGetInt32(out var n) ? n : 20;
 }
 
+// `dotnet run --project site -- selftest`: checks for helpers used in rendering.
 static int SiteSelfTest(string built)
 {
     var failures = 0;
@@ -429,7 +415,7 @@ static void DeveloperFilterChecks(Action<bool, string> check, string built)
         (cat is null || cats[i].Contains(cat)) && (lang is null || langs[i].Contains(lang))
         && (cat is null || lang is null || pairs[i] is null || (pairs[i]!.TryGetValue(cat, out var ls) && ls.Contains(lang)));
 
-    // Filter options (chips or <option>s, depending on the layout) carry data-kind,
+    // Filter entries (the sidebar list buttons) carry data-kind,
     // data-value and data-count: the developer count with no other filter active.
     // The empty value is "All" and counts everyone.
     var options = Regex.Matches(html, """"data-kind="(cat|lang)" data-value(?:="([^"]*)")? data-count="(\d+)"""").ToList();

@@ -95,41 +95,38 @@ list, and search results too, via `"w": 1` in `index.json`.
     line: followers on git.ge, last change, or first seen.
   - A–Z restores the two groups.
   - There are no rank numbers.
-- **Filters and sort (app.js).** Three layouts, chosen by `developerFilterLayout` in
-  `config/site.json` (or `--filter-layout` when rendering), so they can be compared:
-  - `"dropdowns"`: one toolbar row of native selects (category, language, sort), then
-    the result ("5 დეველოპერი · გასუფთავება") on the right. On phones one select per line.
-  - `"hybrid"`: category chips in one row ("ყველა" first, "სხვა" last, scrolling
-    sideways when needed), then a row with the language and sort selects and the result.
-  - `"sidebar"`: a narrow sticky left column (13rem) beside the grid with two short
+- **Filters and sort (app.js, `DevSidebar`).**
+  - **Sidebar:** a narrow sticky left column (13rem) beside the grid with two short
     lists, "კატეგორია" and "ენა": one compact line per value with a radio-like marker
-    and its count ("● მობილური 5"), "ყველა" first. Languages show the top 12 plus the
-    active one; "ყველა ენა…" expands the full list in place ("ნაკლები" folds it).
-    A toolbar spans both columns above them: one panel-left icon button (20px icon,
-    32px target, left pane filled while the lists are shown; `aria-expanded`,
+    and its count ("● მობილური 5"), "ყველა" first. Entries are buttons with
+    `aria-pressed`. Languages show the top 12 plus the active one; "ყველა ენა…" expands
+    the full list in place ("ნაკლები" folds it). No `<select>`.
+  - **Toolbar,** spanning both columns above them: one panel-left icon button (20px
+    icon, 32px target, left pane filled while the lists are shown; `aria-expanded`,
     `aria-controls`, label and tooltip "ფილტრების ჩვენება" / "ფილტრების დამალვა", a
-    count badge while filters are active), the active filters as removable tags
-    ("მობილური ✕") while the column is hidden, the sort as text links ("დალაგება: ა–ჰ ·
-    პროექტები · გამომწერები · ბოლო ცვლილება", the active one bold and underlined; they
-    wrap, never clip) and on the right the result ("861 დეველოპერი", "· გასუფთავება"
-    while filtering). The toggle stays in the same place in both states. With the
-    column shown the grid has 3 columns on a typical desktop, without it 4.
-    On desktop the column starts **hidden**; the choice is kept in localStorage
-    (`gitge.devSidebar`, "expanded"/"collapsed"; no cookies) and wins over the default;
-    app.js applies it to `<html>` (`devs-collapsed`) before revealing the column, so
-    there is no jump. Below 56rem the same button also says "ფილტრები" and opens the
-    lists as a panel under the toolbar (the button, ✕, "მზადაა" or Esc closes it); the
-    tags always show there. No `<select>`.
-  - Every option (chip, list entry or `<option>`) carries `data-kind`, `data-value`
-    ("" = all) and `data-count`. Categories in config order; languages by number of
-    developers, then A–Z.
+    count badge while filters are active); the active filters as removable tags
+    ("მობილური ×", an inline SVG ×, label "ფილტრის მოხსნა: მობილური") while the column
+    is hidden; the sort as text links ("დალაგება: ა–ჰ · პროექტები · გამომწერები · ბოლო
+    ცვლილება", the active one bold and underlined; they wrap, never clip); and on the
+    right the result ("861 დეველოპერი", "· გასუფთავება" while filtering). The toggle
+    stays in the same place in both states.
+  - **Desktop:** the column starts **hidden** (grid 4 columns at 1280; 3 with the
+    column). The choice is kept in localStorage (`gitge.devSidebar`,
+    "expanded"/"collapsed"; no cookies) and wins over the default; app.js applies it to
+    `<html>` (`devs-collapsed`) before revealing the column, so there is no jump.
+  - **Below 56rem:** the same button also says "ფილტრები" and opens the lists as a
+    panel under the toolbar (the button, ×, "მზადაა" or Esc closes it); the tags always
+    show there.
+  - **Without JavaScript:** no toggle, lists or sort links; the full grouped A–Z grid.
+  - Every list entry carries `data-kind`, `data-value` ("" = all) and `data-count`.
+    Categories in config order; languages by number of developers, then A–Z.
   - One category and one language at a time, combined with AND. Either filter alone
     matches when **any** of a developer's published projects (listed or search-only)
     has that category or primary language; **both together need one project with
     both** (e.g. a mobile app written in C#).
   - Counts are live: each option shows how many developers it would show together
-    with the other active filter. Options with 0 are disabled (chips: dimmed,
-    `aria-disabled`, but in place); the active one never is.
+    with the other active filter. Entries with 0 are dimmed and inert
+    (`aria-disabled`, but in place); the active one never is.
   - "New on git.ge" is left out of the sort until at least
     `developerPages.firstSeenSortMin` (default 20) developers were first seen on a
     later day than the earliest first-seen date (everyone found at launch shares it).
@@ -190,12 +187,13 @@ self-tests.
 ### Config (`config/site.json`)
 
 ```json
-"developerPages": { "minCommits": 1, "rankTopN": 10 }
+"developerPages": { "minCommits": 1, "rankTopN": 10, "firstSeenSortMin": 20 }
 ```
 
 `minCommits` is 1 because the network is sparse. About 37 of 434 developers have
 any contribution link to another git.ge developer, so a higher threshold would
-hide the section almost everywhere.
+hide the section almost everywhere. `firstSeenSortMin` gates the "New on git.ge"
+sort (see Filters and sort).
 
 ## Tests
 

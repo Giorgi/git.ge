@@ -19,5 +19,5 @@ _build/
 # Avatar cache for developer pages (see gitge.cs avatars); CI caches it, never committed
 _cache/
 
-# Extra builds for side-by-side comparison (dotnet run --project site -- --out _site-x)
+# Extra builds next to _site/ (dotnet run --project site -- --out _site-x)
 _site-*/

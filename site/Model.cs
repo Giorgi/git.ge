@@ -147,10 +147,6 @@ public static class Site
     public static Dictionary<string, string> Pages { get; set; } = [];     // name.lang -> HTML
     public static Dictionary<string, string> AssetVersions { get; set; } = [];
 
-    // Layout of the /developers/ controls: "dropdowns", "hybrid" or "sidebar"
-    // (config/site.json "developerFilterLayout", overridable with --filter-layout).
-    public static string FilterLayout { get; set; } = "dropdowns";
-
     // "New on git.ge" sort: offered once at least this many developers were first seen
     // after the earliest first-seen date (config/site.json developerPages.firstSeenSortMin).
     public static int FirstSeenSortMin { get; set; } = 20;

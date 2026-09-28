@@ -1,11 +1,11 @@
-@* Layout "sidebar": the category and language lists in a narrow left column beside the
+@* Filters for the directory: the category and language lists in a narrow left column beside the
    grid. A toolbar spans both columns above them: a panel-left icon button that shows
    or hides the column (it never moves), the active filters as removable tags while the
    column is hidden, the sort links and the result ("5 დეველოპერი · გასუფთავება").
    On desktop the column starts hidden and the choice is remembered (localStorage). On
    narrow screens the button also says "ფილტრები" and opens the lists as a panel above
    the grid. Without JavaScript the button, the lists and the sort are hidden: just the grid. *@
-<div class="dev-filters devs-layout" data-filter-for="devs-dir" data-count-always>
+<div class="dev-filters devs-layout" data-filter-for="devs-dir">
     <div class="devs-topbar">
         <button type="button" class="devs-toggle" hidden aria-expanded="false" aria-controls="devs-filter-panel">
             <svg class="devs-toggle-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
