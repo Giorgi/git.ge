@@ -10,21 +10,35 @@
     @* Filters and sort (app.js): one category and one language at a time, combined with
        AND. Category + language means ONE project with both (data-pairs); either alone
        means any project. Counts are developers, recounted against the other active
-       filter (0 = disabled). Two layouts, chosen by "developerFilterLayout" in
-       config/site.json (or --filter-layout): "dropdowns" (one row of selects) or
-       "hybrid" (category chips + selects). Hidden without JavaScript, where the full
-       list shows. *@
-    @if (Site.FilterLayout == "hybrid")
+       filter (0 = disabled). Three layouts, chosen by "developerFilterLayout" in
+       config/site.json (or --filter-layout): "dropdowns" (one row of selects), "hybrid"
+       (category chips + selects) or "sidebar" (lists in a left column beside the grid).
+       Hidden without JavaScript, where the full list shows. *@
+    @if (Site.FilterLayout == "sidebar")
     {
-        <DevControlsHybrid Developers="@All" />
+        <DevSidebar Developers="@All">@Directory</DevSidebar>
     }
     else
     {
-        <DevControlsDropdowns Developers="@All" />
+        @if (Site.FilterLayout == "hybrid")
+        {
+            <DevControlsHybrid Developers="@All" />
+        }
+        else
+        {
+            <DevControlsDropdowns Developers="@All" />
+        }
+        <p class="note dev-filter-empty" hidden><T K="devs.noMatch" /></p>
+        @Directory
     }
-    <p class="note dev-filter-empty" hidden><T K="devs.noMatch" /></p>
+</Layout>
 
-    <div class="dev-dir" data-metric="name" id="devs-dir">
+@code {
+    List<SiteDeveloper> All => Site.Data.DeveloperPages;
+    List<SiteDeveloper> Listed => All.Where(d => d.Projects.Count > 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+    List<SiteDeveloper> More => All.Where(d => d.Projects.Count == 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+
+    RenderFragment Directory => @<div class="dev-dir" data-metric="name" id="devs-dir">
         <ol class="dev-grid" id="devs">
             @foreach (var d in Listed)
             {
@@ -41,11 +55,5 @@
                 }
             </ol>
         }
-    </div>
-</Layout>
-
-@code {
-    List<SiteDeveloper> All => Site.Data.DeveloperPages;
-    List<SiteDeveloper> Listed => All.Where(d => d.Projects.Count > 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
-    List<SiteDeveloper> More => All.Where(d => d.Projects.Count == 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+    </div>;
 }

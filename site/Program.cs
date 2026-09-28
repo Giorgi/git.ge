@@ -44,10 +44,12 @@ if (!File.Exists(dataFile))
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 Site.Data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(dataFile), json)!;
 Site.Strings = Strings.Load(Path.Combine(root, "i18n"));
-Site.FilterLayout = Option("--filter-layout") ?? FilterLayoutFromConfig(Path.Combine(root, "config", "site.json"));
-if (Site.FilterLayout is not ("dropdowns" or "hybrid"))
+var siteConfig = Path.Combine(root, "config", "site.json");
+Site.FilterLayout = Option("--filter-layout") ?? FilterLayoutFromConfig(siteConfig);
+Site.FirstSeenSortMin = FirstSeenSortMinFromConfig(siteConfig);
+if (Site.FilterLayout is not ("dropdowns" or "hybrid" or "sidebar"))
 {
-    Console.Error.WriteLine($"Unknown developer filter layout '{Site.FilterLayout}' (expected dropdowns or hybrid).");
+    Console.Error.WriteLine($"Unknown developer filter layout '{Site.FilterLayout}' (expected dropdowns, hybrid or sidebar).");
     return 1;
 }
 
@@ -324,6 +326,14 @@ static string FilterLayoutFromConfig(string file)
     return doc.RootElement.TryGetProperty("developerFilterLayout", out var v) && v.GetString() is { Length: > 0 } s ? s : "dropdowns";
 }
 
+static int FirstSeenSortMinFromConfig(string file)
+{
+    if (!File.Exists(file)) return 20;
+    using var doc = JsonDocument.Parse(File.ReadAllText(file));
+    return doc.RootElement.TryGetProperty("developerPages", out var pages) && pages.TryGetProperty("firstSeenSortMin", out var v)
+        && v.TryGetInt32(out var n) ? n : 20;
+}
+
 static int SiteSelfTest(string built)
 {
     var failures = 0;
@@ -360,11 +370,16 @@ static int SiteSelfTest(string built)
     Check(Seo.JoinKa(["a", "b", "c"]) == "a, b და c" && Seo.JoinKa(["a"]) == "a", "Georgian list joining");
 
     // The built site, when there is one: unique titles/descriptions, valid JSON-LD.
-    // "New on git.ge" sort: hidden while every developer shares one first-seen date.
+    // "New on git.ge" sort: only once enough developers (min) arrived after the earliest date.
     SiteDeveloper Dev(string? first) => new() { Login = "x", FirstSeenAt = first };
-    Check(!DeveloperFilters.ShowFirstSeenSort([Dev("2026-09-25"), Dev("2026-09-25"), Dev(null)]), "first-seen sort hidden when all dates are equal");
-    Check(DeveloperFilters.ShowFirstSeenSort([Dev("2026-09-25"), Dev("2026-10-02")]), "first-seen sort shown once dates differ");
-    Check(!DeveloperFilters.ShowFirstSeenSort([]), "first-seen sort hidden with no developers");
+    List<SiteDeveloper> Devs(int launch, int later) =>
+        [.. Enumerable.Repeat("2026-09-25", launch).Select(Dev), .. Enumerable.Repeat("2026-10-02T08:00:00Z", later).Select(Dev), Dev(null)];
+    Check(!DeveloperFilters.ShowFirstSeenSort(Devs(5, 0), 20), "first-seen sort hidden when all dates are equal");
+    Check(!DeveloperFilters.ShowFirstSeenSort(Devs(800, 19), 20), "first-seen sort hidden with 19 later developers (min 20)");
+    Check(DeveloperFilters.ShowFirstSeenSort(Devs(800, 20), 20), "first-seen sort shown with 20 later developers (min 20)");
+    Check(!DeveloperFilters.ShowFirstSeenSort([Dev("2026-09-25T01:00:00Z"), Dev("2026-09-25T23:00:00Z")], 1), "same day, different times: not later");
+    Check(DeveloperFilters.ShowFirstSeenSort(Devs(1, 1), 1), "min 1: shown once dates differ");
+    Check(!DeveloperFilters.ShowFirstSeenSort([], 20), "first-seen sort hidden with no developers");
 
     if (Directory.Exists(built))
     {
@@ -461,6 +476,15 @@ static void DeveloperFilterChecks(Action<bool, string> check, string built)
         var anyProject = Enumerable.Range(0, cards.Count).Count(i => cats[i].Contains(c) && langs[i].Contains(l));
         check(facet == expected, $"{c} + {l}: {facet} developers (same project; any project would be {anyProject})");
     }
+
+    // "New on git.ge" is offered exactly when enough developers arrived after launch.
+    var min = FirstSeenSortMinFromConfig(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(built))!, "config", "site.json"));
+    var days = data.DeveloperPages.Select(d => d.FirstSeenAt?[..10]).OfType<string>().ToList();
+    var earliest = days.Count > 0 ? days.Min(StringComparer.Ordinal) : null;
+    var later = days.Count(d => string.CompareOrdinal(d, earliest) > 0);
+    var offered = Regex.IsMatch(html, "(?:data-sort|value)=\"first\"");
+    check(offered == DeveloperFilters.ShowFirstSeenSort(data.DeveloperPages, min),
+          $"\"new on git.ge\" sort {(offered ? "shown" : "hidden")}: {later} developers after the first date (min {min})");
 }
 
 static void CopyDirectory(string from, string to)

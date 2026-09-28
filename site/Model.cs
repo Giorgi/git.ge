@@ -147,9 +147,13 @@ public static class Site
     public static Dictionary<string, string> Pages { get; set; } = [];     // name.lang -> HTML
     public static Dictionary<string, string> AssetVersions { get; set; } = [];
 
-    // Layout of the /developers/ controls: "dropdowns" or "hybrid" (config/site.json
-    // "developerFilterLayout", overridable with --filter-layout).
+    // Layout of the /developers/ controls: "dropdowns", "hybrid" or "sidebar"
+    // (config/site.json "developerFilterLayout", overridable with --filter-layout).
     public static string FilterLayout { get; set; } = "dropdowns";
+
+    // "New on git.ge" sort: offered once at least this many developers were first seen
+    // after the earliest first-seen date (config/site.json developerPages.firstSeenSortMin).
+    public static int FirstSeenSortMin { get; set; } = 20;
 
     static Dictionary<string, SiteProject>? byKey;
     public static SiteProject Project(string key) => (byKey ??= Data.Projects.ToDictionary(p => p.Key))[key];
@@ -294,10 +298,16 @@ public static class DeveloperFilters
     public static IEnumerable<(string Value, string Label, int Count)> LanguageOptions(IEnumerable<SiteDeveloper> developers) =>
         LanguageCounts(developers).Select(l => (l.Language, l.Language, l.Count));
 
-    // "New on git.ge" only sorts something once developers were first seen on different
-    // days; right after launch everyone shares the first import's date.
-    public static bool ShowFirstSeenSort(IEnumerable<SiteDeveloper> developers) =>
-        developers.Select(d => d.FirstSeenAt).OfType<string>().Distinct().Skip(1).Any();
+    // "New on git.ge" only sorts something useful once enough developers arrived after
+    // the first import (everyone found at launch shares its date): at least `min`
+    // developers first seen on a later day than the earliest one.
+    public static bool ShowFirstSeenSort(IEnumerable<SiteDeveloper> developers, int? min = null)
+    {
+        var days = developers.Select(d => d.FirstSeenAt).OfType<string>().Where(s => s.Length >= 10).Select(s => s[..10]).ToList();
+        if (days.Count == 0) return false;
+        var earliest = days.Min(StringComparer.Ordinal)!;
+        return days.Count(d => string.CompareOrdinal(d, earliest) > 0) >= Math.Max(1, min ?? Site.FirstSeenSortMin);
+    }
 
     // Languages by number of developers, most common first.
     public static List<(string Language, int Count)> LanguageCounts(IEnumerable<SiteDeveloper> developers) =>

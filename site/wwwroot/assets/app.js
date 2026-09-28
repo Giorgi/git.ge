@@ -266,10 +266,13 @@
         if (select) control.el.value = active[kind] || "";
       }
       const filtering = Boolean(active.cat || active.lang);
-      count.textContent = filtering ? (shown === 1 ? t("devs.filterCountOne") : t("devs.filterCount", shown)) : "";
+      const showCount = filtering || "countAlways" in filters.dataset;
+      count.textContent = showCount ? (shown === 1 ? t("devs.filterCountOne") : t("devs.filterCount", shown)) : "";
       clear.hidden = !filtering;
       empty.hidden = shown > 0;
+      for (const hook of afterApply) hook();
     };
+    const afterApply = [];
 
     const saveUrl = () => {
       const params = new URLSearchParams(location.search);
@@ -309,6 +312,63 @@
     for (const [kind, control] of Object.entries(controls)) {
       const value = params.get(param[kind]);
       if (value && control.items.some(i => i.dataset.value === value)) active[kind] = value;
+    }
+
+    // Sidebar layout: the lists sit in a column beside the grid (a panel behind the
+    // "ფილტრები" button on narrow screens), the long language list folds after the top
+    // entries, and the active filters show as removable tags under the button.
+    const side = filters.querySelector(".devs-side");
+    if (side) {
+      const phonebar = filters.querySelector(".devs-phonebar");
+      const toggle = filters.querySelector(".devs-filter-toggle");
+      const badge = filters.querySelector(".devs-filter-badge");
+      const tags = filters.querySelector(".devs-tags");
+      side.hidden = phonebar.hidden = false;
+      filters.classList.add("ready");
+
+      // "ყველა ენა…" / "ნაკლები": folded, the list keeps its top entries plus the active one.
+      for (const facet of side.querySelectorAll(".devs-facet")) {
+        const more = facet.querySelector(".devs-facet-more");
+        if (!more) continue;
+        const fold = () => {
+          const open = more.getAttribute("aria-expanded") === "true";
+          for (const li of facet.querySelectorAll(".devs-facet-extra"))
+            li.hidden = !open && li.querySelector("button").getAttribute("aria-pressed") !== "true";
+          more.textContent = t(open ? "devs.fewerLanguages" : "devs.allLanguages");
+        };
+        more.addEventListener("click", () => {
+          more.setAttribute("aria-expanded", String(more.getAttribute("aria-expanded") !== "true"));
+          fold();
+        });
+        afterApply.push(fold);
+      }
+
+      // The panel on narrow screens: opens right after the button (next in tab order),
+      // closes with ✕, "მზადაა" or Esc.
+      const openPanel = open => {
+        filters.classList.toggle("open", open);
+        toggle.setAttribute("aria-expanded", String(open));
+      };
+      toggle.addEventListener("click", () => openPanel(!filters.classList.contains("open")));
+      for (const b of side.querySelectorAll("[data-panel-close]"))
+        b.addEventListener("click", () => { openPanel(false); toggle.focus(); });
+      side.addEventListener("keydown", e => {
+        if (e.key === "Escape" && filters.classList.contains("open")) { openPanel(false); toggle.focus(); }
+      });
+
+      afterApply.push(() => {
+        const on = ["cat", "lang"].filter(kind => active[kind]);
+        badge.textContent = on.length ? ` (${on.length})` : "";
+        tags.replaceChildren(...on.map(kind => {
+          const tag = document.createElement("button");
+          tag.type = "button";
+          tag.className = "devs-tag";
+          tag.textContent = `${label(kind, active[kind])} ✕`;
+          tag.setAttribute("aria-label", t("devs.removeFilter", label(kind, active[kind])));
+          tag.addEventListener("click", () => { set(kind, null); toggle.focus(); });
+          return tag;
+        }));
+      });
     }
 
     // Sorting regroups or merges the lists; re-apply so group headings stay right.

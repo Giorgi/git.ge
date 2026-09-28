@@ -8,6 +8,7 @@
   "developerFilterLayout": "dropdowns",
   "developerPages": {
     "minCommits": 1,
-    "rankTopN": 10
+    "rankTopN": 10,
+    "firstSeenSortMin": 20
   }
 }

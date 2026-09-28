@@ -1,0 +1,30 @@
+@* Sort order for the sidebar layout: a quiet row of text links, the active one bold
+   ("დალაგება: ა–ჰ · პროექტები · …"). Buttons with aria-pressed (app.js); hidden without
+   JavaScript. "New on git.ge" only once enough developers arrived after launch. *@
+<div class="sort devs-sort" hidden role="group" aria-labelledby="devs-sort-label" data-sort-for="devs" data-groups="devs-more" data-group-sort="name">
+    <span id="devs-sort-label"><T K="sort.label" /></span>
+    @foreach (var (key, label, i) in Options.Select((o, i) => (o.Key, o.Label, i)))
+    {
+        @if (i > 0)
+        {
+            <span class="devs-sort-sep" aria-hidden="true">·</span>
+        }
+        <button type="button" data-sort="@key" aria-pressed="@(key == "name" ? "true" : "false")"><T K="@label" /></button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<SiteDeveloper> Developers { get; set; } = [];
+
+    static readonly (string Key, string Label)[] All =
+    [
+        ("name", "sort.name"),
+        ("projects", "sort.projects"),
+        ("followed", "sort.followedShort"),
+        ("pushed", "sort.recent"),
+        ("first", "sort.firstSeen"),
+    ];
+
+    IEnumerable<(string Key, string Label)> Options =>
+        All.Where(o => o.Key != "first" || DeveloperFilters.ShowFirstSeenSort(Developers));
+}

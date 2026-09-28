@@ -1,0 +1,35 @@
+@* One filter list in the sidebar layout: a small heading, then one compact line per
+   value with a radio-like marker and a live count ("● მობილური 5"), "ყველა" first.
+   Entries are buttons with aria-pressed (app.js); zero-count ones are dimmed and inert.
+   With Top set, only the first Top values show until "ყველა ენა…" expands the list. *@
+<section class="devs-facet" data-filter="@Kind" role="group" aria-labelledby="devs-facet-@Kind">
+    <h2 class="devs-facet-title" id="devs-facet-@Kind"><T K="@TitleKey" /></h2>
+    <ul class="devs-facet-list">
+        <li><button type="button" class="devs-facet-item" data-kind="@Kind" data-value="" data-count="@Total" aria-pressed="true"><span class="devs-facet-label"><T K="devs.filterAll" /></span> <span class="n">@Total</span></button></li>
+        @foreach (var (option, i) in Options.Select((o, i) => (o, i)))
+        {
+            <li class="@(Extra(i) ? "devs-facet-extra" : null)" hidden="@Extra(i)"><button type="button" class="devs-facet-item" data-kind="@Kind" data-value="@option.Value" data-count="@option.Count" aria-pressed="false"><span class="devs-facet-label">@if (Kind == "cat")
+                    {
+                        <T K="@($"cat.{option.Value}")" />
+                    }
+                    else
+                    {
+                        @option.Label
+                    }</span> <span class="n">@option.Count</span></button></li>
+        }
+    </ul>
+    @if (Top is { } top && Options.Count > top)
+    {
+        <button type="button" class="linklike devs-facet-more" aria-expanded="false"><T K="devs.allLanguages" /></button>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Kind { get; set; } = "";
+    [Parameter, EditorRequired] public string TitleKey { get; set; } = "";
+    [Parameter, EditorRequired] public List<(string Value, string Label, int Count)> Options { get; set; } = [];
+    [Parameter, EditorRequired] public int Total { get; set; }
+    [Parameter] public int? Top { get; set; }
+
+    bool Extra(int i) => Top is { } top && i >= top;
+}

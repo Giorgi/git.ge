@@ -95,15 +95,25 @@ list, and search results too, via `"w": 1` in `index.json`.
     line: followers on git.ge, last change, or first seen.
   - A–Z restores the two groups.
   - There are no rank numbers.
-- **Filters and sort (app.js).** Two layouts, chosen by `developerFilterLayout` in
+- **Filters and sort (app.js).** Three layouts, chosen by `developerFilterLayout` in
   `config/site.json` (or `--filter-layout` when rendering), so they can be compared:
   - `"dropdowns"`: one toolbar row of native selects (category, language, sort), then
     the result ("5 დეველოპერი · გასუფთავება") on the right. On phones one select per line.
   - `"hybrid"`: category chips in one row ("ყველა" first, "სხვა" last, scrolling
     sideways when needed), then a row with the language and sort selects and the result.
-  - Every option (chip or `<option>`) carries `data-kind`, `data-value` ("" = all) and
-    `data-count`. Categories in config order; languages by number of developers, then
-    A–Z, all of them in the select.
+  - `"sidebar"`: a narrow sticky left column (13rem) beside the grid with two short
+    lists, "კატეგორია" and "ენა": one compact line per value with a radio-like marker
+    and its count ("● მობილური 5"), "ყველა" first. Languages show the top 12 plus the
+    active one; "ყველა ენა…" expands the full list in place ("ნაკლები" folds it).
+    Above the grid: the sort as text links ("დალაგება: ა–ჰ · პროექტები · გამომწერები ·
+    ბოლო ცვლილება", the active one bold and underlined) and on the right the result
+    ("861 დეველოპერი", "· გასუფთავება" while filtering). The grid gets 3 columns on a
+    typical desktop. Below 56rem the column is replaced by a "ფილტრები (2)" button that
+    opens the same lists as a panel above the grid (✕, "მზადაა" or Esc closes it), with
+    the active filters as removable tags ("მობილური ✕") next to the button. No `<select>`.
+  - Every option (chip, list entry or `<option>`) carries `data-kind`, `data-value`
+    ("" = all) and `data-count`. Categories in config order; languages by number of
+    developers, then A–Z.
   - One category and one language at a time, combined with AND. Either filter alone
     matches when **any** of a developer's published projects (listed or search-only)
     has that category or primary language; **both together need one project with
@@ -111,8 +121,9 @@ list, and search results too, via `"w": 1` in `index.json`.
   - Counts are live: each option shows how many developers it would show together
     with the other active filter. Options with 0 are disabled (chips: dimmed,
     `aria-disabled`, but in place); the active one never is.
-  - "New on git.ge" is left out of the sort while every developer shares one
-    first-seen date (right after launch it sorts nothing).
+  - "New on git.ge" is left out of the sort until at least
+    `developerPages.firstSeenSortMin` (default 20) developers were first seen on a
+    later day than the earliest first-seen date (everyone found at launch shares it).
   - Cards carry `data-cats` (the categories shown on the card, then `;` and the rest),
     `data-langs`, and `data-pairs` ("mobile:Kotlin,Swift|web:C#": each category's
     languages) only where `data-cats` × `data-langs` would give a different answer

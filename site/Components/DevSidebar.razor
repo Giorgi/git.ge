@@ -1,0 +1,33 @@
+@* Layout "sidebar": the category and language lists in a narrow left column beside the
+   grid; above the grid the sort links and the result ("5 დეველოპერი · გასუფთავება").
+   On narrow screens the column is replaced by a "ფილტრები" button that opens the same
+   lists as a panel above the grid, with the active filters as removable tags under it.
+   Without JavaScript the lists, the button and the sort are hidden: just the grid. *@
+<div class="dev-filters devs-layout" data-filter-for="devs-dir" data-count-always>
+    <div class="devs-phonebar" hidden>
+        <button type="button" class="devs-filter-toggle" aria-expanded="false" aria-controls="devs-filter-panel"><T K="devs.filters" /><span class="devs-filter-badge"></span></button>
+        <span class="devs-tags"></span>
+    </div>
+    <div class="devs-side" id="devs-filter-panel" hidden>
+        <div class="devs-panel-head">
+            <strong><T K="devs.filters" /></strong>
+            <button type="button" class="devs-panel-close" data-panel-close><span aria-hidden="true">✕</span><span class="visually-hidden"><T K="devs.closeFilters" /></span></button>
+        </div>
+        <DevFacet Kind="cat" TitleKey="devs.facetCategory" Options="@DeveloperFilters.CategoryOptions(Developers).ToList()" Total="@Developers.Count" />
+        <DevFacet Kind="lang" TitleKey="devs.facetLanguage" Options="@DeveloperFilters.LanguageOptions(Developers).ToList()" Total="@Developers.Count" Top="12" />
+        <button type="button" class="devs-panel-done" data-panel-close><T K="devs.done" /></button>
+    </div>
+    <div class="devs-main">
+        <div class="devs-topbar">
+            <DevSortLinks Developers="@Developers" />
+            <DevFilterStatus />
+        </div>
+        <p class="note dev-filter-empty" hidden><T K="devs.noMatch" /></p>
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<SiteDeveloper> Developers { get; set; } = [];
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+}
