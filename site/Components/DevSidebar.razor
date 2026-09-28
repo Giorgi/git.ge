@@ -1,17 +1,26 @@
 @* Layout "sidebar": the category and language lists in a narrow left column beside the
-   grid; above the grid the sort links and the result ("5 დეველოპერი · გასუფთავება").
-   On narrow screens the column is replaced by a "ფილტრები" button that opens the same
-   lists as a panel above the grid, with the active filters as removable tags under it.
-   On desktop "‹ დამალვა" folds the column away (remembered in localStorage); the same
-   button and tags then sit above the full-width grid, and the button brings it back.
-   Without JavaScript the lists, the button and the sort are hidden: just the grid. *@
+   grid. A toolbar spans both columns above them: a panel-left icon button that shows
+   or hides the column (it never moves), the active filters as removable tags while the
+   column is hidden, the sort links and the result ("5 დეველოპერი · გასუფთავება").
+   On desktop the column starts hidden and the choice is remembered (localStorage). On
+   narrow screens the button also says "ფილტრები" and opens the lists as a panel above
+   the grid. Without JavaScript the button, the lists and the sort are hidden: just the grid. *@
 <div class="dev-filters devs-layout" data-filter-for="devs-dir" data-count-always>
-    <div class="devs-phonebar" hidden>
-        <button type="button" class="devs-filter-toggle" aria-expanded="false" aria-controls="devs-filter-panel"><T K="devs.filters" /><span class="devs-filter-badge"></span></button>
+    <div class="devs-topbar">
+        <button type="button" class="devs-toggle" hidden aria-expanded="false" aria-controls="devs-filter-panel">
+            <svg class="devs-toggle-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <rect class="devs-toggle-pane" x="3.75" y="4.75" width="5.5" height="14.5" rx="1" />
+                <rect x="3" y="4" width="18" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+                <path d="M9.75 4.5v15" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+            <span class="devs-toggle-text"><T K="devs.filters" /></span>
+            <span class="devs-toggle-badge" hidden></span>
+        </button>
         <span class="devs-tags"></span>
+        <DevSortLinks Developers="@Developers" />
+        <DevFilterStatus />
     </div>
     <div class="devs-side" id="devs-filter-panel" hidden>
-        <button type="button" class="linklike devs-side-hide" aria-expanded="true" aria-controls="devs-filter-panel"><span aria-hidden="true">‹ <T K="devs.hide" /></span><span class="visually-hidden"><T K="devs.hideFilters" /></span></button>
         <div class="devs-panel-head">
             <strong><T K="devs.filters" /></strong>
             <button type="button" class="devs-panel-close" data-panel-close><span aria-hidden="true">✕</span><span class="visually-hidden"><T K="devs.closeFilters" /></span></button>
@@ -21,10 +30,6 @@
         <button type="button" class="devs-panel-done" data-panel-close><T K="devs.done" /></button>
     </div>
     <div class="devs-main">
-        <div class="devs-topbar">
-            <DevSortLinks Developers="@Developers" />
-            <DevFilterStatus />
-        </div>
         <p class="note dev-filter-empty" hidden><T K="devs.noMatch" /></p>
         @ChildContent
     </div>

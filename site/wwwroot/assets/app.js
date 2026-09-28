@@ -321,16 +321,16 @@
       if (value && control.items.some(i => i.dataset.value === value)) active[kind] = value;
     }
 
-    // Sidebar layout: the lists sit in a column beside the grid (a panel behind the
-    // "ფილტრები" button on narrow screens), the long language list folds after the top
-    // entries, and the active filters show as removable tags under the button.
+    // Sidebar layout: the lists sit in a column beside the grid, shown or hidden by one
+    // icon button at the start of the toolbar (a panel above the grid on narrow screens,
+    // where the button also says "ფილტრები"). The long language list folds after the top
+    // entries; while the column is hidden, the active filters show as removable tags.
     const side = filters.querySelector(".devs-side");
     if (side) {
-      const phonebar = filters.querySelector(".devs-phonebar");
-      const toggle = filters.querySelector(".devs-filter-toggle");
-      const badge = filters.querySelector(".devs-filter-badge");
+      const toggle = filters.querySelector(".devs-toggle");
+      const badge = toggle.querySelector(".devs-toggle-badge");
       const tags = filters.querySelector(".devs-tags");
-      side.hidden = phonebar.hidden = false;
+      side.hidden = toggle.hidden = false;
       filters.classList.add("ready");
 
       // "ყველა ენა…" / "ნაკლები": folded, the list keeps its top entries plus the active one.
@@ -350,38 +350,44 @@
         afterApply.push(fold);
       }
 
-      // The panel on narrow screens: opens right after the button (next in tab order),
-      // closes with ✕, "მზადაა" or Esc.
+      // Desktop: the column is shown or hidden (default hidden, the choice remembered).
+      // Narrow screens: the panel opens under the toolbar and closes with the button,
+      // ✕, "მზადაა" or Esc.
       const narrow = matchMedia("(max-width: 56rem)");
-      const openPanel = open => {
-        filters.classList.toggle("open", open);
+      const shown = () => narrow.matches ? filters.classList.contains("open") : !root.classList.contains("devs-collapsed");
+      const activeCount = () => ["cat", "lang"].filter(kind => active[kind]).length;
+      const sync = () => {
+        const open = shown();
+        const n = activeCount();
         toggle.setAttribute("aria-expanded", String(open));
+        const action = t(open ? "devs.hideFilters" : "devs.showFilters");
+        toggle.title = action;
+        toggle.setAttribute("aria-label", n ? `${action} (${n})` : action);
+        badge.textContent = n || "";
+        badge.hidden = !n;
       };
-      // On desktop the button unfolds the column that "‹ დამალვა" folded; the choice
-      // is remembered (default: folded).
-      const hide = side.querySelector(".devs-side-hide");
       const setCollapsed = collapsed => {
         root.classList.toggle("devs-collapsed", collapsed);
-        hide.setAttribute("aria-expanded", String(!collapsed));
-        if (!narrow.matches) toggle.setAttribute("aria-expanded", String(!collapsed));
         try { localStorage.setItem(sidebarKey, collapsed ? "collapsed" : "expanded"); } catch { /* private mode: fine */ }
+        sync();
       };
-      hide.setAttribute("aria-expanded", String(!root.classList.contains("devs-collapsed")));
-      hide.addEventListener("click", () => { setCollapsed(true); toggle.focus(); });
+      const openPanel = open => {
+        filters.classList.toggle("open", open);
+        sync();
+      };
       toggle.addEventListener("click", () => {
         if (narrow.matches) openPanel(!filters.classList.contains("open"));
-        else { setCollapsed(false); hide.focus(); }
+        else setCollapsed(!root.classList.contains("devs-collapsed"));
       });
       for (const b of side.querySelectorAll("[data-panel-close]"))
         b.addEventListener("click", () => { openPanel(false); toggle.focus(); });
       side.addEventListener("keydown", e => {
         if (e.key === "Escape" && filters.classList.contains("open")) { openPanel(false); toggle.focus(); }
       });
+      narrow.addEventListener?.("change", sync);
 
       afterApply.push(() => {
-        const on = ["cat", "lang"].filter(kind => active[kind]);
-        badge.textContent = on.length ? ` (${on.length})` : "";
-        tags.replaceChildren(...on.map(kind => {
+        tags.replaceChildren(...["cat", "lang"].filter(kind => active[kind]).map(kind => {
           const tag = document.createElement("button");
           tag.type = "button";
           tag.className = "devs-tag";
@@ -390,6 +396,7 @@
           tag.addEventListener("click", () => { set(kind, null); toggle.focus(); });
           return tag;
         }));
+        sync();
       });
     }
 

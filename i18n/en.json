@@ -122,7 +122,7 @@
   "devs.allLanguages": "All languages…",
   "devs.fewerLanguages": "Fewer",
   "devs.done": "Done",
-  "devs.hide": "Hide",
+  "devs.showFilters": "Show filters",
   "devs.hideFilters": "Hide filters",
   "devs.closeFilters": "Close filters",
   "devs.removeFilter": "Remove filter: {0}",

@@ -105,17 +105,21 @@ list, and search results too, via `"w": 1` in `index.json`.
     lists, "კატეგორია" and "ენა": one compact line per value with a radio-like marker
     and its count ("● მობილური 5"), "ყველა" first. Languages show the top 12 plus the
     active one; "ყველა ენა…" expands the full list in place ("ნაკლები" folds it).
-    Above the grid: the sort as text links ("დალაგება: ა–ჰ · პროექტები · გამომწერები ·
-    ბოლო ცვლილება", the active one bold and underlined) and on the right the result
-    ("861 დეველოპერი", "· გასუფთავება" while filtering). The grid gets 3 columns on a
-    typical desktop. Below 56rem the column is replaced by a "ფილტრები (2)" button that
-    opens the same lists as a panel above the grid (✕, "მზადაა" or Esc closes it), with
-    the active filters as removable tags ("მობილური ✕") next to the button. No `<select>`.
-    On desktop the column starts **folded**: the same button and tags sit above a
-    full-width grid (4 columns), and the button unfolds the column; "‹ დამალვა" at its
-    top folds it again. The choice is kept in localStorage (`gitge.devSidebar`,
-    "expanded"/"collapsed"; no cookies) and wins over the default; app.js applies it
-    to `<html>` (`devs-collapsed`) before revealing the column, so there is no jump.
+    A toolbar spans both columns above them: one panel-left icon button (20px icon,
+    32px target, left pane filled while the lists are shown; `aria-expanded`,
+    `aria-controls`, label and tooltip "ფილტრების ჩვენება" / "ფილტრების დამალვა", a
+    count badge while filters are active), the active filters as removable tags
+    ("მობილური ✕") while the column is hidden, the sort as text links ("დალაგება: ა–ჰ ·
+    პროექტები · გამომწერები · ბოლო ცვლილება", the active one bold and underlined; they
+    wrap, never clip) and on the right the result ("861 დეველოპერი", "· გასუფთავება"
+    while filtering). The toggle stays in the same place in both states. With the
+    column shown the grid has 3 columns on a typical desktop, without it 4.
+    On desktop the column starts **hidden**; the choice is kept in localStorage
+    (`gitge.devSidebar`, "expanded"/"collapsed"; no cookies) and wins over the default;
+    app.js applies it to `<html>` (`devs-collapsed`) before revealing the column, so
+    there is no jump. Below 56rem the same button also says "ფილტრები" and opens the
+    lists as a panel under the toolbar (the button, ✕, "მზადაა" or Esc closes it); the
+    tags always show there. No `<select>`.
   - Every option (chip, list entry or `<option>`) carries `data-kind`, `data-value`
     ("" = all) and `data-count`. Categories in config order; languages by number of
     developers, then A–Z.
