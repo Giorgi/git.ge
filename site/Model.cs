@@ -147,6 +147,10 @@ public static class Site
     public static Dictionary<string, string> Pages { get; set; } = [];     // name.lang -> HTML
     public static Dictionary<string, string> AssetVersions { get; set; } = [];
 
+    // Layout of the /developers/ controls: "dropdowns" or "hybrid" (config/site.json
+    // "developerFilterLayout", overridable with --filter-layout).
+    public static string FilterLayout { get; set; } = "dropdowns";
+
     static Dictionary<string, SiteProject>? byKey;
     public static SiteProject Project(string key) => (byKey ??= Data.Projects.ToDictionary(p => p.Key))[key];
 
@@ -240,8 +244,6 @@ public sealed class Strings(Dictionary<string, string> ka, Dictionary<string, st
 // language when ANY of their published projects (listed or search-only) has it.
 public static class DeveloperFilters
 {
-    public const int TopLanguages = 12;
-
     static IEnumerable<SiteProject> Published(SiteDeveloper d) =>
         d.Projects.Concat(d.Smaller).Select(Site.Project);
 
@@ -283,6 +285,19 @@ public static class DeveloperFilters
         var sets = developers.Select(CategoriesOf).ToList();
         return Site.Data.Categories.Select(c => (c, sets.Count(s => s.Contains(c)))).ToList();
     }
+
+    // Options for the filter controls: (value, Georgian label, developer count), with
+    // empty categories left out. Languages by count, then alphabetically.
+    public static IEnumerable<(string Value, string Label, int Count)> CategoryOptions(IEnumerable<SiteDeveloper> developers) =>
+        CategoryCounts(developers).Where(c => c.Count > 0).Select(c => (c.Key, Site.Strings.Ka($"cat.{c.Key}"), c.Count));
+
+    public static IEnumerable<(string Value, string Label, int Count)> LanguageOptions(IEnumerable<SiteDeveloper> developers) =>
+        LanguageCounts(developers).Select(l => (l.Language, l.Language, l.Count));
+
+    // "New on git.ge" only sorts something once developers were first seen on different
+    // days; right after launch everyone shares the first import's date.
+    public static bool ShowFirstSeenSort(IEnumerable<SiteDeveloper> developers) =>
+        developers.Select(d => d.FirstSeenAt).OfType<string>().Distinct().Skip(1).Any();
 
     // Languages by number of developers, most common first.
     public static List<(string Language, int Count)> LanguageCounts(IEnumerable<SiteDeveloper> developers) =>

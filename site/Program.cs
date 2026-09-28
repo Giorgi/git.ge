@@ -1,6 +1,9 @@
 // Renders the static site. Run from the repository root, after `gitge.cs prepare`:
 //   dotnet run --project site              build _site/ from _build/site-data.json
 //   dotnet run --project site -- serve [--port 5080]   build, then serve _site/ on http://localhost:5080
+// Options: --out <dir> (instead of _site/, e.g. to compare two builds side by side) and
+// --filter-layout dropdowns|hybrid (overrides "developerFilterLayout" in config/site.json).
+//   dotnet run --project site -- selftest [--site <dir>]   checks; built-site checks on <dir> (default _site)
 
 using System.Globalization;
 using System.Security.Cryptography;
@@ -25,11 +28,12 @@ const int PageSize = 100;
 
 var root = Directory.GetCurrentDirectory();
 var dataFile = Path.Combine(root, "_build", "site-data.json");
-var output = Path.Combine(root, "_site");
+string? Option(string name) => Array.IndexOf(args, name) is var i and >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+var output = Path.Combine(root, Option("--out") ?? "_site");
 var wwwroot = Path.Combine(root, "site", "wwwroot");
 
 if (args.FirstOrDefault() == "selftest")
-    return SiteSelfTest();
+    return SiteSelfTest(Path.Combine(root, Option("--site") ?? "_site"));
 
 if (!File.Exists(dataFile))
 {
@@ -40,6 +44,12 @@ if (!File.Exists(dataFile))
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 Site.Data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(dataFile), json)!;
 Site.Strings = Strings.Load(Path.Combine(root, "i18n"));
+Site.FilterLayout = Option("--filter-layout") ?? FilterLayoutFromConfig(Path.Combine(root, "config", "site.json"));
+if (Site.FilterLayout is not ("dropdowns" or "hybrid"))
+{
+    Console.Error.WriteLine($"Unknown developer filter layout '{Site.FilterLayout}' (expected dropdowns or hybrid).");
+    return 1;
+}
 
 var markdown = new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
 Site.Roundups = LoadRoundups(Path.Combine(root, "content", "roundups"), markdown);
@@ -307,7 +317,14 @@ static Dictionary<string, string> LoadPages(string dir, MarkdownPipeline markdow
 }
 
 // `dotnet run --project site -- selftest`: checks for helpers used in rendering.
-static int SiteSelfTest()
+static string FilterLayoutFromConfig(string file)
+{
+    if (!File.Exists(file)) return "dropdowns";
+    using var doc = JsonDocument.Parse(File.ReadAllText(file));
+    return doc.RootElement.TryGetProperty("developerFilterLayout", out var v) && v.GetString() is { Length: > 0 } s ? s : "dropdowns";
+}
+
+static int SiteSelfTest(string built)
 {
     var failures = 0;
     void Check(bool ok, string what)
@@ -343,7 +360,12 @@ static int SiteSelfTest()
     Check(Seo.JoinKa(["a", "b", "c"]) == "a, b და c" && Seo.JoinKa(["a"]) == "a", "Georgian list joining");
 
     // The built site, when there is one: unique titles/descriptions, valid JSON-LD.
-    var built = Path.Combine(Directory.GetCurrentDirectory(), "_site");
+    // "New on git.ge" sort: hidden while every developer shares one first-seen date.
+    SiteDeveloper Dev(string? first) => new() { Login = "x", FirstSeenAt = first };
+    Check(!DeveloperFilters.ShowFirstSeenSort([Dev("2026-09-25"), Dev("2026-09-25"), Dev(null)]), "first-seen sort hidden when all dates are equal");
+    Check(DeveloperFilters.ShowFirstSeenSort([Dev("2026-09-25"), Dev("2026-10-02")]), "first-seen sort shown once dates differ");
+    Check(!DeveloperFilters.ShowFirstSeenSort([]), "first-seen sort hidden with no developers");
+
     if (Directory.Exists(built))
     {
         var problems = BuiltSiteChecks.Run(built);
@@ -352,7 +374,7 @@ static int SiteSelfTest()
     }
     else Console.Error.WriteLine("  (no _site: skipping built-site checks)");
 
-    DeveloperFilterChecks(Check);
+    DeveloperFilterChecks(Check, built);
 
     Console.Error.WriteLine(failures == 0 ? "All site checks passed" : $"{failures} site check(s) FAILED");
     return failures == 0 ? 0 : 1;
@@ -360,9 +382,9 @@ static int SiteSelfTest()
 
 // On the built /developers/ page (skipped if the site hasn't been built): every card
 // carries the filter attributes, and each chip's count equals the cards that match it.
-static void DeveloperFilterChecks(Action<bool, string> check)
+static void DeveloperFilterChecks(Action<bool, string> check, string built)
 {
-    var file = Path.Combine(Directory.GetCurrentDirectory(), "_site", "developers", "index.html");
+    var file = Path.Combine(built, "developers", "index.html");
     if (!File.Exists(file))
     {
         Console.Error.WriteLine("  skip developer filter checks: build the site first");
@@ -392,30 +414,24 @@ static void DeveloperFilterChecks(Action<bool, string> check)
         (cat is null || cats[i].Contains(cat)) && (lang is null || langs[i].Contains(lang))
         && (cat is null || lang is null || pairs[i] is null || (pairs[i]!.TryGetValue(cat, out var ls) && ls.Contains(lang)));
 
-    // Chips rendered with the totals (no filter active). The category row runs up to the
-    // language group; the language group (top row + extra row) up to the sort bar.
-    var catStart = html.IndexOf("data-filter=\"cat\"", StringComparison.Ordinal);
-    var langStart = html.IndexOf("data-filter=\"lang\"", StringComparison.Ordinal);
-    var sortStart = html.IndexOf("class=\"sort\"", langStart, StringComparison.Ordinal);
-    var segments = new Dictionary<string, string>
-    {
-        ["cat"] = catStart >= 0 && langStart > catStart ? html[catStart..langStart] : "",
-        ["lang"] = langStart >= 0 && sortStart > langStart ? html[langStart..sortStart] : "",
-    };
+    // Filter options (chips or <option>s, depending on the layout) carry data-kind,
+    // data-value and data-count: the developer count with no other filter active.
+    // The empty value is "All" and counts everyone.
+    var options = Regex.Matches(html, """"data-kind="(cat|lang)" data-value(?:="([^"]*)")? data-count="(\d+)"""").ToList();
     foreach (var (kind, sets) in new[] { ("cat", cats), ("lang", langs) })
     {
-        var chips = Regex.Matches(segments[kind], "data-value=\"([^\"]*)\"[^>]*>.*?<span class=\"n\">(\\d+)</span>", RegexOptions.Singleline).ToList();
-        check(chips.Count > 0, $"{kind} chips rendered ({chips.Count})");
-        var wrong = chips
-            .Select(m => (Value: Decode(m.Groups[1].Value), Shown: int.Parse(m.Groups[2].Value)))
-            .Where(c => sets.Count(s => s.Contains(c.Value)) != c.Shown)
-            .Select(c => c.Value).ToList();
-        check(wrong.Count == 0, $"{kind} chip counts match the cards{(wrong.Count > 0 ? $" (wrong: {string.Join(", ", wrong)})" : "")}");
+        var items = options.Where(m => m.Groups[1].Value == kind)
+            .Select(m => (Value: Decode(m.Groups[2].Value), Shown: int.Parse(m.Groups[3].Value))).ToList();
+        check(items.Count > 1, $"{kind} filter options rendered ({items.Count})");
+        var wrong = items
+            .Where(c => (c.Value.Length == 0 ? cards.Count : sets.Count(s => s.Contains(c.Value))) != c.Shown)
+            .Select(c => c.Value.Length == 0 ? "(all)" : c.Value).ToList();
+        check(wrong.Count == 0, $"{kind} option counts match the cards{(wrong.Count > 0 ? $" (wrong: {string.Join(", ", wrong)})" : "")}");
     }
 
     // data-pairs against the data itself: for every category × language, a card matches
     // exactly when the developer has one published project in both.
-    var dataFile = Path.Combine(Directory.GetCurrentDirectory(), "_build", "site-data.json");
+    var dataFile = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(built))!, "_build", "site-data.json");
     if (!File.Exists(dataFile)) { Console.Error.WriteLine("  skip data-pairs checks: no _build/site-data.json"); return; }
     var data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(dataFile), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
     var projects = data.Projects.ToDictionary(p => p.Key);
@@ -472,6 +488,6 @@ static void Serve(string dir, int port)
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.SendFileAsync(Path.Combine(dir, "404.html"));
     });
-    Console.Error.WriteLine($"Serving _site/ on http://localhost:{port} (Ctrl+C to stop)");
+    Console.Error.WriteLine($"Serving {Path.GetFileName(dir)}/ on http://localhost:{port} (Ctrl+C to stop)");
     app.Run();
 }

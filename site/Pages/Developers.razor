@@ -1,5 +1,5 @@
 @* The developer directory (/developers/). Default: developers with a listed project (A–Z),
-   then "More developers" with only search-only projects (A–Z). The sort buttons
+   then "More developers" with only search-only projects (A–Z). The sort control
    (app.js) re-sort everyone as one list and show each card's metric for that sort;
    choosing A–Z restores the two groups. No rank numbers. Works without JavaScript. *@
 <Layout Path="/developers/" TitleKey="devs.title" Crumbs="@([(Site.Strings.Ka("devs.title"), "/developers/")])"
@@ -7,54 +7,21 @@
     <h1><T K="devs.title" /></h1>
     <p class="note"><T K="devs.intro" Args="@([Format.Number(All.Count)])" /></p>
 
-    @* Filters (app.js): one category and one language at a time, combined with AND.
-       Category + language means ONE project with both (data-pairs); either alone means
-       any project. Chip counts are developers, and app.js recounts them against the
-       other active filter (0 = dimmed). Hidden without JavaScript, where the full list shows. *@
-    <div class="dev-filters" id="devs-filters" hidden data-filter-for="devs-dir">
-        <div class="chips filter-row" data-filter="cat" role="group" aria-labelledby="devs-filter-cat">
-            <span class="chips-label" id="devs-filter-cat"><T K="devs.filterCategory" /></span>
-            @foreach (var (key, count) in DeveloperFilters.CategoryCounts(All).Where(c => c.Count > 0))
-            {
-                <button type="button" class="chip" data-value="@key" aria-pressed="false"><T K="@($"cat.{key}")" /> <span class="n">@count</span></button>
-            }
-        </div>
-        <div class="filter-group" data-filter="lang" role="group" aria-labelledby="devs-filter-lang">
-            <div class="chips filter-row">
-                <span class="chips-label" id="devs-filter-lang"><T K="devs.filterLanguage" /></span>
-                @foreach (var (language, count, _) in Languages.Take(DeveloperFilters.TopLanguages))
-                {
-                    <button type="button" class="chip" data-value="@language" aria-pressed="false">@language <span class="n">@count</span></button>
-                }
-                @if (Languages.Count > DeveloperFilters.TopLanguages)
-                {
-                    <button type="button" class="chip chip-more" data-more aria-expanded="false" aria-controls="devs-more-langs"><T K="devs.moreLanguages" /></button>
-                }
-            </div>
-            @if (Languages.Count > DeveloperFilters.TopLanguages)
-            {
-                <div class="chips chips-extra" id="devs-more-langs" data-extra-row hidden>
-                    @foreach (var (language, count, _) in Languages.Skip(DeveloperFilters.TopLanguages))
-                    {
-                        <button type="button" class="chip" data-value="@language" data-extra aria-pressed="false">@language <span class="n">@count</span></button>
-                    }
-                </div>
-            }
-        </div>
-    </div>
-
-    <div class="sort" hidden data-sort-for="devs" data-groups="devs-more" data-group-sort="name">
-        <T K="sort.label" />
-        @foreach (var (key, label) in SortOptions)
-        {
-            <button type="button" data-sort="@key" aria-pressed="@(key == "name" ? "true" : "false")"><T K="@label" /></button>
-        }
-        @* The filter result sits on the sort line (right-aligned; wraps under it on phones). *@
-        <span class="dev-filter-status" aria-live="polite">
-            <span class="dev-filter-count"></span>
-            <button type="button" class="linklike dev-filter-clear" hidden><T K="devs.clearFilters" /></button>
-        </span>
-    </div>
+    @* Filters and sort (app.js): one category and one language at a time, combined with
+       AND. Category + language means ONE project with both (data-pairs); either alone
+       means any project. Counts are developers, recounted against the other active
+       filter (0 = disabled). Two layouts, chosen by "developerFilterLayout" in
+       config/site.json (or --filter-layout): "dropdowns" (one row of selects) or
+       "hybrid" (category chips + selects). Hidden without JavaScript, where the full
+       list shows. *@
+    @if (Site.FilterLayout == "hybrid")
+    {
+        <DevControlsHybrid Developers="@All" />
+    }
+    else
+    {
+        <DevControlsDropdowns Developers="@All" />
+    }
     <p class="note dev-filter-empty" hidden><T K="devs.noMatch" /></p>
 
     <div class="dev-dir" data-metric="name" id="devs-dir">
@@ -81,17 +48,4 @@
     List<SiteDeveloper> All => Site.Data.DeveloperPages;
     List<SiteDeveloper> Listed => All.Where(d => d.Projects.Count > 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
     List<SiteDeveloper> More => All.Where(d => d.Projects.Count == 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
-
-    List<(string Language, int Count, int Index)>? languages;
-    List<(string Language, int Count, int Index)> Languages =>
-        languages ??= DeveloperFilters.LanguageCounts(All).Select((l, i) => (l.Language, l.Count, i)).ToList();
-
-    static readonly (string Key, string Label)[] SortOptions =
-    [
-        ("name", "sort.name"),
-        ("projects", "sort.projects"),
-        ("followed", "sort.followed"),
-        ("pushed", "sort.recent"),
-        ("first", "sort.firstSeen"),
-    ];
 }

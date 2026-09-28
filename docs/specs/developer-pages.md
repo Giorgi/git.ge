@@ -95,30 +95,34 @@ list, and search results too, via `"w": 1` in `index.json`.
     line: followers on git.ge, last change, or first seen.
   - A–Z restores the two groups.
   - There are no rank numbers.
-- **Filters (app.js):** two chip rows above the list.
-  - **Categories:** all categories in config order. **Languages:** the 12 most
-    common, then "სხვა ენები… / More languages…" reveals the rest in a wrapping row.
-  - One category and one language at a time, combined with AND; clicking the active
-    chip clears it. Either filter alone matches when **any** of a developer's
-    published projects (listed or search-only) has that category or primary language;
-    **both together need one project with both** (e.g. a mobile app written in C#).
-  - Chip counts are live: each chip shows how many developers it would show together
-    with the other active filter. Chips with 0 are dimmed and inert (`aria-disabled`),
-    but stay in place; the active chip never is.
+- **Filters and sort (app.js).** Two layouts, chosen by `developerFilterLayout` in
+  `config/site.json` (or `--filter-layout` when rendering), so they can be compared:
+  - `"dropdowns"`: one toolbar row of native selects (category, language, sort), then
+    the result ("5 დეველოპერი · გასუფთავება") on the right. On phones one select per line.
+  - `"hybrid"`: category chips in one row ("ყველა" first, "სხვა" last, scrolling
+    sideways when needed), then a row with the language and sort selects and the result.
+  - Every option (chip or `<option>`) carries `data-kind`, `data-value` ("" = all) and
+    `data-count`. Categories in config order; languages by number of developers, then
+    A–Z, all of them in the select.
+  - One category and one language at a time, combined with AND. Either filter alone
+    matches when **any** of a developer's published projects (listed or search-only)
+    has that category or primary language; **both together need one project with
+    both** (e.g. a mobile app written in C#).
+  - Counts are live: each option shows how many developers it would show together
+    with the other active filter. Options with 0 are disabled (chips: dimmed,
+    `aria-disabled`, but in place); the active one never is.
+  - "New on git.ge" is left out of the sort while every developer shares one
+    first-seen date (right after launch it sorts nothing).
   - Cards carry `data-cats` (the categories shown on the card, then `;` and the rest),
     `data-langs`, and `data-pairs` ("mobile:Kotlin,Swift|web:C#": each category's
     languages) only where `data-cats` × `data-langs` would give a different answer
     (about a third of the cards).
-  - The filtered count and "clear filters" sit on the sort line, right-aligned.
-  - Filters work with the sort buttons; in the grouped view an empty group's
-    heading is hidden.
+  - Filters work with the sort; in the grouped view an empty group's heading is hidden.
   - URL state: `?cat=<category>&language=<language>` (e.g. `language=C%23`), so a
     filtered view can be shared. Not `?lang=`, which already switches the interface
     language. Unknown values are ignored; a combination with no results shows the
     no-match message and can be cleared.
-  - Without JavaScript the chips are hidden and the full list shows. The category row
-    and the top-languages row stay on one line and scroll sideways (label fixed,
-    right edge faded while more chips follow); chips selected by the URL are centred.
+  - Without JavaScript the controls are hidden and the full list shows.
 - In the main menu as "დეველოპერები / Developers".
 
 ## Data

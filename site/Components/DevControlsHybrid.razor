@@ -1,0 +1,22 @@
+@* Layout "hybrid": category chips in one scrollable row ("ყველა" first, "სხვა" last),
+   then a toolbar with the language and sort selects and the result on the right.
+   Hidden without JavaScript. *@
+<div class="dev-filters dev-controls" hidden data-filter-for="devs-dir">
+    <div class="chips filter-row" data-filter="cat" role="group" aria-labelledby="devs-filter-cat">
+        <span class="visually-hidden" id="devs-filter-cat"><T K="devs.filterCategory" /></span>
+        <button type="button" class="chip" data-kind="cat" data-value="" data-count="@Developers.Count" aria-pressed="true"><T K="devs.filterAll" /> <span class="n">@Developers.Count</span></button>
+        @foreach (var (value, _, count) in DeveloperFilters.CategoryOptions(Developers))
+        {
+            <button type="button" class="chip" data-kind="cat" data-value="@value" data-count="@count" aria-pressed="false"><T K="@($"cat.{value}")" /> <span class="n">@count</span></button>
+        }
+    </div>
+    <div class="sort dev-toolbar" data-sort-for="devs" data-groups="devs-more" data-group-sort="name">
+        <DevFilterSelect Kind="lang" Options="@DeveloperFilters.LanguageOptions(Developers)" Total="@Developers.Count" />
+        <DevSortSelect Developers="@Developers" />
+        <DevFilterStatus />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<SiteDeveloper> Developers { get; set; } = [];
+}
