@@ -20,6 +20,7 @@
     "minStars": 3,
     "newRepoDays": 60,
     "newRepoMinStars": 1,
+    "profileRepoMinStars": 30,
     "excludePatterns": [
       "^skills-",
       "home[ -]?work",

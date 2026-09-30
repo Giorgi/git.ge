@@ -796,6 +796,11 @@ static class SelfTest
         Check(!Ok(1, 61), "1 star after 60 days doesn't pass");
         Check(!Ok(5, 100, archived: true), "archived needs 10+ stars");
         Check(!Ok(50, 100, desc: null), "no description never passes");
+        bool Profile(string fullName, int stars) => bar.Passes(fullName, "a tool", false, false, null, stars, at.AddDays(-2000), at);
+        Check(!Profile("alice/alice", 29), "a profile README repo (owner/owner) with < 30 stars doesn't pass");
+        Check(!Profile("Alice/alice", 10), "the profile README check ignores letter case");
+        Check(Profile("databasus/databasus", 8672), "owner/owner with 30+ stars passes (a product named like its owner)");
+        Check(Profile("alice/alice-tools", 5), "a repo merely starting with the owner's name is unaffected");
         Submissions(paths);
 
         Log.Info("Baseline selection (latest 2026-06-30, window 30 ± 7 days, target 2026-05-31)");
@@ -2285,6 +2290,8 @@ sealed class QualityBar
     // New repos get a lower bar so "New projects" can show them before they collect stars.
     public int NewRepoDays { get; set; } = 60;
     public int NewRepoMinStars { get; set; } = 1;
+    // A repo named like its owner (a profile README) needs at least this many stars.
+    public int ProfileRepoMinStars { get; set; } = 30;
     // Case-insensitive regexes matched against the repo name and description,
     // to drop course exercises and test assignments.
     public List<string> ExcludePatterns { get; set; } = [];
@@ -2299,9 +2306,16 @@ sealed class QualityBar
         if (templateFrom is not null && !AllowTemplateGenerated) return false;
         if (RequireDescription && string.IsNullOrWhiteSpace(description)) return false;
         if (IsExercise(fullName.Split('/').Last(), description)) return false;
+        if (IsProfileReadme(fullName) && stars < ProfileRepoMinStars) return false;
         return stars >= MinStars
             || (stars >= NewRepoMinStars && createdAt is { } c && c >= now.AddDays(-NewRepoDays));
     }
+
+    // "owner/owner": GitHub shows this repo's README on the owner's profile page, so it's
+    // usually a profile README, not a project. Well-starred ones (a product that shares
+    // its owner's name, like databasus/databasus) are kept.
+    static bool IsProfileReadme(string fullName) =>
+        fullName.Split('/') is [var owner, var name] && owner.Equals(name, StringComparison.OrdinalIgnoreCase);
 
     bool IsExercise(string name, string? description)
     {

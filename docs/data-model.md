@@ -179,7 +179,9 @@ description (always required, at any star count), does not match any of `exclude
 over name and description, aimed at homework, course exercises and test
 assignments), and has **at least `minStars` stars (3)**, or is **new**: created
 in the last `newRepoDays` (60) days with at least `newRepoMinStars` (1) star, so it
-can appear under "New projects". Recent pushes alone don't count: most active
+can appear under "New projects". A repo named exactly like its owner (`owner/owner`,
+which GitHub shows as the owner's profile README) needs at least
+`profileRepoMinStars` (30) stars. Recent pushes alone don't count: most active
 0-star repos are personal work in progress, and the site never showed them.
 Curated and submitted projects bypass the bar. The nightly refresh drops
 discovered repos that no longer meet the bar, based on their last known data; the

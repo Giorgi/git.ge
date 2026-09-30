@@ -38,7 +38,8 @@ What this means in practice, honestly:
   other repos.
 - Auto-discovered repos must pass a quality bar: not a fork, has a description,
   not archived unless it has 10+ stars, and 3+ stars (or, for repos created in the
-  last 60 days, 1+ star). Repos without a description are never listed, whatever
+  last 60 days, 1+ star). Profile README repos (`owner/owner`) need 30+ stars.
+  Repos without a description are never listed, whatever
   their stars.
 
 ## Submissions and removals
