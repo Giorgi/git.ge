@@ -1,7 +1,7 @@
 @* One project row. data-* attributes feed the client-side sort in app.js;
    the card itself is complete without JavaScript. Keep the markup in step
    with card() in wwwroot/assets/app.js, which renders search results. *@
-<li class="p" data-stars="@(P.Stars ?? 0)" data-trend="@P.Trend" data-pushed="@Format.Date(P.PushedAt)" data-created="@Format.Date(P.CreatedAt)">
+<li class="p" data-stars="@(P.Stars ?? 0)" data-trend="@P.Trend" data-pushed="@Format.Date(P.PushedAt)" data-created="@Format.Date(P.CreatedAt)" data-dormant="@(P.Inactive ? "1" : null)">
     <div class="p-head">
         <span class="p-title">@if (ShowOwner && P.FullName is not null)
             {<a class="p-owner" href="@Site.OwnerHref(P.Owner)">@(P.Owner)/</a>}<a class="p-name" href="@P.Url" rel="@(P.IsSubmittedUrl ? "nofollow ugc" : null)">@P.Name</a></span>
@@ -44,7 +44,11 @@
             <span class="p-trend @TrendClass" title="@Site.Strings.Ka("card.trendTitle", Site.Data.Trend.WindowDays)"
                   data-i18n-title="card.trendTitle" data-i18n-title-args="@($"[{Site.Data.Trend.WindowDays}]")">@Format.Trend(P.Trend)</span>
         }
-        <RelTime Value="@P.PushedAt" Class="p-pushed" Label="card.pushedTitle" />
+        <RelTime Value="@P.PushedAt" Class="@(P.ShowDormant ? "p-pushed dim" : "p-pushed")" Label="card.pushedTitle" />
+        @if (P.ShowDormant)
+        {
+            <span class="badge dormant"><T K="card.dormant" Args="@([Site.Data.DormantMonths])" /></span>
+        }
     </div>
 </li>
 

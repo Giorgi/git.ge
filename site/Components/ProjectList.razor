@@ -23,9 +23,10 @@
     [Parameter] public bool Sortable { get; set; }
     [Parameter] public string? Id { get; set; }
 
-    static string DefaultSort => Site.Data.Trend.HasHistory ? "trend" : "stars";
+    // Matches Site.DefaultOrder, the order the server renders.
+    static string DefaultSort => Site.Data.Trend.HasHistory ? "trend" : "popular";
 
     static IEnumerable<(string Key, string Label)> SortOptions =>
         (Site.Data.Trend.HasHistory ? new[] { ("trend", "sort.trend") } : [])
-        .Concat([("stars", "sort.stars"), ("pushed", "sort.recent"), ("created", "sort.new")]);
+        .Concat([("popular", "sort.popular"), ("stars", "sort.stars"), ("pushed", "sort.recent"), ("created", "sort.new")]);
 }

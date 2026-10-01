@@ -144,6 +144,9 @@
   const sorters = {
     trend: el => Number(el.dataset.trend === "" ? -1e9 : el.dataset.trend),
     stars: el => Number(el.dataset.stars || 0),
+    // Active projects first, then dormant or archived ones (data-dormant); each group by
+    // stars. Mirrors Site.PopularOrder.
+    popular: el => (el.dataset.dormant ? 0 : 1e12) + Number(el.dataset.stars || 0),
     pushed: el => el.dataset.pushed || "",
     created: el => el.dataset.created || "",
     // Developer directory (/developers/)
@@ -554,6 +557,8 @@
     li.dataset.trend = p.t ?? "";
     li.dataset.pushed = p.p ?? "";
     li.dataset.created = p.r ?? "";
+    // "o": no push in 12+ months. Archived ones sort with them but keep their own badge.
+    if (p.o || p.a) li.dataset.dormant = "1";
 
     const head = el("div", "p-head");
     const title = el("span", "p-title");
@@ -592,7 +597,8 @@
       meta.append(el("span", "p-trend" + (t > 0 ? " up" : t < 0 ? " down" : ""),
         t === undefined ? "—" : t > 0 ? "+" + t : t < 0 ? "−" + -t : "0"));
     }
-    if (p.p) meta.append(relTime(p.p, "p-pushed", "card.pushedTitle"));
+    if (p.p) meta.append(relTime(p.p, "p-pushed" + (p.o && !p.a ? " dim" : ""), "card.pushedTitle"));
+    if (p.o && !p.a) meta.append(el("span", "badge dormant", t("card.dormant", index.dormantMonths ?? 12)));
     li.append(meta);
     return li;
   }

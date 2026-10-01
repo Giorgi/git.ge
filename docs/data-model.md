@@ -165,8 +165,7 @@ run on the same UTC day overwrites).
   from anywhere between 23 and 37 days back. No such snapshot, or the repo is
   absent from it → trend is `null`, shown as "—".
 - **Cold start:** until a snapshot at least 23 days old exists, the default sort
-  is all-time stars and recent activity, and the site says trend data is still
-  accumulating.
+  is "Popular" (below), and the site says trend data is still accumulating.
 - **Roll-up:** daily files older than 90 days are replaced by
   `monthly/YYYY-MM.json`, which is the last daily snapshot of that month.
 
@@ -214,6 +213,22 @@ which GitHub shows as the owner's profile README) needs at least
 Curated and submitted projects bypass the bar. The nightly refresh drops
 discovered repos that no longer meet the bar, based on their last known data; the
 weekly discovery re-admits them if they grow.
+
+## Dormant projects and the "Popular" sort
+
+A project is **dormant** (`dormant: true` in `site-data.json`) when its last push
+(`pushedAt`) is more than `dormantMonths` months (`config/site.json`, default 12)
+before the data date (the latest snapshot, not the wall clock). A push exactly
+12 months back is still active; an unknown `pushedAt` is never dormant.
+
+- **Popular** sort (the default until trend data exists, and always offered):
+  active projects first, then dormant or archived ones; each group by stars.
+  "Stars" stays pure star order.
+- Cards of dormant, non-archived projects get a muted date and a small
+  "No changes in 12+ months" marker (archived ones already have their own badge).
+- The home page's top list without trend data shows the most-starred active
+  projects.
+- `index.json` carries `o: 1` for dormant projects.
 
 ## What is shown where
 

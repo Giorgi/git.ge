@@ -13,6 +13,7 @@ public sealed class SiteData
     public string RepoUrl { get; set; } = "";
     public string MaintainerLogin { get; set; } = "";
     public int ListingMinStars { get; set; }
+    public int DormantMonths { get; set; } = 12;
     public SiteTrend Trend { get; set; } = new();
     public List<string> Categories { get; set; } = [];
     public int Developers { get; set; }
@@ -104,11 +105,19 @@ public sealed class SiteProject
     public DateTimeOffset? CreatedAt { get; set; }
     public string Category { get; set; } = "other";
     public bool Archived { get; set; }
+    // No push in config/site.json dormantMonths (12) months, relative to the data date.
+    public bool Dormant { get; set; }
     public bool Featured { get; set; }
     public bool Verified { get; set; }
     public bool Maintainer { get; set; }
     public bool Listed { get; set; }
     public string Source { get; set; } = "";
+
+    // Sorts after active projects under "Popular": dormant or archived.
+    public bool Inactive => Dormant || Archived;
+
+    // The "No changes in 12+ months" marker; archived projects have their own badge.
+    public bool ShowDormant => Dormant && !Archived;
 
     // A URL someone submitted (a project hosted outside GitHub): linked with
     // rel="nofollow ugc", since git.ge doesn't vouch for it.
@@ -174,11 +183,16 @@ public static class Site
 
     public static string? Avatar(string login) => Avatars.GetValueOrDefault(login.ToLowerInvariant());
 
-    // Default order: trend when there is history to compute it from, stars otherwise.
+    // Default order: trend when there is history to compute it from, "Popular" otherwise.
     public static IEnumerable<SiteProject> DefaultOrder(IEnumerable<SiteProject> projects) =>
         Data.Trend.HasHistory
             ? projects.OrderByDescending(p => p.Trend ?? int.MinValue).ThenByDescending(p => p.Stars ?? 0)
-            : projects.OrderByDescending(p => p.Stars ?? 0).ThenByDescending(p => p.PushedAt);
+            : PopularOrder(projects);
+
+    // "Popular": active projects first, then dormant or archived ones; each group by stars.
+    // Keep in step with the "popular" sorter in app.js.
+    public static IEnumerable<SiteProject> PopularOrder(IEnumerable<SiteProject> projects) =>
+        projects.OrderBy(p => p.Inactive).ThenByDescending(p => p.Stars ?? 0).ThenByDescending(p => p.PushedAt);
 
     // Cache-busting URL for a file under wwwroot.
     public static string Asset(string path) =>

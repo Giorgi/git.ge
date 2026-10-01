@@ -18,5 +18,5 @@
     // e.g. „ვები“: საქართველოს დეველოპერების 316 ღია კოდის პროექტი, მათ შორის databasus, sinopia და Musify. …
     string Description =>
         Site.Strings.Ka("meta.category", Name, Format.Number(Projects.Count), Seo.JoinKa(Ordered.Take(3).Select(p => p.Name)))
-        + Site.Strings.Ka(Site.Data.Trend.HasHistory ? "meta.sortedTrend" : "meta.sortedStars");
+        + Site.Strings.Ka(Site.Data.Trend.HasHistory ? "meta.sortedTrend" : "meta.sortedPopular");
 }

@@ -27,7 +27,9 @@ language and description, and can be corrected by hand.
 
 The trend is the number of stars a project gained over roughly the last
 {{trendWindowDays}} days, measured against a daily snapshot. New projects have no
-trend yet ("—"). Until enough history has built up, lists are sorted by stars.
+trend yet ("—"). Until enough history has built up, lists are sorted by stars,
+with projects changed in the last {{dormantMonths}} months first; the others are
+marked "No changes in {{dormantMonths}}+ months".
 
 ## The maintainer's projects {#maintainer}
 

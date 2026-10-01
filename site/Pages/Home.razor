@@ -6,7 +6,7 @@
 
     @if (!Site.Data.Trend.HasHistory)
     {
-        <p class="notice"><T K="home.coldStart" Args="@([Site.Data.Trend.FirstTrendDate])" /></p>
+        <p class="notice"><T K="home.coldStart" Args="@([Site.Data.Trend.FirstTrendDate, Site.Data.DormantMonths])" /></p>
     }
 
     @if (Site.Data.Spotlight.Count > 0)
@@ -28,9 +28,9 @@
             else
             {
                 <h2 id="top"><T K="home.topStars" /></h2>
-                <p class="note"><T K="home.topStarsNote" /></p>
+                <p class="note"><T K="home.topStarsNote" Args="@([Site.Data.DormantMonths])" /></p>
             }
-            <ProjectList Items="@Site.DefaultOrder(Site.Listed).Take(TopCount)" />
+            <ProjectList Items="@TopItems" />
             <p class="more"><a href="/projects/"><T K="home.allProjects" /></a></p>
         </section>
 
@@ -65,4 +65,10 @@
 
 @code {
     const int TopCount = 25;
+
+    // Trending once there is history; before that, the most-starred active projects
+    // (dormant and archived ones would make the list look like a museum).
+    static IEnumerable<SiteProject> TopItems => (Site.Data.Trend.HasHistory
+        ? Site.DefaultOrder(Site.Listed)
+        : Site.Listed.Where(p => !p.Inactive).OrderByDescending(p => p.Stars ?? 0).ThenByDescending(p => p.PushedAt)).Take(TopCount);
 }

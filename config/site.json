@@ -4,6 +4,7 @@
   "trendWindowDays": 30,
   "trendToleranceDays": 7,
   "listingMinStars": 10,
+  "dormantMonths": 12,
   "repoUrl": "https://github.com/Giorgi/git.ge",
   "developerPages": {
     "minCommits": 1,

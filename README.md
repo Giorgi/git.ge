@@ -117,7 +117,8 @@ dotnet run gitge.cs -- selftest   # test trending and pruning against tests/fixt
 
 Trend = stars gained since the snapshot closest to 30 days before the latest one
 (anywhere from 23 to 37 days back). Until such a snapshot exists, there is no
-trend and the site sorts by stars instead. A repo missing from that older snapshot
+trend and the site sorts by "Popular" instead (stars, with projects that had no push
+in `dormantMonths` months, default 12, after the active ones). A repo missing from that older snapshot
 shows "—", not its whole star count.
 
 ### Developer pages

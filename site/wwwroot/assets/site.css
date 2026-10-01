@@ -129,6 +129,9 @@ a.p-owner:hover { color: var(--link); }
 .badge.hw { color: var(--up); }
 .badge.ok { color: var(--link); }
 .badge.cat { color: var(--muted); }
+/* No push in 12+ months: the date steps back and a quiet outlined marker follows it. */
+.p-pushed.dim { opacity: .8; }
+.badge.dormant { color: var(--muted); background: none; border: 1px solid var(--line); padding: 0 .35rem; }
 
 /* Avatars (self-hosted; see gitge.cs avatars). Sizes are classes: the CSP forbids inline styles. */
 .avatar { display: inline-block; flex: none; border-radius: 50%; background: var(--soft); border: 1px solid var(--line); object-fit: cover; vertical-align: middle; }

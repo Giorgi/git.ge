@@ -175,6 +175,7 @@ string SearchIndex()
         ["r"] = p.CreatedAt is null ? null : Format.Date(p.CreatedAt),
         ["h"] = p.HelpWanted > 0 ? p.HelpWanted : null,
         ["a"] = p.Archived ? 1 : null,
+        ["o"] = p.Dormant ? 1 : null,
         ["v"] = p.Verified ? 1 : null,
         ["x"] = p.HelpWanted > 0 ? p.Anchor : null,
         ["w"] = Site.Developer(p.Owner) is not null ? 1 : null,   // owner has a developer page (/@login/)
@@ -183,6 +184,7 @@ string SearchIndex()
     return JsonSerializer.Serialize(new
     {
         trend = Site.Data.Trend.HasHistory,
+        dormantMonths = Site.Data.DormantMonths,
         window = Site.Data.Trend.WindowDays,
         projects = items,
     }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) });
@@ -303,6 +305,7 @@ static Dictionary<string, string> LoadPages(string dir, MarkdownPipeline markdow
     var values = new Dictionary<string, string>
     {
         ["listingMinStars"] = Site.Data.ListingMinStars.ToString(CultureInfo.InvariantCulture),
+        ["dormantMonths"] = Site.Data.DormantMonths.ToString(CultureInfo.InvariantCulture),
         ["maintainerLogin"] = Site.Data.MaintainerLogin,
         ["repoUrl"] = Site.Data.RepoUrl,
         ["trendWindowDays"] = Site.Data.Trend.WindowDays.ToString(CultureInfo.InvariantCulture),
@@ -391,8 +394,19 @@ static int SiteSelfTest(string built)
     Check(Format.DateText("") == "" && Format.DateText("2026-13-01") == "", "no readable date for a non-date");
     Check(Site.Strings.Georgian["date.months"].Split(',').Length == 12 && Site.Strings.English["date.months"].Split(',').Length == 12, "12 month abbreviations per language");
 
+    // "Popular": active first, then dormant or archived; each group by stars.
+    SiteProject P(string key, int stars, bool dormant = false, bool archived = false) =>
+        new() { Key = key, Stars = stars, Dormant = dormant, Archived = archived };
+    var popular = Site.PopularOrder([P("old-big", 900, dormant: true), P("small", 15), P("archived", 500, archived: true),
+                                     P("big", 300), P("old-small", 20, dormant: true)]).Select(p => p.Key).ToList();
+    Check(popular.SequenceEqual(["big", "small", "old-big", "archived", "old-small"]),
+          $"popular order: active by stars, then dormant/archived by stars (got {string.Join(", ", popular)})");
+    Check(P("a", 1, dormant: true).ShowDormant && !P("b", 1, dormant: true, archived: true).ShowDormant && !P("c", 1).ShowDormant,
+          "the dormant marker shows on dormant, non-archived projects only");
+
     DeveloperFilterChecks(Check, built);
     HelpWantedFilterChecks(Check, built);
+    DormantMarkerChecks(Check, built);
     RelativeDateChecks(Check, built);
 
     // Links that leave the site: new tab, noopener added to any rel; same-site links untouched.
@@ -404,6 +418,39 @@ static int SiteSelfTest(string built)
 
     Console.Error.WriteLine(failures == 0 ? "All site checks passed" : $"{failures} site check(s) FAILED");
     return failures == 0 ? 0 : 1;
+}
+
+// In the built site: every project card carries the dormant marker exactly when index.json
+// says the project is dormant and not archived, and data-dormant (the "popular" sort key)
+// exactly when it is dormant or archived.
+static void DormantMarkerChecks(Action<bool, string> check, string built)
+{
+    var indexFile = Path.Combine(built, "index.json");
+    if (!File.Exists(indexFile)) return;
+    var flags = new Dictionary<string, (bool Dormant, bool Archived)>();
+    foreach (var p in JsonDocument.Parse(File.ReadAllText(indexFile)).RootElement.GetProperty("projects").EnumerateArray())
+    {
+        var url = p.TryGetProperty("u", out var u) ? u.GetString()! : "https://github.com/" + p.GetProperty("n").GetString();
+        flags[url] = (p.TryGetProperty("o", out _), p.TryGetProperty("a", out _));
+    }
+    var bad = new List<string>();
+    int cards = 0, marked = 0;
+    foreach (var file in Directory.EnumerateFiles(built, "*.html", SearchOption.AllDirectories))
+    {
+        foreach (Match m in Regex.Matches(File.ReadAllText(file), "<li class=\"p\"([^>]*)>(.*?)</li>", RegexOptions.Singleline))
+        {
+            var where = Path.GetRelativePath(built, file);
+            var href = System.Net.WebUtility.HtmlDecode(Regex.Match(m.Groups[2].Value, "class=\"p-name\" href=\"([^\"]*)\"").Groups[1].Value);
+            if (!flags.TryGetValue(href, out var f)) { bad.Add($"{where}: {href} not in index.json"); continue; }
+            cards++;
+            var badge = m.Groups[2].Value.Contains("class=\"badge dormant\"");
+            if (badge) marked++;
+            if (badge != (f.Dormant && !f.Archived)) bad.Add($"{where}: {href} marker {badge}, dormant {f.Dormant}, archived {f.Archived}");
+            if (m.Groups[1].Value.Contains("data-dormant=\"1\"") != (f.Dormant || f.Archived)) bad.Add($"{where}: {href} data-dormant");
+        }
+    }
+    foreach (var b in bad.Take(5)) Console.Error.WriteLine($"    {b}");
+    check(cards > 0 && marked > 0 && bad.Count == 0, $"dormant marker exactly on dormant, non-archived cards ({cards} cards, {marked} marked, {bad.Count} bad)");
 }
 
 // In the built site: every <a href> to another host opens in a new tab with noopener,

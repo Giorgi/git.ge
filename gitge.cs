@@ -830,6 +830,18 @@ static class SelfTest
         Check(ranked.FindIndex(i => i.Project == "tieA") < ranked.FindIndex(i => i.Project == "tieB"),
               "equal scores and stars fall back to a stable order");
         Check(ranked.All(i => i.Score is not null), "every ranked issue has a score");
+        Log.Info("Dormancy (no push in 12 months, relative to the data date 2026-10-01)");
+        var dataDay = new DateOnly(2026, 10, 1);
+        bool Dormant(string pushed) => Dormancy.IsDormant(DateTimeOffset.Parse(pushed, CultureInfo.InvariantCulture), dataDay, 12);
+        Check(!Dormant("2025-10-01T00:00:00Z"), "a push exactly 12 months before the data date is still active");
+        Check(!Dormant("2025-10-01T23:59:59Z"), "the time of day doesn't matter, only the date");
+        Check(Dormant("2025-09-30T23:59:59Z"), "a push one day before the 12-month mark is dormant");
+        Check(!Dormant("2026-09-30T10:00:00Z"), "a push yesterday is active");
+        Check(!Dormancy.IsDormant(null, dataDay, 12), "an unknown push date is never dormant");
+        Check(!Dormancy.IsDormant(DateTimeOffset.Parse("2025-10-15T00:00:00Z", CultureInfo.InvariantCulture), new DateOnly(2026, 10, 14), 12),
+              "the cut-off moves with the data date, not today's date");
+        Check(Dormancy.IsDormant(DateTimeOffset.Parse("2026-03-31T00:00:00Z", CultureInfo.InvariantCulture), dataDay, 6),
+              "dormantMonths is configurable (6 months)");
         Submissions(paths);
 
         Log.Info("Baseline selection (latest 2026-06-30, window 30 ± 7 days, target 2026-05-31)");
@@ -1122,6 +1134,7 @@ static class Prepare
                 CreatedAt = p.CreatedAt,
                 Category = m?.Category ?? categories.Infer(p),
                 Archived = p.IsArchived,
+                Dormant = Dormancy.IsDormant(p.PushedAt, trend.Current, site.DormantMonths),
                 Featured = m?.Featured ?? false,
                 Verified = m?.Verified ?? false,
                 Maintainer = IsMaintainer(p.Owner),
@@ -1179,6 +1192,7 @@ static class Prepare
             RepoUrl = site.RepoUrl,
             MaintainerLogin = site.MaintainerLogin,
             ListingMinStars = site.ListingMinStars,
+            DormantMonths = site.DormantMonths,
             Trend = new SiteTrend
             {
                 Current = trend.Current.ToString("yyyy-MM-dd"),
@@ -1474,6 +1488,7 @@ sealed class SiteData
     public string RepoUrl { get; set; } = "";
     public string MaintainerLogin { get; set; } = "";
     public int ListingMinStars { get; set; }
+    public int DormantMonths { get; set; }
     public SiteTrend Trend { get; set; } = new();
     public List<string> Categories { get; set; } = [];
     public int Developers { get; set; }
@@ -1516,6 +1531,8 @@ sealed class SiteProject
     public DateTimeOffset? CreatedAt { get; set; }
     public string Category { get; set; } = "other";
     public bool Archived { get; set; }
+    // No push in the last DormantMonths months (config/site.json), relative to the data date.
+    public bool Dormant { get; set; }
     public bool Featured { get; set; }
     public bool Verified { get; set; }
     public bool Maintainer { get; set; }
@@ -2258,6 +2275,9 @@ sealed class SiteConfig
     public int TrendToleranceDays { get; set; } = 7;
     // Repos below this appear only in "Recently active" and search, not in listings.
     public int ListingMinStars { get; set; } = 10;
+    // A project whose last push is older than this many months (relative to the data
+    // date) is dormant: it sorts after active ones under "Popular" and gets a marker.
+    public int DormantMonths { get; set; } = 12;
     public string RepoUrl { get; set; } = "";
     public DeveloperPagesConfig DeveloperPages { get; set; } = new();
     public HelpWantedConfig HelpWanted { get; set; } = new();
@@ -2290,6 +2310,14 @@ sealed class HelpWantedConfig
 // popularity = log10(stars + 10) and freshness = 0.5 ^ (age in days / half-life).
 // Age is measured to the data date (the latest snapshot), not the wall clock, so the
 // same data always ranks the same way.
+static class Dormancy
+{
+    // Dormant: the last push is more than `months` months before the data date (a push
+    // exactly `months` months ago is still active). Unknown push date: not dormant.
+    public static bool IsDormant(DateTimeOffset? pushedAt, DateOnly dataDate, int months) =>
+        pushedAt is { } p && months > 0 && DateOnly.FromDateTime(p.UtcDateTime) < dataDate.AddMonths(-months);
+}
+
 static class HelpWantedRanking
 {
     public static double Score(int stars, DateTimeOffset? createdAt, bool assigned, DateOnly dataDate, HelpWantedConfig config)
