@@ -143,6 +143,8 @@ async Task Page<TPage>(string path, Dictionary<string, object?> parameters, bool
 {
     var html = await renderer.Dispatcher.InvokeAsync(async () =>
         (await renderer.RenderComponentAsync<TPage>(ParameterView.FromDictionary(parameters))).ToHtmlString());
+    // Every page, Markdown included: links that leave git.ge open in a new tab.
+    html = ExternalLinks.Mark(html, new Uri(Site.Data.SiteUrl).Host);
     Write(path.EndsWith('/') ? path.TrimStart('/') + "index.html" : path.TrimStart('/'), "<!doctype html>\n" + html);
     if (inSitemap) sitemap.Add((path, lastmod));
 }
@@ -393,8 +395,48 @@ static int SiteSelfTest(string built)
     HelpWantedFilterChecks(Check, built);
     RelativeDateChecks(Check, built);
 
+    // Links that leave the site: new tab, noopener added to any rel; same-site links untouched.
+    Check(ExternalLinks.Mark("<a href=\"https://github.com/x\">", "git.ge") == "<a href=\"https://github.com/x\" rel=\"noopener\" target=\"_blank\">", "external link gets rel=noopener and target=_blank");
+    Check(ExternalLinks.Mark("<a href=\"https://x.example/\" rel=\"nofollow ugc\">", "git.ge") == "<a href=\"https://x.example/\" rel=\"nofollow ugc noopener\" target=\"_blank\">", "submitted URL keeps nofollow ugc, adds noopener");
+    Check(new[] { "<a href=\"/c/web/\">", "<a href=\"#top\">", "<a href=\"https://git.ge/about/\">", "<a href=\"mailto:a@b.c\">" }
+        .All(a => ExternalLinks.Mark(a, "git.ge") == a), "same-site, fragment and mailto links unchanged");
+    ExternalLinkChecks(Check, built);
+
     Console.Error.WriteLine(failures == 0 ? "All site checks passed" : $"{failures} site check(s) FAILED");
     return failures == 0 ? 0 : 1;
+}
+
+// In the built site: every <a href> to another host opens in a new tab with noopener,
+// and no same-site link does.
+static void ExternalLinkChecks(Action<bool, string> check, string built)
+{
+    if (!Directory.Exists(built)) return;
+    var config = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(built))!, "config", "site.json");
+    var host = new Uri(JsonDocument.Parse(File.ReadAllText(config)).RootElement.GetProperty("siteUrl").GetString()!).Host;
+    var bad = new List<string>();
+    int external = 0, internalLinks = 0;
+    foreach (var file in Directory.EnumerateFiles(built, "*.html", SearchOption.AllDirectories))
+    {
+        foreach (Match m in Regex.Matches(File.ReadAllText(file), "<a\\s[^>]*>", RegexOptions.IgnoreCase))
+        {
+            var href = Regex.Match(m.Value, "\\shref=\"([^\"]*)\"");
+            if (!href.Success) continue;
+            var blank = m.Value.Contains("target=\"_blank\"");
+            if (ExternalLinks.IsExternal(System.Net.WebUtility.HtmlDecode(href.Groups[1].Value), host))
+            {
+                external++;
+                var rel = Regex.Match(m.Value, "\\srel=\"([^\"]*)\"").Groups[1].Value.Split(' ');
+                if (!blank || !rel.Contains("noopener")) bad.Add($"{Path.GetRelativePath(built, file)}: {m.Value}");
+            }
+            else
+            {
+                internalLinks++;
+                if (blank) bad.Add($"{Path.GetRelativePath(built, file)} (internal): {m.Value}");
+            }
+        }
+    }
+    foreach (var b in bad.Take(5)) Console.Error.WriteLine($"    {b}");
+    check(external > 0 && bad.Count == 0, $"external links open in a new tab with noopener, internal ones don't ({external} external, {internalLinks} internal, {bad.Count} bad)");
 }
 
 // Every <time data-rel> in the built site carries an ISO datetime and, as its text (the

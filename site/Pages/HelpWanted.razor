@@ -47,7 +47,7 @@
                                 @foreach (var issue in issues)
                                 {
                                     <li data-cats="@project.Category" data-langs="@project.Language" data-labels="@string.Join(",", HelpWantedFilters.LabelsOf(issue))">
-                                        <a href="@issue.Url" target="_blank" rel="noopener">@issue.Title</a>
+                                        <a href="@issue.Url">@issue.Title</a>
                                         <span class="issue-meta">
                                             #@issue.Number
                                             @foreach (var label in issue.Labels)

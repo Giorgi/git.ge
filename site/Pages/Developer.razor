@@ -10,7 +10,7 @@
             <div class="dev-id">
                 <h1>@D.DisplayName</h1>
                 <p class="dev-login">
-                    <a href="@D.Url" target="_blank" rel="noopener">github.com/@D.Login</a> ·
+                    <a href="@D.Url">github.com/@D.Login</a> ·
                     <T K="@(D.IsOrg ? "dev.org" : "dev.person")" />
                 </p>
                 <p class="dev-summary">
@@ -129,7 +129,7 @@
                                 @foreach (var issue in Issues.Take(MaxIssues))
                                 {
                                     <li class="row">
-                                        <span class="row-main"><a href="@issue.Url" target="_blank" rel="noopener">@issue.Title</a></span>
+                                        <span class="row-main"><a href="@issue.Url">@issue.Title</a></span>
                                         <span class="row-note">@Site.Project(issue.Project).Name</span>
                                     </li>
                                 }

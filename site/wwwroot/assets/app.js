@@ -541,6 +541,14 @@
       if (text !== undefined) e.textContent = text;
       return e;
     };
+    // Links that leave git.ge open in a new tab, as on the server (ExternalLinks in Links.cs).
+    const external = a => {
+      if (a.host !== location.host) {
+        a.target = "_blank";
+        a.rel = (a.rel ? a.rel + " " : "") + "noopener";
+      }
+      return a;
+    };
     const li = el("li", "p");
     li.dataset.stars = p.s ?? 0;
     li.dataset.trend = p.t ?? "";
@@ -559,9 +567,10 @@
       const owner = el("a", "p-owner", ownerLogin + "/");
       // "w": the owner has a developer page on git.ge.
       owner.href = p.w ? "/@" + ownerLogin.toLowerCase() + "/" : "https://github.com/" + ownerLogin;
-      title.append(owner);
+      title.append(external(owner));
       name.textContent = p.n.slice(slash + 1);
     } else name.textContent = p.n;
+    external(name);
     title.append(name);
     head.append(title);
     if (p.a) head.append(el("span", "badge", t("card.archived")));
