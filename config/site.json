@@ -9,5 +9,9 @@
     "minCommits": 1,
     "rankTopN": 10,
     "firstSeenSortMin": 20
+  },
+  "helpWanted": {
+    "halfLifeDays": 30,
+    "assignedFactor": 0.25
   }
 }

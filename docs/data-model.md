@@ -19,7 +19,7 @@ git-ignored on `main`:
 main branch
   config/
     discovery.json        location search terms, quality bar, help-wanted labels
-    site.json             site URL, maintainer login, trend window
+    site.json             site URL, maintainer login, trend window, help-wanted ranking
   data/
     manual/
       developers.json     { "include": [logins], "exclude": [logins] }
@@ -169,6 +169,34 @@ run on the same UTC day overwrites).
   accumulating.
 - **Roll-up:** daily files older than 90 days are replaced by
   `monthly/YYYY-MM.json`, which is the last daily snapshot of that month.
+
+## Help-wanted issue (`discovered/issues.json`)
+
+```json
+{"project":"gh:1225015398","number":17,"title":"ci: adopt Helm 4.2.0 …","url":"https://github.com/lexfrei/ouroboros/issues/17","createdAt":"2026-06-03T10:05:35+00:00","assigned":true,"labels":["good first issue"]}
+```
+
+Open issues carrying any label in `config/discovery.json` → `helpWantedLabels`,
+fetched by the nightly refresh (up to 10 per project, most recently updated first) for projects whose
+`helpWantedIssues` > 0. `assigned` is true when the issue has at least one assignee
+(`assignees { totalCount }` in the same GraphQL query, no extra calls). `labels` are
+the issue's first 10 label names as GitHub returns them.
+
+**Ranking on /help-wanted/** (computed by `prepare`, which adds `score` to each issue
+in `site-data.json`; not stored here):
+
+- issue score = popularity × freshness × assigned factor
+- popularity = log10(project stars + 10)
+- freshness = 0.5 ^ (age in days / `halfLifeDays`), age measured to the data date
+  (the latest snapshot, not the wall clock; a missing `createdAt` counts as 365 days)
+- assigned factor = `assignedFactor` for assigned issues, otherwise 1
+- projects are ordered by their best issue's score (ties: stars, then key), issues
+  within a project by score (ties: newest, then number).
+
+Both settings live in `config/site.json` → `helpWanted`: `halfLifeDays` (default 30)
+and `assignedFactor` (default 0.25). The page's filters (category, the project's
+language, and label, with "good first issue" / "help wanted" spellings normalised)
+count issues.
 
 ## Quality bar (auto-discovered repos only)
 

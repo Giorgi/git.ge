@@ -532,7 +532,7 @@ static class Refresh
                   nodes(ids: $ids) {
                     ... on Repository {
                       issues(first: {{IssuesPerRepo}}, states: OPEN, labels: $labels, orderBy: { field: UPDATED_AT, direction: DESC }) {
-                        nodes { number title url createdAt labels(first: 10) { nodes { name } } }
+                        nodes { number title url createdAt assignees { totalCount } labels(first: 10) { nodes { name } } }
                       }
                     }
                   }
@@ -550,6 +550,7 @@ static class Refresh
                         Title = issue["title"]!.GetValue<string>(),
                         Url = issue["url"]!.GetValue<string>(),
                         CreatedAt = Json.Date(issue["createdAt"]),
+                        Assigned = issue["assignees"]?["totalCount"]?.GetValue<int>() > 0,
                         Labels = issue["labels"]!["nodes"]!.AsArray().Select(l => l!["name"]!.GetValue<string>()).ToList(),
                     });
                 }
@@ -801,6 +802,34 @@ static class SelfTest
         Check(!Profile("Alice/alice", 10), "the profile README check ignores letter case");
         Check(Profile("databasus/databasus", 8672), "owner/owner with 30+ stars passes (a product named like its owner)");
         Check(Profile("alice/alice-tools", 5), "a repo merely starting with the owner's name is unaffected");
+
+        Log.Info("Help-wanted ranking (popularity × freshness × assigned factor)");
+        var hw = new HelpWantedConfig();
+        var day = new DateOnly(2026, 10, 2);
+        DateTimeOffset Opened(int daysAgo) => new(day.AddDays(-daysAgo).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        double S(int stars, int daysAgo, bool assigned = false) => HelpWantedRanking.Score(stars, Opened(daysAgo), assigned, day, hw);
+        Check(Math.Abs(S(0, 0) - 1.0) < 1e-9, "a brand-new issue on a 0-star project scores log10(10) = 1");
+        Check(Math.Abs(S(90, 30) - 1.0) < 1e-9, "one half-life halves the score (90 stars, 30 days: 2 × 0.5 = 1)");
+        Check(S(20, 2) > S(5000, 120), "a fresh issue on a small project beats a four-month-old one on a big project");
+        Check(S(5000, 10) > S(20, 10), "at the same age, the more popular project wins");
+        Check(Math.Abs(S(100, 5, assigned: true) - S(100, 5) * 0.25) < 1e-9, "an assigned issue scores a quarter");
+        Check(S(100, 5, assigned: true) < S(100, 40), "an assigned fresh issue sinks below an unassigned older one");
+        Check(S(100, -3) == S(100, 0), "an issue dated after the data date counts as age 0");
+        var ranked = HelpWantedRanking.Rank(
+            [
+                new HelpWantedIssue { Project = "big", Number = 1, CreatedAt = Opened(200) },
+                new HelpWantedIssue { Project = "small", Number = 7, CreatedAt = Opened(1) },
+                new HelpWantedIssue { Project = "big", Number = 2, CreatedAt = Opened(3), Assigned = true },
+                new HelpWantedIssue { Project = "tieA", Number = 1, CreatedAt = Opened(40) },
+                new HelpWantedIssue { Project = "tieB", Number = 1, CreatedAt = Opened(40) },
+            ],
+            new Dictionary<string, int> { ["big"] = 3000, ["small"] = 15, ["tieA"] = 50, ["tieB"] = 50 }, day, hw);
+        Check(ranked[0].Project == "small", "projects are ordered by their best issue (fresh small project first)");
+        Check(ranked.FindIndex(i => i.Project == "big") is var b && ranked[b].Number == 2 && ranked[b + 1].Number == 1,
+              "within a project, issues are ordered by score");
+        Check(ranked.FindIndex(i => i.Project == "tieA") < ranked.FindIndex(i => i.Project == "tieB"),
+              "equal scores and stars fall back to a stable order");
+        Check(ranked.All(i => i.Score is not null), "every ranked issue has a score");
         Submissions(paths);
 
         Log.Info("Baseline selection (latest 2026-06-30, window 30 ± 7 days, target 2026-05-31)");
@@ -1162,7 +1191,9 @@ static class Prepare
             NewThisMonth = newThisMonth.Select(p => p.Key).ToList(),
             RecentlyActive = recentlyActive.Select(p => p.Key).ToList(),
             Spotlight = PickSpotlight(published, now, spotlightHistory).Select(p => p.Key).ToList(),
-            Issues = Store.ReadList<HelpWantedIssue>(paths.Issues).Where(i => publishedKeys.Contains(i.Project)).ToList(),
+            Issues = HelpWantedRanking.Rank(
+                Store.ReadList<HelpWantedIssue>(paths.Issues).Where(i => publishedKeys.Contains(i.Project)),
+                published.ToDictionary(p => p.Key, p => p.Stars ?? 0), trend.Current, site.HelpWanted),
             DeveloperPages = DeveloperPages.Build(
                 published,
                 Store.ReadList<Developer>(paths.Developers),
@@ -2229,6 +2260,7 @@ sealed class SiteConfig
     public int ListingMinStars { get; set; } = 10;
     public string RepoUrl { get; set; } = "";
     public DeveloperPagesConfig DeveloperPages { get; set; } = new();
+    public HelpWantedConfig HelpWanted { get; set; } = new();
 }
 
 sealed class HelpWantedIssue
@@ -2238,7 +2270,52 @@ sealed class HelpWantedIssue
     public string Title { get; set; } = "";
     public string Url { get; set; } = "";
     public DateTimeOffset? CreatedAt { get; set; }
+    // Someone is assigned on GitHub: probably taken, so it ranks lower.
+    public bool Assigned { get; set; }
     public List<string> Labels { get; set; } = [];
+    // Ranking score, computed by prepare for the site data only (never stored in issues.json).
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? Score { get; set; }
+}
+
+sealed class HelpWantedConfig
+{
+    // Freshness halves every HalfLifeDays days since the issue was opened.
+    public double HalfLifeDays { get; set; } = 30;
+    // Multiplier for issues that already have an assignee.
+    public double AssignedFactor { get; set; } = 0.25;
+}
+
+// /help-wanted/ ranking: score = popularity × freshness × assigned factor, where
+// popularity = log10(stars + 10) and freshness = 0.5 ^ (age in days / half-life).
+// Age is measured to the data date (the latest snapshot), not the wall clock, so the
+// same data always ranks the same way.
+static class HelpWantedRanking
+{
+    public static double Score(int stars, DateTimeOffset? createdAt, bool assigned, DateOnly dataDate, HelpWantedConfig config)
+    {
+        var popularity = Math.Log10(Math.Max(0, stars) + 10);
+        var ageDays = createdAt is { } c ? Math.Max(0, dataDate.DayNumber - DateOnly.FromDateTime(c.UtcDateTime).DayNumber) : 365;
+        var freshness = Math.Pow(0.5, ageDays / Math.Max(1, config.HalfLifeDays));
+        return popularity * freshness * (assigned ? config.AssignedFactor : 1);
+    }
+
+    // Scores every issue; returns them in display order: projects by their best issue
+    // (ties: stars), issues within a project by score (ties: newest first).
+    public static List<HelpWantedIssue> Rank(IEnumerable<HelpWantedIssue> issues, IReadOnlyDictionary<string, int> starsByProject,
+                                             DateOnly dataDate, HelpWantedConfig config)
+    {
+        var list = issues.ToList();
+        foreach (var issue in list)
+            issue.Score = Math.Round(Score(starsByProject.GetValueOrDefault(issue.Project), issue.CreatedAt, issue.Assigned, dataDate, config), 6);
+        return list
+            .GroupBy(i => i.Project)
+            .OrderByDescending(g => g.Max(i => i.Score))
+            .ThenByDescending(g => starsByProject.GetValueOrDefault(g.Key))
+            .ThenBy(g => g.Key, StringComparer.Ordinal)
+            .SelectMany(g => g.OrderByDescending(i => i.Score).ThenByDescending(i => i.CreatedAt).ThenBy(i => i.Number))
+            .ToList();
+    }
 }
 
 sealed class CategoryConfig
