@@ -67,6 +67,11 @@
   "hw.intro": "Open issues labelled “good first issue” or “help wanted”: a good place to make a first open-source contribution.",
   "hw.count": "{0} issues in {1} projects",
   "hw.none": "There are no such issues right now.",
+  "hw.ranking": "Ranked by project popularity and issue freshness: newer issues, and issues nobody is assigned to yet, come first.",
+  "hw.countOne": "1 issue in 1 project",
+  "hw.assigned": "assigned",
+  "hw.facetLabel": "Label",
+  "hw.noMatch": "No issues match these filters.",
 
   "roundups.title": "Roundups",
   "roundups.intro": "A monthly roundup of what was built and what moved.",

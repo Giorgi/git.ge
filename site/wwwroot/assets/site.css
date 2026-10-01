@@ -182,7 +182,7 @@ a.p-owner:hover { color: var(--link); }
 .dev-card-login, .dev-card-meta { font-size: .78rem; color: var(--muted); }
 .dev-card-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dev-group { margin-top: 2rem; }
-/* Directory filters: a toolbar across the top (the panel-left toggle, the
+/* Filter sidebar (FilterSidebar: /developers/ and /help-wanted/): a toolbar across the top (the panel-left toggle, the
    filter tags while the column is hidden, the sort links, the result), then the
    category and language lists in a narrow left column (sticky, scrolls on its own)
    beside the grid. The toolbar spans both columns, so the toggle never moves.
@@ -294,7 +294,7 @@ a.p-owner:hover { color: var(--link); }
 .linklike { font: inherit; color: var(--link); background: none; border: 0; padding: 0; margin-left: .6rem; cursor: pointer; }
 .linklike:hover { text-decoration: underline; }
 /* Elements above set a display value, which would otherwise override [hidden]. */
-.dev-cell[hidden], .dev-group[hidden], .sort[hidden], .devs-side[hidden] { display: none; }
+.dev-cell[hidden], .dev-group[hidden], .sort[hidden], .devs-side[hidden], .hw-project[hidden] { display: none; }
 /* Which meta line a card shows follows the active sort (app.js sets data-metric). */
 .m-metric { display: none; }
 .dev-dir[data-metric="followed"] .m-default, .dev-dir[data-metric="pushed"] .m-default, .dev-dir[data-metric="first"] .m-default { display: none; }
@@ -328,6 +328,12 @@ a.p-owner:hover { color: var(--link); }
 .issues li { margin: .25rem 0; }
 .issue-meta { display: inline-flex; flex-wrap: wrap; gap: .1rem .5rem; margin-left: .3rem; font-size: .78rem; color: var(--muted); }
 .label { background: var(--badge); border-radius: 3px; padding: 0 .35rem; color: var(--fg); }
+/* Someone is already assigned: a quiet outlined note, not a label. */
+.issue-assigned { border: 1px solid var(--line); border-radius: 3px; padding: 0 .35rem; }
+.hw-ranking { margin-top: -.4rem; }
+/* The filter toolbar shows the (live) count, so the static one is for no-JS only. */
+.devs-layout.ready .hw-total { display: none; }
+.devs-main .hw-project:first-child h2 { margin-top: .2rem; }
 
 /* Roundups and long text */
 .roundups { list-style: none; padding: 0; }

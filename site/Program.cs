@@ -375,10 +375,72 @@ static int SiteSelfTest(string built)
     }
     else Console.Error.WriteLine("  (no _site: skipping built-site checks)");
 
+    // Help-wanted label filter: spellings normalise to the two values, anything else drops.
+    List<string> Labels(params string[] labels) => HelpWantedFilters.LabelsOf(new HelpWantedIssue { Labels = [.. labels] });
+    Check(Labels("good first issue").SequenceEqual(["good-first-issue"]), "label 'good first issue' → good-first-issue");
+    Check(Labels("Good-First-Issue", "good_first_issue").SequenceEqual(["good-first-issue"]), "label spellings normalise and dedupe");
+    Check(Labels("help wanted", "good first issue", "bug").SequenceEqual(["good-first-issue", "help-wanted"]), "both labels kept in order, others dropped");
+    Check(Labels("Help Wanted 🙏", "enhancement").Count == 0, "unknown labels give no filter value");
+
     DeveloperFilterChecks(Check, built);
+    HelpWantedFilterChecks(Check, built);
 
     Console.Error.WriteLine(failures == 0 ? "All site checks passed" : $"{failures} site check(s) FAILED");
     return failures == 0 ? 0 : 1;
+}
+
+// On the built /help-wanted/ page (skipped if the site hasn't been built): every issue
+// carries the filter attributes inside a project section, each option's count equals
+// the issues that match it, and the projects follow the ranked order from site-data.
+static void HelpWantedFilterChecks(Action<bool, string> check, string built)
+{
+    var file = Path.Combine(built, "help-wanted", "index.html");
+    if (!File.Exists(file))
+    {
+        Console.Error.WriteLine("  skip help-wanted filter checks: build the site first");
+        return;
+    }
+    var html = File.ReadAllText(file);
+    string Decode(string s) => System.Net.WebUtility.HtmlDecode(s);
+    string? Attr(string tag, string name) =>
+        Regex.Match(tag, $"\\s{name}=\"([^\"]*)\"") is { Success: true } m ? Decode(m.Groups[1].Value) : null;
+
+    var issues = Regex.Matches(html, "<li [^>]*data-labels[^>]*>").Select(m => m.Value).ToList();
+    if (issues.Count == 0 && html.Contains("hw-project") is false)
+    {
+        Console.Error.WriteLine("  skip help-wanted filter checks: no issues");
+        return;
+    }
+    check(issues.Count > 0, $"/help-wanted/ has filterable issues ({issues.Count})");
+    check(issues.All(i => Attr(i, "data-cats") is { Length: > 0 }), "every issue has data-cats");
+    var sets = new Dictionary<string, List<HashSet<string>>>
+    {
+        ["cat"] = issues.Select(i => (Attr(i, "data-cats") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet()).ToList(),
+        ["lang"] = issues.Select(i => (Attr(i, "data-langs") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet()).ToList(),
+        ["label"] = issues.Select(i => (Attr(i, "data-labels") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet()).ToList(),
+    };
+    var options = Regex.Matches(html, """"data-kind="(cat|lang|label)" data-value(?:="([^"]*)")? data-count="(\d+)"""").ToList();
+    foreach (var (kind, kindSets) in sets)
+    {
+        var items = options.Where(m => m.Groups[1].Value == kind)
+            .Select(m => (Value: Decode(m.Groups[2].Value), Shown: int.Parse(m.Groups[3].Value))).ToList();
+        check(items.Count > 1, $"help-wanted {kind} options rendered ({items.Count})");
+        var wrong = items
+            .Where(c => (c.Value.Length == 0 ? issues.Count : kindSets.Count(s => s.Contains(c.Value))) != c.Shown)
+            .Select(c => c.Value.Length == 0 ? "(all)" : c.Value).ToList();
+        check(wrong.Count == 0, $"help-wanted {kind} counts match the issues{(wrong.Count > 0 ? $" (wrong: {string.Join(", ", wrong)})" : "")}");
+    }
+    var sections = Regex.Matches(html, "<section class=\"hw-project\" id=\"([^\"]+)\" data-filter-group").Select(m => m.Groups[1].Value).ToList();
+    check(sections.Count > 0 && Regex.Matches(html, "<section class=\"hw-project\"").Count == sections.Count, $"every project section is a filter group ({sections.Count})");
+    check(Regex.Matches(html, "<time datetime=\"\\d{4}-\\d{2}-\\d{2}\">").Count >= issues.Count, "every issue date is a <time datetime=YYYY-MM-DD>");
+
+    var dataFile = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(built))!, "_build", "site-data.json");
+    if (!File.Exists(dataFile)) return;
+    var data = JsonSerializer.Deserialize<SiteData>(File.ReadAllText(dataFile), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+    var best = data.Issues.GroupBy(i => i.Project).Select(g => g.Max(i => i.Score ?? 0)).ToList();
+    check(data.Issues.All(i => i.Score is not null), "every help-wanted issue has a score");
+    check(best.Zip(best.Skip(1)).All(p => p.First >= p.Second), "help-wanted projects in descending best-score order");
+    check(sections.Count == best.Count, $"one section per project ({sections.Count} sections, {best.Count} projects)");
 }
 
 // On the built /developers/ page (skipped if the site hasn't been built): every card

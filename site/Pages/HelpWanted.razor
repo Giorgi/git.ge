@@ -1,5 +1,11 @@
+@* Help wanted (/help-wanted/): open "good first issue" / "help wanted" issues, grouped by
+   project. The order comes ranked from prepare (HelpWantedRanking in gitge.cs): each issue
+   scores project popularity × freshness × a factor for already-assigned issues; projects
+   follow their best issue, issues their score. Filters (app.js, FilterSidebar): category,
+   language (the project's) and label, combined with AND; counts are issues, and a project
+   shows while one of its issues matches. Without JavaScript: the full ranked list. *@
 <Layout Path="/help-wanted/" TitleKey="hw.title" Crumbs="@([(Site.Strings.Ka("hw.title"), "/help-wanted/")])"
-        Description="@Site.Strings.Ka("meta.helpWanted", Format.Number(Site.Data.Issues.Count), Format.Number(Site.Data.Issues.Select(i => i.Project).Distinct().Count()))">
+        Description="@Site.Strings.Ka("meta.helpWanted", Format.Number(Issues.Count), Format.Number(Groups.Count))">
     <h1><T K="hw.title" /></h1>
     <p class="lead"><T K="hw.intro" /></p>
 
@@ -9,46 +15,66 @@
     }
     else
     {
-        <p class="note"><T K="hw.count" Args="@([Site.Data.Issues.Count, Groups.Count])" /></p>
-        @foreach (var (project, issues) in Groups)
-        {
-            <section class="hw-project" id="@project.Anchor">
-                <h2>
-                    <a href="@project.Url" rel="@(project.IsSubmittedUrl ? "nofollow ugc" : null)"><span class="p-owner">@(project.Owner)/</span>@project.Name</a>
-                    <span class="p-meta">
-                        @if (project.Language is not null)
-                        {
-                            <span class="p-lang">@project.Language</span>
-                        }
-                        <span class="p-stars">★ @Format.Number(project.Stars)</span>
-                    </span>
-                </h2>
-                <ul class="issues">
-                    @foreach (var issue in issues)
+        <p class="note hw-ranking"><T K="hw.ranking" /></p>
+        <FilterSidebar FilterFor="hw-list" Items="li[data-labels]" Facets="cat,lang,label" StorageKey="gitge.hwSidebar"
+                       CountKey="hw.count" CountOneKey="hw.countOne" EmptyKey="hw.noMatch">
+            <Lists>
+                <DevFacet Kind="cat" TitleKey="devs.facetCategory" Options="@HelpWantedFilters.CategoryOptions(Issues).ToList()" Total="@Issues.Count" />
+                <DevFacet Kind="lang" TitleKey="devs.facetLanguage" Options="@HelpWantedFilters.LanguageOptions(Issues).ToList()" Total="@Issues.Count" Top="12" />
+                <DevFacet Kind="label" TitleKey="hw.facetLabel" Options="@HelpWantedFilters.LabelOptions(Issues).ToList()" Total="@Issues.Count" />
+            </Lists>
+            <ChildContent>
+                <p class="note hw-total"><T K="hw.count" Args="@([Issues.Count, Groups.Count])" /></p>
+                <div id="hw-list">
+                    @foreach (var (project, issues) in Groups)
                     {
-                        <li>
-                            <a href="@issue.Url">@issue.Title</a>
-                            <span class="issue-meta">
-                                #@issue.Number
-                                @foreach (var label in issue.Labels)
+                        <section class="hw-project" id="@project.Anchor" data-filter-group>
+                            <h2>
+                                <a href="@project.Url" rel="@(project.IsSubmittedUrl ? "nofollow ugc" : null)"><span class="p-owner">@(project.Owner)/</span>@project.Name</a>
+                                <span class="p-meta">
+                                    @if (project.Language is not null)
+                                    {
+                                        <span class="p-lang">@project.Language</span>
+                                    }
+                                    <span class="p-stars">★ @Format.Number(project.Stars)</span>
+                                </span>
+                            </h2>
+                            <ul class="issues">
+                                @foreach (var issue in issues)
                                 {
-                                    <span class="label">@label</span>
+                                    <li data-cats="@project.Category" data-langs="@project.Language" data-labels="@string.Join(",", HelpWantedFilters.LabelsOf(issue))">
+                                        <a href="@issue.Url">@issue.Title</a>
+                                        <span class="issue-meta">
+                                            #@issue.Number
+                                            @foreach (var label in issue.Labels)
+                                            {
+                                                <span class="label">@label</span>
+                                            }
+                                            @if (issue.Assigned)
+                                            {
+                                                <span class="issue-assigned"><T K="hw.assigned" /></span>
+                                            }
+                                            <time datetime="@Format.Date(issue.CreatedAt)">@Format.Date(issue.CreatedAt)</time>
+                                        </span>
+                                    </li>
                                 }
-                                <time datetime="@Format.Date(issue.CreatedAt)">@Format.Date(issue.CreatedAt)</time>
-                            </span>
-                        </li>
+                            </ul>
+                        </section>
                     }
-                </ul>
-            </section>
-        }
+                </div>
+            </ChildContent>
+        </FilterSidebar>
     }
 </Layout>
 
 @code {
+    List<HelpWantedIssue> Issues => Site.Data.Issues;
+
+    // Issues arrive ranked; GroupBy keeps first-appearance order, so the projects follow
+    // their best issue and each project's issues keep their score order.
     List<(SiteProject Project, List<HelpWantedIssue> Issues)> Groups =>
-        Site.Data.Issues
+        Issues
             .GroupBy(i => i.Project)
-            .Select(g => (Project: Site.Project(g.Key), Issues: g.OrderByDescending(i => i.CreatedAt).ToList()))
-            .OrderByDescending(g => g.Project.Stars ?? 0)
+            .Select(g => (Project: Site.Project(g.Key), Issues: g.ToList()))
             .ToList();
 }

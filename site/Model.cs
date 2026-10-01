@@ -125,7 +125,11 @@ public sealed class HelpWantedIssue
     public string Title { get; set; } = "";
     public string Url { get; set; } = "";
     public DateTimeOffset? CreatedAt { get; set; }
+    public bool Assigned { get; set; }
     public List<string> Labels { get; set; } = [];
+    // Ranking score from prepare (popularity × freshness × assigned factor); issues
+    // arrive in display order, so the page only needs it for the order of projects.
+    public double? Score { get; set; }
 }
 
 // One roundup: Georgian, plus English when <slug>.en.md exists (otherwise the
@@ -312,4 +316,41 @@ public static class DeveloperFilters
             .Select(g => (g.Key, g.Count()))
             .OrderByDescending(x => x.Item2).ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .ToList();
+}
+
+// Filters on /help-wanted/: category and language of the issue's project, and the
+// issue's label. The unit everywhere is an issue (counts, matching); a project section
+// shows while it has at least one matching issue.
+public static class HelpWantedFilters
+{
+    // The two labels the page is about, as filter values. Label names vary between repos
+    // ("good first issue", "good-first-issue", "Help Wanted"); anything else is ignored.
+    public static readonly string[] LabelValues = ["good-first-issue", "help-wanted"];
+
+    public static List<string> LabelsOf(HelpWantedIssue issue) =>
+        issue.Labels
+            .Select(l => string.Join("-", l.Trim().ToLowerInvariant().Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries)))
+            .Where(LabelValues.Contains)
+            .Distinct()
+            .OrderBy(l => Array.IndexOf(LabelValues, l))
+            .ToList();
+
+    // "good-first-issue" → "good first issue": GitHub's own wording, the same in both languages.
+    public static string LabelText(string value) => value.Replace('-', ' ');
+
+    public static IEnumerable<(string Value, string Label, int Count)> CategoryOptions(IReadOnlyList<HelpWantedIssue> issues) =>
+        Site.Data.Categories
+            .Select(c => (c, Site.Strings.Ka($"cat.{c}"), issues.Count(i => Site.Project(i.Project).Category == c)))
+            .Where(x => x.Item3 > 0);
+
+    public static IEnumerable<(string Value, string Label, int Count)> LanguageOptions(IReadOnlyList<HelpWantedIssue> issues) =>
+        issues.Select(i => Site.Project(i.Project).Language).OfType<string>()
+            .GroupBy(l => l)
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (g.Key, g.Key, g.Count()));
+
+    public static IEnumerable<(string Value, string Label, int Count)> LabelOptions(IReadOnlyList<HelpWantedIssue> issues) =>
+        LabelValues
+            .Select(v => (v, LabelText(v), issues.Count(i => LabelsOf(i).Contains(v))))
+            .Where(x => x.Item3 > 0);
 }

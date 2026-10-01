@@ -8,10 +8,11 @@
   const EN = I18N.en;
   const root = document.documentElement;
 
-  // /developers/ sidebar on desktop: folded unless the visitor expanded it before.
-  // Set first thing so the directory never renders in the other state (the column
-  // itself only appears once app.js reveals it).
-  const sidebarKey = "gitge.devSidebar";
+  // Filter sidebar (/developers/, /help-wanted/) on desktop: folded unless the visitor
+  // expanded it before, remembered per page (data-storage-key). Set first thing so the
+  // list never renders in the other state (the column itself only appears once app.js
+  // reveals it). The script is deferred, so the markup is already there.
+  const sidebarKey = document.querySelector(".dev-filters[data-storage-key]")?.dataset.storageKey || "gitge.devSidebar";
   const storedSidebar = () => { try { return localStorage.getItem(sidebarKey); } catch { return null; } };
   root.classList.toggle("devs-collapsed", storedSidebar() !== "expanded");
   // A UI string in the current language.
@@ -187,15 +188,17 @@
     }
   }
 
-  // ---- Filters (/developers/) -------------------------------------------------
-  // One category and one language at a time (AND across the two). Either alone
-  // matches when ANY of a developer's projects has it (data-cats / data-langs); both
-  // together need ONE project with both (data-pairs, or data-cats × data-langs when
-  // the server left data-pairs out because they're equivalent). Each control is a
-  // list of buttons with aria-pressed; every entry carries data-value ("" = all).
-  // Counts are recounted against the other active filter; entries with 0 are dimmed
-  // and inert. State lives in ?cat= & ?language= (not ?lang=, which switches the
-  // interface language).
+  // ---- Filters (/developers/, /help-wanted/) -----------------------------------
+  // The page's sidebar (FilterSidebar) names its facets in data-facets: cat, lang and,
+  // on /help-wanted/, label. One value per facet at a time, AND across facets. Each
+  // filtered item (data-items) carries its values: data-cats, data-langs, data-labels.
+  // On /developers/ a category and a language together need ONE project with both
+  // (data-pairs, or data-cats × data-langs when the server left data-pairs out because
+  // they're equivalent). Each control is a list of buttons with aria-pressed; every
+  // entry carries data-value ("" = all). Counts are recounted against the other active
+  // filters; entries with 0 are dimmed and inert. Elements marked data-filter-group
+  // (a project section) hide when none of their items match. State lives in ?cat=,
+  // ?language= and ?label= (not ?lang=, which switches the interface language).
 
   const filters = document.querySelector(".dev-filters[data-filter-for]");
   if (filters) {
@@ -203,39 +206,45 @@
     const count = filters.querySelector(".dev-filter-count");
     const clear = filters.querySelector(".dev-filter-clear");
     const empty = document.querySelector(".dev-filter-empty");
-    const active = { cat: null, lang: null };
-    const param = { cat: "cat", lang: "language" };   // URL parameter names
+    const kinds = (filters.dataset.facets || "cat,lang").split(",");
+    const active = Object.fromEntries(kinds.map(kind => [kind, null]));
+    const param = { cat: "cat", lang: "language", label: "label" };   // URL parameter names
+    const countKey = filters.dataset.countKey || "devs.filterCount";
+    const countOneKey = filters.dataset.countOneKey || null;
 
-    // The two lists (category, language).
+    // The lists, one per facet.
     const controls = {};
-    for (const kind of ["cat", "lang"]) {
+    for (const kind of kinds) {
       const el = filters.querySelector(`[data-filter="${kind}"]`);
       if (el) controls[kind] = { kind, el, items: [...el.querySelectorAll("button[data-value]")] };
     }
-    const label = (kind, value) => kind === "cat" ? t("cat." + value) : value;
+    const label = (kind, value) => kind === "cat" ? t("cat." + value)
+      : kind === "label" ? value.replace(/-/g, " ") : value;
 
-    // Parse each card once. data-pairs: "mobile:Kotlin,Swift|web:C#,TypeScript".
+    // Parse each item once. data-pairs: "mobile:Kotlin,Swift|web:C#,TypeScript".
     const split = s => (s ? s.split(",") : []);
-    const cards = [...host.querySelectorAll("li[data-cats]")].map(li => ({
+    const attr = { cat: "cats", lang: "langs", label: "labels" };
+    const cards = [...host.querySelectorAll(filters.dataset.items || "li[data-cats]")].map(li => ({
       li,
-      cats: new Set(split((li.dataset.cats || "").replace(";", ","))),
-      langs: new Set(split(li.dataset.langs)),
+      values: Object.fromEntries(kinds.map(kind =>
+        [kind, new Set(split((li.dataset[attr[kind]] || "").replace(";", ",")))])),
       pairs: li.dataset.pairs
         ? new Map(li.dataset.pairs.split("|").map(e => [e.slice(0, e.indexOf(":")), new Set(split(e.slice(e.indexOf(":") + 1)))]))
         : null,
     }));
-    const matches = (card, cat, lang) => {
-      if (cat && !card.cats.has(cat)) return false;
-      if (lang && !card.langs.has(lang)) return false;
-      if (cat && lang && card.pairs) return card.pairs.get(cat)?.has(lang) === true;
+    const matches = (card, state) => {
+      for (const kind of kinds)
+        if (state[kind] && !card.values[kind].has(state[kind])) return false;
+      if (state.cat && state.lang && card.pairs) return card.pairs.get(state.cat)?.has(state.lang) === true;
       return true;
     };
-    const countFor = (cat, lang) => cards.reduce((sum, card) => sum + (matches(card, cat, lang) ? 1 : 0), 0);
+    const countFor = state => cards.reduce((sum, card) => sum + (matches(card, state) ? 1 : 0), 0);
+    const groups = [...host.querySelectorAll("[data-filter-group]")];
 
     const apply = () => {
       let shown = 0;
       for (const card of cards) {
-        const match = matches(card, active.cat, active.lang);
+        const match = matches(card, active);
         card.li.hidden = !match;
         if (match) shown++;
       }
@@ -245,19 +254,25 @@
         if (!list || list.hidden) continue;   // merged by a sort: the sort code hides it
         title.hidden = ![...list.children].some(li => !li.hidden);
       }
-      // Each option counts the developers it would show together with the other filter.
+      // A section (a project on /help-wanted/) shows while one of its items matches.
+      let groupsShown = 0;
+      for (const group of groups) {
+        group.hidden = !cards.some(card => !card.li.hidden && group.contains(card.li));
+        if (!group.hidden) groupsShown++;
+      }
+      // Each option counts the items it would show together with the other filters.
       for (const { kind, items } of Object.values(controls)) {
         for (const item of items) {
           const value = item.dataset.value || null;
-          const n = countFor(kind === "cat" ? value : active.cat, kind === "lang" ? value : active.lang);
+          const n = countFor({ ...active, [kind]: value });
           const on = value === active[kind];
           item.querySelector(".n").textContent = n;
           item.setAttribute("aria-pressed", String(on));
           if (n === 0 && !on && value !== null) item.setAttribute("aria-disabled", "true"); else item.removeAttribute("aria-disabled");
         }
       }
-      const filtering = Boolean(active.cat || active.lang);
-      count.textContent = shown === 1 ? t("devs.filterCountOne") : t("devs.filterCount", shown);
+      const filtering = kinds.some(kind => active[kind]);
+      count.textContent = shown === 1 && countOneKey ? t(countOneKey, shown, groupsShown) : t(countKey, shown, groupsShown);
       clear.hidden = !filtering;
       empty.hidden = shown > 0;
       for (const hook of afterApply) hook();
@@ -266,7 +281,7 @@
 
     const saveUrl = () => {
       const params = new URLSearchParams(location.search);
-      for (const kind of ["cat", "lang"]) {
+      for (const kind of kinds) {
         if (active[kind]) params.set(param[kind], active[kind]); else params.delete(param[kind]);
       }
       const query = params.toString();
@@ -287,7 +302,7 @@
       });
     }
     clear.addEventListener("click", () => {
-      active.cat = active.lang = null;
+      for (const kind of kinds) active[kind] = null;
       apply();
       saveUrl();
     });
@@ -334,7 +349,7 @@
       // ×, "მზადაა" or Esc.
       const narrow = matchMedia("(max-width: 56rem)");
       const shown = () => narrow.matches ? filters.classList.contains("open") : !root.classList.contains("devs-collapsed");
-      const activeCount = () => ["cat", "lang"].filter(kind => active[kind]).length;
+      const activeCount = () => kinds.filter(kind => active[kind]).length;
       const sync = () => {
         const open = shown();
         const n = activeCount();
@@ -381,7 +396,7 @@
       };
 
       afterApply.push(() => {
-        tags.replaceChildren(...["cat", "lang"].filter(kind => active[kind]).map(kind => {
+        tags.replaceChildren(...kinds.filter(kind => active[kind]).map(kind => {
           const tag = document.createElement("button");
           tag.type = "button";
           tag.className = "devs-tag";
