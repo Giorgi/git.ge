@@ -15,6 +15,7 @@
   {"project":"gh:110697247","number":2,"title":"Prettier console output.","url":"https://github.com/vaukalak/reprolog/issues/2","createdAt":"2017-11-14T14:09:58+00:00","labels":["help wanted"]},
   {"project":"gh:110697247","number":3,"title":"Add reactotron integration.","url":"https://github.com/vaukalak/reprolog/issues/3","createdAt":"2017-11-14T14:19:18+00:00","labels":["help wanted"]},
   {"project":"gh:110697247","number":5,"title":"replace isRuntimeConfig with Symbol instead of string.","url":"https://github.com/vaukalak/reprolog/issues/5","createdAt":"2017-12-11T22:39:14+00:00","labels":["help wanted","good first issue"]},
+  {"project":"gh:1134467375","number":69,"title":"CFC support: looking for real-world examples","url":"https://github.com/ArthurkaX/cds-text-sync/issues/69","createdAt":"2026-09-30T05:18:38+00:00","labels":["enhancement","help wanted","roadmap"]},
   {"project":"gh:113587031","number":2,"title":"Way slower than grep","url":"https://github.com/jkomyno/pate/issues/2","createdAt":"2017-12-11T01:57:49+00:00","labels":["enhancement","help wanted"]},
   {"project":"gh:115024215","number":4,"title":"JUnit5 runner","url":"https://github.com/saksmt/ktest/issues/4","createdAt":"2018-01-22T15:31:02+00:00","labels":["help wanted","core:runner"]},
   {"project":"gh:11516200","number":163,"title":"Low quality translation compared to google live translator","url":"https://github.com/Stichoza/google-translate-php/issues/163","createdAt":"2021-04-12T17:46:34+00:00","labels":["enhancement","help wanted"]},
