@@ -367,3 +367,8 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
   .dev-head { gap: .8rem; }
   .dev-head .avatar-96 { width: 64px; height: 64px; font-size: 1.6rem; }
 }
+
+/* Home Spotlight: the short heading and its note share one line (the note wraps under it on phones). */
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .75rem; row-gap: .1rem; margin: 1.6em 0 .35rem; }
+.sec-head h2 { margin: 0; }
+.sec-head .note { margin: 0; }

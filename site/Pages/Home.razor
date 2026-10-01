@@ -12,8 +12,10 @@
     @if (Site.Data.Spotlight.Count > 0)
     {
         <section class="spotlight" aria-labelledby="spotlight">
-            <h2 id="spotlight"><T K="home.spotlight" /></h2>
-            <p class="note"><T K="home.spotlightNote" /></p>
+            <div class="sec-head">
+                <h2 id="spotlight"><T K="home.spotlight" /></h2>
+                <p class="note"><T K="home.spotlightNote" /></p>
+            </div>
             <ProjectList Items="@Site.Data.Spotlight.Select(Site.Project)" />
         </section>
     }
