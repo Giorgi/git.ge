@@ -44,10 +44,7 @@
             <span class="p-trend @TrendClass" title="@Site.Strings.Ka("card.trendTitle", Site.Data.Trend.WindowDays)"
                   data-i18n-title="card.trendTitle" data-i18n-title-args="@($"[{Site.Data.Trend.WindowDays}]")">@Format.Trend(P.Trend)</span>
         }
-        @if (P.PushedAt is not null)
-        {
-            <time class="p-pushed" datetime="@Format.Date(P.PushedAt)" title="@Site.Strings.Ka("card.pushedTitle")" data-i18n-title="card.pushedTitle">@Format.Date(P.PushedAt)</time>
-        }
+        <RelTime Value="@P.PushedAt" Class="p-pushed" Label="card.pushedTitle" />
     </div>
 </li>
 

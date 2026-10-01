@@ -1,0 +1,18 @@
+@* A date shown relative to the viewer's today. The HTML carries the readable date
+   ("29 სექ. 2026", the no-JS view) and the ISO date in datetime; app.js replaces the
+   text with "3 დღის წინ" / "3 days ago" and keeps the full date in the tooltip, prefixed
+   by Label ("ბოლო ცვლილება: 29 სექ. 2026") when given. Nothing renders without a date. *@
+@if (Iso.Length > 0)
+{
+    <time class="@Class" datetime="@Iso" data-rel data-rel-label="@Label" title="@Title">@Format.DateText(Iso)</time>
+}
+
+@code {
+    [Parameter, EditorRequired] public DateTimeOffset? Value { get; set; }
+    [Parameter] public string? Class { get; set; }
+    // i18n key of the tooltip prefix.
+    [Parameter] public string? Label { get; set; }
+
+    string Iso => Format.Date(Value);
+    string Title => Label is null ? Format.DateText(Iso) : $"{Site.Strings.Ka(Label)}: {Format.DateText(Iso)}";
+}

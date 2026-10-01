@@ -201,6 +201,14 @@ public static class Format
 
     public static string Date(DateTimeOffset? d) => d?.UtcDateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
 
+    // "2026-09-29" → "29 სექ. 2026": the readable date a <time data-rel> shows without
+    // JavaScript (app.js then shows it relative, "3 დღის წინ"). Month abbreviations come
+    // from i18n (date.months), the same list app.js uses. "" for anything not a date.
+    public static string DateText(string? iso, IReadOnlyDictionary<string, string>? strings = null) =>
+        DateOnly.TryParseExact(iso, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? $"{d.Day} {(strings ?? Site.Strings.Georgian)["date.months"].Split(',')[d.Month - 1]} {d.Year}"
+            : "";
+
     // Georgian ordinals written with digits, per grammar.emis.ge (exercise 179):
     // 1 → "1-ელი" (current norm); "მე-N" where the numeral word starts with მე-:
     // 2–20 (მეორე … მეოცე), 40/60/80 (მეორმოცე …), 100, 200 … 900 (მეასე, მეორასე …)

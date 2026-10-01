@@ -58,7 +58,7 @@
                                             {
                                                 <span class="issue-assigned"><T K="hw.assigned" /></span>
                                             }
-                                            <time datetime="@Format.Date(issue.CreatedAt)">@Format.Date(issue.CreatedAt)</time>
+                                            <RelTime Value="@issue.CreatedAt" Label="hw.openedTitle" />
                                         </span>
                                     </li>
                                 }

@@ -382,11 +382,44 @@ static int SiteSelfTest(string built)
     Check(Labels("help wanted", "good first issue", "bug").SequenceEqual(["good-first-issue", "help-wanted"]), "both labels kept in order, others dropped");
     Check(Labels("Help Wanted 🙏", "enhancement").Count == 0, "unknown labels give no filter value");
 
+    // Readable dates (the no-JS text of <time data-rel>).
+    if (Site.Strings.Georgian.Count == 0) Site.Strings = Strings.Load(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(built))!, "i18n"));
+    Check(Format.DateText("2026-09-29") == "29 სექ. 2026", $"Georgian readable date (got {Format.DateText("2026-09-29")})");
+    Check(Format.DateText("2026-01-05", Site.Strings.English) == "5 Jan 2026", "English readable date");
+    Check(Format.DateText("") == "" && Format.DateText("2026-13-01") == "", "no readable date for a non-date");
+    Check(Site.Strings.Georgian["date.months"].Split(',').Length == 12 && Site.Strings.English["date.months"].Split(',').Length == 12, "12 month abbreviations per language");
+
     DeveloperFilterChecks(Check, built);
     HelpWantedFilterChecks(Check, built);
+    RelativeDateChecks(Check, built);
 
     Console.Error.WriteLine(failures == 0 ? "All site checks passed" : $"{failures} site check(s) FAILED");
     return failures == 0 ? 0 : 1;
+}
+
+// Every <time data-rel> in the built site carries an ISO datetime and, as its text (the
+// no-JS view), the readable date for it; issue and project dates use it.
+static void RelativeDateChecks(Action<bool, string> check, string built)
+{
+    if (!Directory.Exists(built)) return;
+    var bad = new List<string>();
+    var total = 0;
+    foreach (var file in Directory.EnumerateFiles(built, "*.html", SearchOption.AllDirectories))
+    {
+        foreach (Match m in Regex.Matches(File.ReadAllText(file), "<time([^>]*\\sdata-rel[^>]*)>([^<]*)</time>"))
+        {
+            total++;
+            var dt = Regex.Match(m.Groups[1].Value, "datetime=\"([^\"]*)\"").Groups[1].Value;
+            var text = System.Net.WebUtility.HtmlDecode(m.Groups[2].Value);
+            if (!Regex.IsMatch(dt, "^\\d{4}-\\d{2}-\\d{2}$") || text != Format.DateText(dt))
+                bad.Add($"{Path.GetRelativePath(built, file)}: datetime=\"{dt}\" text \"{text}\"");
+        }
+    }
+    foreach (var b in bad.Take(5)) Console.Error.WriteLine($"    {b}");
+    check(total > 0 && bad.Count == 0, $"every <time data-rel> has an ISO datetime and readable text ({total} dates, {bad.Count} bad)");
+    var hw = Path.Combine(built, "help-wanted", "index.html");
+    if (File.Exists(hw))
+        check(!Regex.IsMatch(File.ReadAllText(hw), "<time(?![^>]*data-rel)"), "help-wanted dates are all relative-ready");
 }
 
 // On the built /help-wanted/ page (skipped if the site hasn't been built): every issue

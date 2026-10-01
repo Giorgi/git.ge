@@ -81,6 +81,64 @@
   if (requested === "en" || requested === "ka") storeLanguage(requested);
   if ((requested || storedLanguage()) === "en") applyLanguage("en");
 
+  // ---- Dates ------------------------------------------------------------------
+  // <time data-rel datetime="YYYY-MM-DD"> shows how long ago, counted in calendar days
+  // from the viewer's today: დღეს / გუშინ, days under 2 weeks, weeks under 9 weeks,
+  // months under a year, then years ("3 დღის წინ", "3 days ago"). The tooltip keeps the
+  // readable date ("29 სექ. 2026"), after the data-rel-label string when there is one.
+  // Without Intl.RelativeTimeFormat the readable date stays as the text. Browsers whose
+  // Intl has no Georgian data (it falls back to English) use the rel.* strings instead.
+
+  const absDate = iso => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return `${d} ${t("date.months").split(",")[m - 1]} ${y}`;
+  };
+  const ownWords = {
+    format(n, unit) {
+      if (unit === "day") return n === 0 ? t("rel.today") : n === -1 ? t("rel.yesterday") : t("rel.days", -n);
+      if (unit === "year" && n === -1) return t("rel.yearOne");
+      return t({ week: "rel.weeks", month: "rel.months", year: "rel.years" }[unit], -n);
+    },
+  };
+  const formatters = {};
+  const formatter = lang => formatters[lang] ??=
+    Intl.RelativeTimeFormat.supportedLocalesOf([lang]).length
+      ? new Intl.RelativeTimeFormat(lang, { numeric: "auto" })
+      : ownWords;
+  function relDate(iso, now = new Date()) {
+    if (typeof Intl === "undefined" || !Intl.RelativeTimeFormat) return absDate(iso);
+    const [y, m, d] = iso.split("-").map(Number);
+    const ty = now.getFullYear(), tm = now.getMonth() + 1, td = now.getDate();
+    const days = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86400000);
+    const rtf = formatter(root.lang === "en" ? "en" : "ka");
+    if (days <= 0) return rtf.format(0, "day");
+    if (days < 14) return rtf.format(-days, "day");
+    if (days < 63) return rtf.format(-Math.round(days / 7), "week");
+    const months = (ty - y) * 12 + (tm - m) - (td < d ? 1 : 0);
+    if (months < 12) return rtf.format(-Math.max(months, 2), "month");
+    return rtf.format(-Math.floor(months / 12), "year");
+  }
+  function renderTime(el) {
+    const iso = (el.getAttribute("datetime") || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+    el.textContent = relDate(iso);
+    const label = el.dataset.relLabel;
+    el.title = label ? `${t(label)}: ${absDate(iso)}` : absDate(iso);
+  }
+  // A new <time data-rel> (search results, developer metric lines).
+  function relTime(iso, cls, label) {
+    const el = document.createElement("time");
+    if (cls) el.className = cls;
+    el.setAttribute("datetime", iso);
+    el.dataset.rel = "";
+    if (label) el.dataset.relLabel = label;
+    renderTime(el);
+    return el;
+  }
+  const renderTimes = () => { for (const el of document.querySelectorAll("time[data-rel]")) renderTime(el); };
+  languageHooks.push(renderTimes);
+  renderTimes();
+
   // ---- Sorting --------------------------------------------------------------
 
   const sorters = {
@@ -123,10 +181,18 @@
 
     // Developer cards: the metric line for the active sort, built from data-* so the
     // HTML only carries the default meta line.
+    // A date goes in as <time data-rel> ("ბოლო ცვლილება: 3 დღის წინ"); the tooltip has
+    // the line with the readable date instead.
+    const withDate = (key, value) => {
+      const iso = (value || "").slice(0, 10);
+      if (!iso) return { nodes: [t(key, "—")], title: t(key, "—") };
+      const [before, after] = t(key, "\u0001").split("\u0001");
+      return { nodes: [before, relTime(iso), after ?? ""], title: t(key, absDate(iso)) };
+    };
     const metrics = {
-      followed: el => t("devs.metricFollowed", el.dataset.followed || "0"),
-      pushed: el => t("devs.metricPushed", el.dataset.pushed || "—"),
-      first: el => t("devs.metricFirst", el.dataset.first || "—"),
+      followed: el => { const text = t("devs.metricFollowed", el.dataset.followed || "0"); return { nodes: [text], title: text }; },
+      pushed: el => withDate("devs.metricPushed", el.dataset.pushed),
+      first: el => withDate("devs.metricFirst", el.dataset.first),
     };
     const showMetric = key => {
       if (!metricHost) return;
@@ -140,8 +206,9 @@
           line.className = "dev-card-meta m-metric";
           li.querySelector(".m-default").after(line);
         }
-        line.textContent = make(li);
-        line.title = line.textContent;
+        const { nodes, title } = make(li);
+        line.replaceChildren(...nodes);
+        line.title = title;
       }
     };
     if (metricHost) {
@@ -516,11 +583,7 @@
       meta.append(el("span", "p-trend" + (t > 0 ? " up" : t < 0 ? " down" : ""),
         t === undefined ? "—" : t > 0 ? "+" + t : t < 0 ? "−" + -t : "0"));
     }
-    if (p.p) {
-      const time = el("time", "p-pushed", p.p);
-      time.dateTime = p.p;
-      meta.append(time);
-    }
+    if (p.p) meta.append(relTime(p.p, "p-pushed", "card.pushedTitle"));
     li.append(meta);
     return li;
   }
