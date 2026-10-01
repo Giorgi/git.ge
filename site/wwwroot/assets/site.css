@@ -103,7 +103,7 @@ h2 { font-size: 1.15rem; }
 .intro h1 { margin-bottom: .1em; }
 .stats, .note, .lead { color: var(--muted); }
 .note { font-size: .88rem; margin: 0 0 .5rem; }
-.lead { max-width: 46rem; }
+.lead { max-width: 66rem; }
 .notice { background: var(--soft); border-left: 3px solid var(--accent); padding: .5rem .8rem; font-size: .92rem; }
 .more { margin: .6rem 0 0; }
 
@@ -199,21 +199,20 @@ a.p-owner:hover { color: var(--link); }
 .devs-main { min-width: 0; }
 .devs-panel-head, .devs-panel-done { display: none; }
 
-/* The toggle: a panel-left icon (left pane filled while the lists are shown), a
-   count badge while filters are active; on narrow screens also the word "ფილტრები". */
+/* The toggle: a button with a panel-left icon (left pane filled while the lists are
+   shown), the word "ფილტრები" and a count badge while filters are active. */
 .devs-toggle {
   display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
-  min-width: 2rem; min-height: 2rem; padding: .2rem .3rem; margin-left: -.3rem;
-  font: inherit; font-size: .9rem; color: var(--fg); background: none;
-  border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+  min-width: 2rem; min-height: 2rem; padding: .2rem .65rem .2rem .45rem;
+  font: inherit; font-size: .9rem; color: var(--fg); background: var(--soft);
+  border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
 }
-.devs-toggle:hover { background: var(--soft); }
+.devs-toggle:hover { border-color: var(--muted); }
 .devs-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .devs-toggle[hidden], .devs-toggle-badge[hidden] { display: none; }
 .devs-toggle-icon { flex: none; display: block; }
 .devs-toggle-pane { fill: currentColor; opacity: 0; }
 .devs-toggle[aria-expanded="true"] .devs-toggle-pane { opacity: .45; }
-.devs-toggle-text { display: none; }
 .devs-toggle-badge {
   display: inline-block; min-width: 1.15rem; padding: 0 .3rem; border-radius: 999px;
   background: var(--fg); color: var(--bg); font-size: .72rem; font-weight: 600;
@@ -264,11 +263,8 @@ a.p-owner:hover { color: var(--link); }
 .devs-topbar .dev-filter-status { margin-left: auto; display: inline-flex; align-items: baseline; color: var(--muted); gap: .35rem; white-space: nowrap; }
 .devs-topbar .dev-filter-status .linklike { margin-left: 0; }
 .devs-topbar .dev-filter-status:has(.dev-filter-clear:not([hidden])) .dev-filter-count::after { content: " ·"; }
-/* Inline toolbar (pages without sort links): the button says "ფილტრები" on desktop
-   too and the result follows it on the left instead of going right. */
-.devs-inline .devs-toggle { margin-left: 0; padding: .2rem .65rem .2rem .45rem; background: var(--soft); border-color: var(--line); }
-.devs-inline .devs-toggle:hover { border-color: var(--muted); }
-.devs-inline .devs-toggle-text { display: inline; }
+/* Inline toolbar (pages without sort links): the result follows the button on the
+   left instead of going right. */
 .devs-inline .devs-topbar .dev-filter-status { margin-left: 0; white-space: normal; }
 .devs-main .dev-filter-empty { margin: .3rem 0 .8rem; }
 .devs-main .dev-grid { margin-top: 0; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); }
@@ -282,10 +278,7 @@ a.p-owner:hover { color: var(--link); }
 }
 @media (max-width: 56rem) {
   .devs-layout.ready { display: block; }
-  .devs-toggle { margin-left: 0; padding: .2rem .65rem .2rem .45rem; background: var(--soft); border-color: var(--line); }
-  .devs-toggle:hover { border-color: var(--muted); }
   .devs-toggle[aria-expanded="true"] { border-color: var(--fg); }
-  .devs-toggle-text { display: inline; }
   .devs-topbar .dev-filter-status { margin-left: 0; }
   /* The panel: closed until the button opens it, then in the flow under the toolbar. */
   .devs-layout:not(.open) .devs-side { display: none; }
@@ -337,7 +330,7 @@ a.p-owner:hover { color: var(--link); }
 /* Someone is already assigned: a quiet outlined note, not a label. */
 .issue-assigned { border: 1px solid var(--line); border-radius: 3px; padding: 0 .35rem; }
 /* "How is this ordered?": one quiet line under the lead, as wide as the lead. */
-.hw-ranking { max-width: 46rem; margin: -.4rem 0 .4rem; color: var(--muted); font-size: .85rem; }
+.hw-ranking { max-width: 66rem; margin: -.4rem 0 .4rem; color: var(--muted); font-size: .85rem; }
 .hw-ranking summary { cursor: pointer; width: fit-content; }
 .hw-ranking p { margin: .3rem 0 0; }
 /* The filter toolbar shows the (live) count, so the static one is for no-JS only. */

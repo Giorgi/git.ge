@@ -1,14 +1,14 @@
 @* The filter sidebar shared by /developers/ and /help-wanted/: filter lists in a narrow
-   left column beside the content. A toolbar spans both columns above them: a panel-left
-   icon button that shows or hides the column (it never moves), the active filters as
-   removable tags while the column is hidden, an optional sort control and the result
-   ("5 დეველოპერი · გასუფთავება"). Two arrangements: with a sort control (/developers/)
-   the result is right-aligned after the sort links; Inline (/help-wanted/, no sort) keeps
-   everything left-aligned in reading order: the button with its word "ფილტრები" (on
-   desktop too), the result ("106 issue · 52 პროექტი"), then the tags. On desktop the column starts hidden and the choice is
-   remembered per page (localStorage, StorageKey). On narrow screens the button also says
-   "ფილტრები" and opens the lists as a panel above the content. Without JavaScript the
-   button, the lists and the sort are hidden: just the content.
+   left column beside the content. A toolbar spans both columns above them: the
+   "ფილტრები" button with a panel-left icon that shows or hides the column (it never
+   moves), the active filters as removable tags while the column is hidden, an optional
+   sort control and the result ("5 დეველოპერი · გასუფთავება"). Two arrangements: with a
+   sort control (/developers/) the result is right-aligned after the sort links; Inline
+   (/help-wanted/, no sort) keeps everything left-aligned in reading order: the button,
+   the result ("106 issue · 52 პროექტი"), then the tags. On desktop the column starts
+   hidden and the choice is remembered per page (localStorage, StorageKey). On narrow
+   screens the button opens the lists as a panel above the content. Without JavaScript
+   the button, the lists and the sort are hidden: just the content.
 
    app.js reads the data-* attributes: which elements are filtered (Items), which facets
    exist (Facets: cat, lang, label), the result line's string keys, and the storage key.
