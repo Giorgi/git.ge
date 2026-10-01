@@ -65,11 +65,14 @@
 
   "hw.title": "დახმარება სჭირდება",
   "hw.intro": "ღია issue-ები ჭდით „good first issue“ ან „help wanted“. კარგი ადგილია ღია კოდში პირველი წვლილის შესატანად.",
-  "hw.count": "{0} issue {1} პროექტში",
   "hw.none": "ამჟამად ასეთი issue არ არის.",
   "hw.ranking": "დალაგებულია პროექტის პოპულარობისა და issue-ის სიახლის მიხედვით: ახალი issue-ები და ის, რომლებსაც ჯერ შემსრულებელი არ ჰყავს, უფრო მაღლა ჩანს.",
-  "hw.countOne": "1 issue 1 პროექტში",
-  "hw.assigned": "შემსრულებელი ჰყავს",
+  "hw.howOrdered": "როგორ არის დალაგებული?",
+  "hw.countIssues": "{0} issue",
+  "hw.countIssuesOne": "1 issue",
+  "hw.countProjects": "{0} პროექტი",
+  "hw.countProjectsOne": "1 პროექტი",
+  "hw.assigned": "ჰყავს შემსრულებელი",
   "hw.facetLabel": "ჭდე",
   "hw.noMatch": "ამ ფილტრებით issue ვერ მოიძებნა.",
 

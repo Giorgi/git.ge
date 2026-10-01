@@ -15,16 +15,20 @@
     }
     else
     {
-        <p class="note hw-ranking"><T K="hw.ranking" /></p>
-        <FilterSidebar FilterFor="hw-list" Items="li[data-labels]" Facets="cat,lang,label" StorageKey="gitge.hwSidebar"
-                       CountKey="hw.count" CountOneKey="hw.countOne" EmptyKey="hw.noMatch">
+        <details class="hw-ranking">
+            <summary><T K="hw.howOrdered" /></summary>
+            <p><T K="hw.ranking" /></p>
+        </details>
+        <FilterSidebar FilterFor="hw-list" Items="li[data-labels]" Facets="cat,lang,label" StorageKey="gitge.hwSidebar" Inline
+                       CountKey="hw.countIssues" CountOneKey="hw.countIssuesOne" GroupKey="hw.countProjects" GroupOneKey="hw.countProjectsOne"
+                       EmptyKey="hw.noMatch">
             <Lists>
                 <DevFacet Kind="cat" TitleKey="devs.facetCategory" Options="@HelpWantedFilters.CategoryOptions(Issues).ToList()" Total="@Issues.Count" />
                 <DevFacet Kind="lang" TitleKey="devs.facetLanguage" Options="@HelpWantedFilters.LanguageOptions(Issues).ToList()" Total="@Issues.Count" Top="12" />
                 <DevFacet Kind="label" TitleKey="hw.facetLabel" Options="@HelpWantedFilters.LabelOptions(Issues).ToList()" Total="@Issues.Count" />
             </Lists>
             <ChildContent>
-                <p class="note hw-total"><T K="hw.count" Args="@([Issues.Count, Groups.Count])" /></p>
+                <p class="note hw-total"><T K="@(Issues.Count == 1 ? "hw.countIssuesOne" : "hw.countIssues")" Args="@([Issues.Count])" /> · <T K="@(Groups.Count == 1 ? "hw.countProjectsOne" : "hw.countProjects")" Args="@([Groups.Count])" /></p>
                 <div id="hw-list">
                     @foreach (var (project, issues) in Groups)
                     {
@@ -43,7 +47,7 @@
                                 @foreach (var issue in issues)
                                 {
                                     <li data-cats="@project.Category" data-langs="@project.Language" data-labels="@string.Join(",", HelpWantedFilters.LabelsOf(issue))">
-                                        <a href="@issue.Url">@issue.Title</a>
+                                        <a href="@issue.Url" target="_blank" rel="noopener">@issue.Title</a>
                                         <span class="issue-meta">
                                             #@issue.Number
                                             @foreach (var label in issue.Labels)

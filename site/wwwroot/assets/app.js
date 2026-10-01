@@ -211,6 +211,12 @@
     const param = { cat: "cat", lang: "language", label: "label" };   // URL parameter names
     const countKey = filters.dataset.countKey || "devs.filterCount";
     const countOneKey = filters.dataset.countOneKey || null;
+    const groupKey = filters.dataset.groupKey || null;
+    const groupOneKey = filters.dataset.groupOneKey || null;
+    // "5 დეველოპერი", or with groups "62 issue · 24 პროექტი".
+    const one = (n, key, oneKey) => n === 1 && oneKey ? t(oneKey, n) : t(key, n);
+    const resultText = (n, groups) =>
+      one(n, countKey, countOneKey) + (groupKey ? " · " + one(groups, groupKey, groupOneKey) : "");
 
     // The lists, one per facet.
     const controls = {};
@@ -272,7 +278,7 @@
         }
       }
       const filtering = kinds.some(kind => active[kind]);
-      count.textContent = shown === 1 && countOneKey ? t(countOneKey, shown, groupsShown) : t(countKey, shown, groupsShown);
+      count.textContent = resultText(shown, groupsShown);
       clear.hidden = !filtering;
       empty.hidden = shown > 0;
       for (const hook of afterApply) hook();

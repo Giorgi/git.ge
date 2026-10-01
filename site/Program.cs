@@ -432,7 +432,10 @@ static void HelpWantedFilterChecks(Action<bool, string> check, string built)
     }
     var sections = Regex.Matches(html, "<section class=\"hw-project\" id=\"([^\"]+)\" data-filter-group").Select(m => m.Groups[1].Value).ToList();
     check(sections.Count > 0 && Regex.Matches(html, "<section class=\"hw-project\"").Count == sections.Count, $"every project section is a filter group ({sections.Count})");
-    check(Regex.Matches(html, "<time datetime=\"\\d{4}-\\d{2}-\\d{2}\">").Count >= issues.Count, "every issue date is a <time datetime=YYYY-MM-DD>");
+    check(Regex.Matches(html, "<time datetime=\"\\d{4}-\\d{2}-\\d{2}\"").Count >= issues.Count, "every issue date is a <time datetime=YYYY-MM-DD>");
+    var issueLinks = Regex.Matches(html, "<a href=\"https://github\\.com/[^\"]+/issues/\\d+\"[^>]*>").Select(m => m.Value).ToList();
+    check(issueLinks.Count == issues.Count && issueLinks.All(a => a.Contains("target=\"_blank\"") && a.Contains("rel=\"noopener\"")),
+        $"issue links open in a new tab with rel=noopener ({issueLinks.Count})");
 
     var dataFile = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(built))!, "_build", "site-data.json");
     if (!File.Exists(dataFile)) return;

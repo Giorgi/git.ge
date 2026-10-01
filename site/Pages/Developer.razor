@@ -129,7 +129,7 @@
                                 @foreach (var issue in Issues.Take(MaxIssues))
                                 {
                                     <li class="row">
-                                        <span class="row-main"><a href="@issue.Url">@issue.Title</a></span>
+                                        <span class="row-main"><a href="@issue.Url" target="_blank" rel="noopener">@issue.Title</a></span>
                                         <span class="row-note">@Site.Project(issue.Project).Name</span>
                                     </li>
                                 }
