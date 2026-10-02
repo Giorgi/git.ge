@@ -345,7 +345,7 @@ a.p-owner:hover { color: var(--link); }
 .roundups li { padding: .5rem 0; border-bottom: 1px solid var(--line); }
 .roundups time { color: var(--muted); font-size: .85rem; margin-right: .6rem; font-variant-numeric: tabular-nums; }
 .roundups p { margin: .1rem 0 0; color: var(--muted); font-size: .92rem; }
-.prose { max-width: 46rem; }
+.prose { max-width: 54rem; }
 .prose h2 { margin-top: 1.8em; }
 .prose li { margin: .2rem 0; }
 .prose code { font-family: var(--mono); font-size: .88em; background: var(--soft); padding: .05rem .3rem; border-radius: 3px; }
