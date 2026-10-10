@@ -166,6 +166,8 @@ run on the same UTC day overwrites).
   absent from it → trend is `null`, shown as "—".
 - **Cold start:** until a snapshot at least 23 days old exists, the default sort
   is "Popular" (below), and the site says trend data is still accumulating.
+  The date it names (`trend.firstTrendDate` in the site data) is the oldest
+  snapshot + 23 days, so it stays the same from one nightly run to the next.
 - **Roll-up:** daily files older than 90 days are replaced by
   `monthly/YYYY-MM.json`, which is the last daily snapshot of that month.
 

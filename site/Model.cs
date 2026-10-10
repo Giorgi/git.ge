@@ -82,9 +82,8 @@ public sealed class SiteTrend
 
     public bool HasHistory => Baseline is not null;
 
-    // First date on which a baseline can exist (window minus tolerance of 7 days).
-    public string FirstTrendDate =>
-        DateOnly.ParseExact(Current, "yyyy-MM-dd", CultureInfo.InvariantCulture).AddDays(WindowDays - 7).ToString("yyyy-MM-dd");
+    // First date on which a baseline can exist: oldest snapshot + window - tolerance.
+    public string FirstTrendDate { get; set; } = "";
 }
 
 public sealed class SiteProject

@@ -656,7 +656,7 @@ sealed class SnapshotStore(string root)
     public static Snapshot Load(string path) => Store.Read<Snapshot>(path);
 }
 
-sealed record TrendResult(DateOnly Current, DateOnly? Baseline, Dictionary<long, int?> Delta)
+sealed record TrendResult(DateOnly Current, DateOnly? Baseline, DateOnly FirstTrendDate, Dictionary<long, int?> Delta)
 {
     // False until a snapshot old enough exists; the site then sorts by stars instead.
     public bool HasHistory => Baseline is not null;
@@ -675,8 +675,13 @@ static class Trending
         var baseline = PickBaseline(current, files.Keys, windowDays, toleranceDays);
         var currentStars = SnapshotStore.Load(files[current]).Stars;
         var baselineStars = baseline is { } b ? SnapshotStore.Load(files[b]).Stars : null;
-        return new(current, baseline, Diff(currentStars, baselineStars));
+        return new(current, baseline, FirstTrendDate(files.Keys.First(), windowDays, toleranceDays), Diff(currentStars, baselineStars));
     }
+
+    // The first day the oldest snapshot can serve as a baseline. Counted from the
+    // oldest snapshot, not the latest, so the date doesn't move with every nightly run.
+    public static DateOnly FirstTrendDate(DateOnly oldest, int windowDays, int toleranceDays) =>
+        oldest.AddDays(windowDays - toleranceDays);
 
     // The snapshot closest to windowDays before current, within ± toleranceDays.
     // On a tie the older one wins, because it covers the whole window.
@@ -853,6 +858,11 @@ static class SelfTest
         Check(Trending.PickBaseline(current, [d("2026-05-24")], 30, 7) == d("2026-05-24"), "37 days back (edge of tolerance) is used");
         Check(Trending.PickBaseline(current, [d("2026-06-07")], 30, 7) == d("2026-06-07"), "23 days back (edge of tolerance) is used");
         Check(Trending.PickBaseline(current, [d("2026-05-15"), d("2026-06-15")], 30, 7) is null, "a gap around the target gives no baseline");
+        var oldest = d("2026-09-25");
+        var first = Trending.FirstTrendDate(oldest, 30, 7);
+        Check(first == d("2026-10-18"), "first trend date is the oldest snapshot + window - tolerance");
+        Check(Trending.PickBaseline(first, [oldest], 30, 7) == oldest, "on the first trend date the oldest snapshot is a baseline");
+        Check(Trending.PickBaseline(first.AddDays(-1), [oldest], 30, 7) is null, "the day before the first trend date there is no baseline");
 
         var work = Path.Combine(Path.GetTempPath(), $"gitge-selftest-{Guid.NewGuid():N}");
         CopyDirectory(Path.Combine(paths.Root, "tests", "fixtures", "snapshots"), work);
@@ -1198,6 +1208,7 @@ static class Prepare
                 Current = trend.Current.ToString("yyyy-MM-dd"),
                 Baseline = trend.Baseline?.ToString("yyyy-MM-dd"),
                 WindowDays = site.TrendWindowDays,
+                FirstTrendDate = trend.FirstTrendDate.ToString("yyyy-MM-dd"),
             },
             Categories = categories.Order,
             Developers = published.Where(p => p.Listed).Select(p => p.Owner).Distinct(ignoreCase).Count(),
@@ -1511,6 +1522,7 @@ sealed class SiteTrend
     public string Current { get; set; } = "";
     public string? Baseline { get; set; }
     public int WindowDays { get; set; }
+    public string FirstTrendDate { get; set; } = "";
 }
 
 sealed class SiteProject
