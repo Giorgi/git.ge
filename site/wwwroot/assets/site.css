@@ -14,11 +14,12 @@
   --bg: #fdfdfc;
   --fg: #1b1b1a;
   --muted: #62625f;
+  --dim: #747471;   /* a step back from --muted, still 4.5:1 on --bg */
   --line: #e4e3df;
   --soft: #f3f2ef;
   --accent: #b3261e;
   --link: #1f4fbf;
-  --up: #1d7a3a;
+  --up: #1b7536;    /* 4.5:1 on --badge too (the help-wanted badge) */
   --down: #9a3b1c;
   --badge: #efeae0;
   --font: "Noto Sans Georgian", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -31,6 +32,7 @@
     --bg: #141413;
     --fg: #e8e7e3;
     --muted: #a09f9a;
+    --dim: #85847f;
     --line: #2d2c2a;
     --soft: #1d1c1b;
     --accent: #f07167;
@@ -58,7 +60,7 @@ a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-h1, h2, h3 { line-height: 1.25; margin: 1.6em 0 .3em; }
+h1, h2, h3 { line-height: 1.25; margin: 1.6em 0 .3em; text-wrap: balance; }
 h1 { font-size: 1.6rem; margin-top: 1.2em; }
 h2 { font-size: 1.15rem; }
 
@@ -119,7 +121,7 @@ h2 { font-size: 1.15rem; }
 .p-name { font-weight: 600; overflow-wrap: anywhere; }
 .p-owner { font-weight: 400; color: var(--muted); }
 a.p-owner:hover { color: var(--link); }
-.p-desc { margin: .1rem 0 .15rem; font-size: .93rem; }
+.p-desc { margin: .1rem 0 .15rem; font-size: .93rem; text-wrap: pretty; }
 .p-meta { display: flex; flex-wrap: wrap; gap: .1rem .9rem; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .p-lang::before { content: ""; display: inline-block; width: .5em; height: .5em; border-radius: 50%; background: var(--muted); margin-right: .35em; vertical-align: .08em; }
 .p-trend.up { color: var(--up); font-weight: 600; }
@@ -130,7 +132,7 @@ a.p-owner:hover { color: var(--link); }
 .badge.ok { color: var(--link); }
 .badge.cat { color: var(--muted); }
 /* No push in 12+ months: the date steps back and a quiet outlined marker follows it. */
-.p-pushed.dim { opacity: .8; }
+.p-pushed.dim { color: var(--dim); }
 .badge.dormant { color: var(--muted); background: none; border: 1px solid var(--line); padding: 0 .35rem; }
 
 /* Avatars (self-hosted; see gitge.cs avatars). Sizes are classes: the CSP forbids inline styles. */
