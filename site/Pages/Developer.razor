@@ -14,7 +14,8 @@
                     <T K="@(D.IsOrg ? "dev.org" : "dev.person")" />
                 </p>
                 <p class="dev-summary">
-                    <T K="dev.summary" Args="@([Format.Number(D.Projects.Count + D.Smaller.Count), Format.Number(D.Stars)])" />
+                    <T K="dev.projectCount" Args="@([Format.Number(D.Projects.Count + D.Smaller.Count)])" /> ·
+                    @Format.Number(D.Stars) <Stars />
                     @if (D.Languages.Count > 0)
                     {
                         <span> · @string.Join(", ", D.Languages)</span>
@@ -29,28 +30,55 @@
                     <ul class="chips">
                         @foreach (var week in D.Spotlight)
                         {
-                            <li class="chip"><T K="dev.spotlight" Args="@([week])" /></li>
+                            @* Both languages, CSS shows one: the dates have month names. *@
+                            <li class="chip">@foreach (var (lang, s) in Langs)
+                                {<span class="l10n" lang="@lang">@s["dev.spotlight"].Replace("{0}", Format.WeekText(week, s))</span>}</li>
                         }
                         @foreach (var slug in D.Roundups)
                         {
-                            <li class="chip"><a href="/roundups/@slug/"><T K="dev.roundup" Args="@([slug])" /></a></li>
+                            <li class="chip"><a href="/roundups/@slug/">@foreach (var (lang, s) in Langs)
+                                {<span class="l10n" lang="@lang">@s["dev.roundup"].Replace("{0}", Format.MonthText(slug, s))</span>}</a></li>
                         }
                     </ul>
                 }
             </div>
+            @* Shown by app.js: the share sheet on touch devices, otherwise copies the link. *@
+            <div class="dev-share">
+                <button type="button" class="btn" hidden data-share>
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3.5v11M7.75 7.75 12 3.5l4.25 4.25M5.5 12.5v5.75c0 .97.78 1.75 1.75 1.75h9.5c.97 0 1.75-.78 1.75-1.75V12.5" />
+                    </svg>
+                    <T K="dev.share" />
+                </button>
+                <span class="dev-share-status" role="status" data-share-status></span>
+            </div>
         </header>
 
-        @* Below the header (not beside the avatar), so the sentences get the full width on phones. *@
+        @* Below the header (not beside the avatar), so the sentences get the full width on phones.
+           The best TopRanks lead in a larger size; the rest wait behind "კიდევ N". *@
         @if (D.Ranks.Count > 0)
         {
             <section class="dev-ranks" aria-labelledby="dev-ranks">
                 <h2 id="dev-ranks"><T K="dev.ranking" /></h2>
-                <ul>
-                    @foreach (var r in D.Ranks)
+                <ul class="dev-ranks-top">
+                    @foreach (var r in D.Ranks.Take(TopRanks))
                     {
-                        <li><RankLine R="r" /></li>
+                        <li><RankLine R="r" Strong="true" /></li>
                     }
                 </ul>
+                @if (D.Ranks.Count > TopRanks)
+                {
+                    var more = D.Ranks.Count - TopRanks;
+                    <details class="dev-ranks-more">
+                        <summary><T K="@(more == 1 ? "dev.moreRanksOne" : "dev.moreRanks")" Args="@([more])" /></summary>
+                        <ul>
+                            @foreach (var r in D.Ranks.Skip(TopRanks))
+                            {
+                                <li><RankLine R="r" /></li>
+                            }
+                        </ul>
+                    </details>
+                }
             </section>
         }
 
@@ -99,7 +127,7 @@
                                     <li class="row">
                                         <a class="row-avatar" href="@Site.OwnerHref(project.Owner)" title="@(Site.Developer(project.Owner)?.DisplayName ?? project.Owner)" aria-hidden="true" tabindex="-1"><Avatar Login="@project.Owner" Size="24" /></a>
                                         <span class="row-main"><a class="p-owner" href="@Site.OwnerHref(project.Owner)">@(project.Owner)/</a><a href="@project.Url" rel="@(project.IsSubmittedUrl ? "nofollow ugc" : null)">@project.Name</a></span>
-                                        <span class="row-note"><T K="dev.commits" Args="@([c.Commits])" /></span>
+                                        <span class="row-note"><T K="@(c.Commits == 1 ? "dev.commitsOne" : "dev.commits")" Args="@([c.Commits])" /></span>
                                     </li>
                                 }
                             </ul>
@@ -115,7 +143,7 @@
                                     <li class="row">
                                         <a class="row-avatar" href="@Site.OwnerHref(c.Login)" aria-hidden="true" tabindex="-1"><Avatar Login="@c.Login" Size="24" /></a>
                                         <span class="row-main"><a href="@Site.OwnerHref(c.Login)">@(Site.Developer(c.Login)?.DisplayName ?? c.Login)</a></span>
-                                        <span class="row-note"><T K="dev.commits" Args="@([c.Commits])" /></span>
+                                        <span class="row-note"><T K="@(c.Commits == 1 ? "dev.commitsOne" : "dev.commits")" Args="@([c.Commits])" /></span>
                                     </li>
                                 }
                             </ul>
@@ -130,7 +158,7 @@
                                 {
                                     <li class="row">
                                         <span class="row-main"><a href="@issue.Url">@issue.Title</a></span>
-                                        <span class="row-note">@Site.Project(issue.Project).Name</span>
+                                        <span class="row-note" title="@Site.Project(issue.Project).Name">@Site.Project(issue.Project).Name</span>
                                     </li>
                                 }
                             </ul>
@@ -148,6 +176,9 @@
 
 @code {
     const int MaxIssues = 5;
+    const int TopRanks = 2;
+
+    static (string Lang, Dictionary<string, string> Strings)[] Langs => [("ka", Site.Strings.Georgian), ("en", Site.Strings.English)];
 
     [Parameter, EditorRequired] public SiteDeveloper D { get; set; } = default!;
 

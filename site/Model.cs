@@ -222,6 +222,27 @@ public static class Format
             ? $"{d.Day} {(strings ?? Site.Strings.Georgian)["date.months"].Split(',')[d.Month - 1]} {d.Year}"
             : "";
 
+    // A Spotlight week "2026-W43" → "19–25 ოქტ. 2026" (Monday to Sunday); across months
+    // "27 ოქტ. – 2 ნოე. 2026", across years with both years. The week code if unparseable.
+    public static string WeekText(string isoWeek, IReadOnlyDictionary<string, string>? strings = null)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(isoWeek, @"^(\d{4})-W(\d{2})$");
+        if (!m.Success) return isoWeek;
+        var months = (strings ?? Site.Strings.Georgian)["date.months"].Split(',');
+        var from = DateOnly.FromDateTime(ISOWeek.ToDateTime(int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), DayOfWeek.Monday));
+        var to = from.AddDays(6);
+        string Mon(DateOnly d) => months[d.Month - 1];
+        return from.Year != to.Year ? $"{from.Day} {Mon(from)} {from.Year} – {to.Day} {Mon(to)} {to.Year}"
+            : from.Month != to.Month ? $"{from.Day} {Mon(from)} – {to.Day} {Mon(to)} {to.Year}"
+            : $"{from.Day}–{to.Day} {Mon(to)} {to.Year}";
+    }
+
+    // A roundup slug "2026-09" → "სექ. 2026". The slug if unparseable.
+    public static string MonthText(string slug, IReadOnlyDictionary<string, string>? strings = null) =>
+        DateOnly.TryParseExact(slug + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? $"{(strings ?? Site.Strings.Georgian)["date.months"].Split(',')[d.Month - 1]} {d.Year}"
+            : slug;
+
     // Georgian ordinals written with digits, per grammar.emis.ge (exercise 179):
     // 1 → "1-ელი" (current norm); "მე-N" where the numeral word starts with მე-:
     // 2–20 (მეორე … მეოცე), 40/60/80 (მეორმოცე …), 100, 200 … 900 (მეასე, მეორასე …)

@@ -149,6 +149,33 @@
   languageHooks.push(renderTimes);
   renderTimes();
 
+  // ---- Share (developer pages) ------------------------------------------------
+  // On touch devices the system share sheet; elsewhere the canonical link goes to the
+  // clipboard and "ბმული დაკოპირდა" shows for a moment.
+
+  for (const button of document.querySelectorAll("[data-share]")) {
+    const status = button.parentElement.querySelector("[data-share-status]");
+    const url = document.querySelector('link[rel="canonical"]')?.href || location.href;
+    const touch = matchMedia("(pointer: coarse)").matches;
+    if (!(touch && navigator.share) && !navigator.clipboard) continue;
+    button.hidden = false;
+    let timer;
+    button.addEventListener("click", async () => {
+      if (touch && navigator.share) {
+        try { await navigator.share({ title: document.title, url }); } catch { /* dismissed */ }
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        status.textContent = t("dev.copied");
+      } catch {
+        status.textContent = url;
+      }
+      clearTimeout(timer);
+      timer = setTimeout(() => { status.textContent = ""; }, 2500);
+    });
+  }
+
   // ---- Sorting --------------------------------------------------------------
 
   const sorters = {
@@ -562,6 +589,16 @@
       }
       return a;
     };
+    // Words only screen readers get ("ვარსკვლავი" after a star count); they switch
+    // language with the page like any data-i18n text.
+    const srWords = (key, ...a) => {
+      const e = el("span", "visually-hidden", " " + t(key, ...a));
+      e.dataset.i18n = key;
+      if (a.length) e.dataset.i18nArgs = JSON.stringify(a);
+      e.dataset.ka = " " + format(I18N.ka[key] ?? key, a);
+      e.dataset.i18nPrefix = " ";
+      return e;
+    };
     const li = el("li", "p");
     li.dataset.stars = p.s ?? 0;
     li.dataset.trend = p.t ?? "";
@@ -601,11 +638,19 @@
 
     const meta = el("div", "p-meta");
     if (p.l) meta.append(el("span", "p-lang", p.l));
-    if (p.s !== undefined) meta.append(el("span", "p-stars", "★ " + p.s.toLocaleString("en-US")));
+    if (p.s !== undefined) {
+      const stars = el("span", "p-stars");
+      const sign = el("span", null, "★ ");
+      sign.setAttribute("aria-hidden", "true");
+      stars.append(sign, p.s.toLocaleString("en-US"), srWords("card.starsSr"));
+      meta.append(stars);
+    }
     if (index.trend && p.s !== undefined) {
       const t = p.t;
-      meta.append(el("span", "p-trend" + (t > 0 ? " up" : t < 0 ? " down" : ""),
-        t === undefined ? "—" : t > 0 ? "+" + t : t < 0 ? "−" + -t : "0"));
+      const trend = el("span", "p-trend" + (t > 0 ? " up" : t < 0 ? " down" : ""),
+        t === undefined ? "—" : t > 0 ? "+" + t : t < 0 ? "−" + -t : "0");
+      if (index.window) trend.append(srWords("card.trendSr", index.window));
+      meta.append(trend);
     }
     if (p.p) meta.append(relTime(p.p, "p-pushed" + (p.o && !p.a ? " dim" : ""), "card.pushed"));
     if (p.o && !p.a) meta.append(el("span", "badge dormant", t("card.dormant", index.dormantMonths ?? 12)));

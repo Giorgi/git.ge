@@ -37,12 +37,12 @@
         }
         @if (P.Stars is not null)
         {
-            <span class="p-stars" title="@Site.Strings.Ka("card.starsTitle")" data-i18n-title="card.starsTitle">★ @Format.Number(P.Stars)</span>
+            <span class="p-stars" title="@Site.Strings.Ka("card.starsTitle")" data-i18n-title="card.starsTitle"><span aria-hidden="true">★ </span>@Format.Number(P.Stars)<span class="visually-hidden">@(" ")<T K="card.starsSr" /></span></span>
         }
         @if (Site.Data.Trend.HasHistory && P.Stars is not null)
         {
             <span class="p-trend @TrendClass" title="@Site.Strings.Ka("card.trendTitle", Site.Data.Trend.WindowDays)"
-                  data-i18n-title="card.trendTitle" data-i18n-title-args="@($"[{Site.Data.Trend.WindowDays}]")">@Format.Trend(P.Trend)</span>
+                  data-i18n-title="card.trendTitle" data-i18n-title-args="@($"[{Site.Data.Trend.WindowDays}]")">@Format.Trend(P.Trend)<span class="visually-hidden">@(" ")<T K="card.trendSr" Args="@([Site.Data.Trend.WindowDays])" /></span></span>
         }
         <RelTime Value="@P.PushedAt" Class="@(P.ShowDormant ? "p-pushed dim" : "p-pushed")" Verb="card.pushed" />
         @if (P.ShowDormant)

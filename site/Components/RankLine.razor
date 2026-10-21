@@ -14,10 +14,17 @@
                     <a href="@Project.Url" rel="@(Project.IsSubmittedUrl ? "nofollow ugc" : null)">@Project.Name</a>
                     break;
                 case "{1}":
-                    @(lang == "ka" ? Format.OrdinalKa(R.Rank) : Format.OrdinalEn(R.Rank))
+                    @if (Strong)
+                    {
+                        <strong>@(lang == "ka" ? Format.OrdinalKa(R.Rank) : Format.OrdinalEn(R.Rank))</strong>
+                    }
+                    else
+                    {
+                        @(lang == "ka" ? Format.OrdinalKa(R.Rank) : Format.OrdinalEn(R.Rank))
+                    }
                     break;
                 case "{2}":
-                    <a href="/c/@R.Category/">@CategoryName(lang)</a>
+                    <a href="/c/@R.Category/">@if (Strong) { <strong>@CategoryName(lang)</strong> } else { @CategoryName(lang) }</a>
                     break;
                 case "{3}":
                     @Format.Number(R.Of)
@@ -32,6 +39,8 @@
 
 @code {
     [Parameter, EditorRequired] public SiteRank R { get; set; } = default!;
+    // The developer's top ranks: ordinal and category in bold.
+    [Parameter] public bool Strong { get; set; }
 
     SiteProject Project => Site.Project(R.Project);
 

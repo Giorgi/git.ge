@@ -141,8 +141,22 @@ a.p-owner:hover { color: var(--link); }
 .avatar-initial { display: inline-grid; place-items: center; color: var(--muted); font-weight: 600; }
 
 /* Developer page */
-.dev-head { display: flex; gap: 1.25rem; align-items: flex-start; margin-top: 1.4rem; }
-.dev-id { min-width: 0; }
+.dev-head { display: flex; flex-wrap: wrap; gap: .6rem 1.25rem; align-items: flex-start; margin-top: 1.4rem; }
+.dev-id { flex: 1 1 14rem; min-width: 0; }
+/* Share: top right beside the name; wraps under the header on phones. */
+.dev-share { display: flex; align-items: center; gap: .5rem; }
+.dev-share-status { font-size: .85rem; color: var(--muted); }
+.dev-share-status:empty { display: none; }
+@media (max-width: 36rem) { .dev-share { flex-basis: 100%; } }
+/* A quiet button: soft background, hairline border (same look as the filter toggle). */
+.btn {
+  display: inline-flex; align-items: center; gap: .4rem; min-height: 2rem; padding: .2rem .7rem .2rem .55rem;
+  font: inherit; font-size: .9rem; color: var(--fg); background: var(--soft);
+  border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+}
+.btn:hover { border-color: var(--muted); }
+.btn[hidden] { display: none; }
+.btn svg { flex: none; display: block; }
 .dev-id h1 { margin: 0 0 .15rem; }
 .dev-login, .dev-summary { margin: .1rem 0; color: var(--muted); font-size: .92rem; }
 .dev-login a { color: var(--muted); }
@@ -155,11 +169,22 @@ a.p-owner:hover { color: var(--link); }
 .dev-ranks h2 { font-size: .85rem; font-weight: 600; color: var(--muted); margin: 0 0 .15rem; }
 .dev-ranks ul { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
 .dev-ranks li { padding: .08rem 0; overflow-wrap: anywhere; }
+/* The best ranks lead: body size, ordinal and category in bold. */
+.dev-ranks .dev-ranks-top { font-size: 1rem; }
+.dev-ranks-top li { padding: .12rem 0; }
+.dev-ranks-more { margin-top: .2rem; }
+.dev-ranks-more summary { cursor: pointer; color: var(--muted); font-size: .88rem; width: fit-content; }
+.dev-ranks-more ul { margin-top: .15rem; }
 .dev-social { display: flex; flex-wrap: wrap; gap: .6rem 2.5rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 1.2rem 0 .4rem; padding: .6rem 0 .5rem; }
 .dev-social-title { flex-basis: 100%; margin: 0; font-size: .88rem; font-weight: 600; }
 .people-text { margin: 0 0 .35rem; font-size: .85rem; color: var(--muted); }
 .people-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
 .people-more { font-size: .82rem; color: var(--muted); margin-left: .3rem; }
+.people-narrow { display: none; }
+@media (max-width: 36rem) {
+  .people-list .people-wide { display: none; }
+  .people-list .people-narrow { display: list-item; }
+}
 .dev-cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1.4fr); gap: 0 2.5rem; }
 .dev-cols > :only-child { grid-column: 1 / -1; }
 @media (max-width: 52rem) { .dev-cols { grid-template-columns: minmax(0, 1fr); } }
@@ -172,7 +197,9 @@ a.p-owner:hover { color: var(--link); }
 .row { display: flex; align-items: center; gap: .5rem; padding: .35rem 0; border-bottom: 1px solid var(--line); line-height: 1.35; }
 .row-avatar { display: flex; flex: none; }
 .row-main { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
-.row-note { flex: none; color: var(--muted); font-size: .8rem; white-space: nowrap; }
+/* At most 40% of the row, cut with "…" (full text in the title), so a long project
+   name doesn't squeeze the issue title onto three lines. */
+.row-note { flex: none; max-width: 40%; color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Developer directory (/u/): cells stretch to the row's height, so bottom borders align. */
 .dev-grid { list-style: none; padding: 0; margin: .6rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0 1.2rem; align-items: stretch; }
@@ -363,7 +390,12 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
   .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .chips::-webkit-scrollbar { display: none; }
   h1 { font-size: 1.35rem; }
-  .bar { gap: .4rem 1rem; }
+  /* Logo and the language button share the first row; the menu gets the second, so
+     the page starts one row higher. */
+  .bar { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "logo lang" "nav nav"; gap: .4rem 1rem; }
+  .logo { grid-area: logo; }
+  .nav { grid-area: nav; gap: .3rem 1rem; }
+  .lang { grid-area: lang; }
   .dev-head { gap: .8rem; }
   .dev-head .avatar-96 { width: 64px; height: 64px; font-size: 1.6rem; }
 }

@@ -1,22 +1,28 @@
 @* A row of linked avatars (mutual follows, followers, following): a heading with
-   the count, up to Max avatars, then "and N more". Hidden when empty. *@
+   the count, up to Max avatars, then "and N more". On phones only MaxNarrow avatars
+   show, so the row stays one line; it gets its own "and N more" (CSS picks which).
+   Hidden when empty. *@
 @if (Logins.Count > 0)
 {
     <div class="people">
         <p class="people-text"><T K="@TextKey" Args="@([Logins.Count])" /></p>
         <ul class="people-list">
-            @foreach (var login in Logins.Take(Max))
+            @foreach (var (login, i) in Logins.Take(Max).Select((l, i) => (l, i)))
             {
                 var dev = Site.Developer(login);
-                <li>
-                    <a href="@Site.OwnerHref(login)" title="@(dev?.DisplayName ?? login)">
+                <li class="@(i >= MaxNarrow ? "people-wide" : null)">
+                    <a href="@Site.OwnerHref(login)" title="@(dev?.DisplayName ?? login)" aria-label="@(dev?.DisplayName ?? login)">
                         <Avatar Login="@login" Size="36" />
                     </a>
                 </li>
             }
+            @if (Logins.Count > MaxNarrow)
+            {
+                <li class="people-more people-narrow"><T K="dev.andMore" Args="@([Logins.Count - MaxNarrow])" /></li>
+            }
             @if (Logins.Count > Max)
             {
-                <li class="people-more"><T K="dev.andMore" Args="@([Logins.Count - Max])" /></li>
+                <li class="people-more people-wide"><T K="dev.andMore" Args="@([Logins.Count - Max])" /></li>
             }
         </ul>
     </div>
@@ -26,4 +32,6 @@
     [Parameter, EditorRequired] public List<string> Logins { get; set; } = [];
     [Parameter, EditorRequired] public string TextKey { get; set; } = "";
     [Parameter] public int Max { get; set; } = 12;
+    // Fits a 320px screen with "and N more" beside it.
+    const int MaxNarrow = 5;
 }
