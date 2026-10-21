@@ -5,7 +5,7 @@
 @font-face {
   font-family: "Noto Sans Georgian";
   src: url("/assets/fonts/noto-sans-georgian.woff2") format("woff2");
-  font-weight: 400 700;
+  font-weight: 100 900;   /* variable: the home page headline uses 900 */
   font-display: swap;
   unicode-range: U+0589, U+10A0-10FF, U+1C90-1CBA, U+1CBD-1CBF, U+205A, U+2D00-2D2F, U+2E31;
 }
@@ -35,7 +35,7 @@
     --dim: #85847f;
     --line: #2d2c2a;
     --soft: #1d1c1b;
-    --accent: #f07167;
+    --accent: #f04a3e;   /* a true red, 5:1 on --bg */
     --link: #8ab4ff;
     --up: #6fcf8b;
     --down: #f0a07a;
@@ -71,7 +71,7 @@ h2 { font-size: 1.15rem; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Header */
-.site-header { border-bottom: 1px solid var(--line); background: var(--soft); }
+.site-header { border-bottom: 1px solid var(--line); background: var(--bg); }
 .bar { display: flex; align-items: center; gap: 1.25rem; padding-top: .6rem; padding-bottom: .4rem; flex-wrap: wrap; }
 .logo { font-weight: 700; font-size: 1.25rem; color: var(--fg); letter-spacing: -.01em; }
 .logo span { color: var(--accent); }
@@ -101,12 +101,62 @@ h2 { font-size: 1.15rem; }
 .site-footer { border-top: 1px solid var(--line); margin-top: 3rem; padding: 1rem 0 2rem; color: var(--muted); font-size: .85rem; }
 .site-footer p { margin: .2rem 0; }
 
+/* Home: the counts at poster size beside a search, then the wall of developers.
+   Only this week's active developers get colour (and the red ring). */
+/* The title takes the full width (each line one phrase, never broken mid-word);
+   the lead and the search share the row under it. */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 27rem); gap: 1.6rem 3.5rem; align-items: end; margin-top: 2.6rem; }
+.hero-title { grid-column: 1 / -1; margin: 0; font-size: clamp(2.2rem, 7.2vw, 6.6rem); line-height: .98; font-weight: 900; letter-spacing: -.03em; text-wrap: wrap; overflow-wrap: normal; }
+.hero-side { display: contents; }
+.hero-line { display: block; }
+html[lang="en"] .hero-title { font-size: clamp(2rem, 5vw, 4.6rem); }
+.hero-title .n { font-variant-numeric: tabular-nums; }
+.hero-title .hot { color: var(--accent); }
+.hero-lead { margin: 0; max-width: 34rem; font-size: 1.2rem; line-height: 1.5; color: var(--muted); }
+.hero-search { display: flex; border-bottom: 3px solid var(--fg); }
+.hero-search input { flex: 1; min-width: 0; font: inherit; font-size: 1.1rem; color: var(--fg); background: none; border: 0; padding: .6rem 0; }
+.hero-search input:focus-visible { outline: none; }
+.hero-search:focus-within { border-bottom-color: var(--accent); }
+.hero-search button { display: flex; align-items: center; color: var(--fg); background: none; border: 0; padding: 0 0 0 .8rem; cursor: pointer; }
+.hero-search button:hover { color: var(--accent); }
+@media (max-width: 52rem) { .hero { grid-template-columns: minmax(0, 1fr); margin-top: 1.6rem; } }
+
+.wall-wrap { margin-top: 2.4rem; }
+.wall { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: .4rem; }
+.wall a { display: block; border-radius: 50%; }
+.wall .avatar { width: 100%; height: auto; aspect-ratio: 1; filter: grayscale(1); opacity: .85; transition: filter .2s, opacity .2s; }
+.wall .on .avatar { filter: none; opacity: 1; outline: 3px solid var(--accent); outline-offset: 2px; }
+.wall a:hover .avatar, .wall a:focus-visible .avatar { filter: none; opacity: 1; }
+/* Its own focus ring: the link's red outline would sit on the active faces' red ring. */
+.wall a:focus-visible { outline: 3px solid var(--fg); outline-offset: 6px; }
+.wall-cap { display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; margin: .9rem 0 0; font-size: .88rem; color: var(--muted); }
+.wall-cap span:nth-child(2) { color: var(--accent); }
+.wall-cap a { margin-left: auto; }
+/* Fewer, larger faces on smaller screens: three full rows each time. */
+@media (max-width: 64rem) { .wall { grid-template-columns: repeat(16, minmax(0, 1fr)); } .wall li:nth-child(n+97) { display: none; } }
+@media (max-width: 36rem) { .wall { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .3rem; } .wall li:nth-child(n+61) { display: none; } .wall-cap a { margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .wall .avatar { transition: none; } }
+
+/* Home: links in ink, so red marks only what is live this week. */
+.home .p-name, .home .wall-cap a, .home .more a, .home .catgrid a, .home .p-owner:hover, .home .site-footer a, .home .hero-cats a { color: var(--fg); }
+.home .site-footer a:hover, .home .hero-cats a:hover { text-decoration: underline; text-underline-offset: .15em; }
+/* A drawn arrow after "see all" links (no glyph in the translatable text). */
+.go { display: inline-flex; align-items: center; gap: .35em; }
+.go svg { flex: none; }
+/* The categories, one quiet line under the search, so they stay one step from the top. */
+.hero-cats { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; margin: 0; font-size: .95rem; }
+.hero-cats .n { color: var(--muted); font-size: .82rem; margin-left: .25em; font-variant-numeric: tabular-nums; }
+.home .p-name:hover, .home .wall-cap a:hover, .home .more a:hover { text-decoration: underline; text-underline-offset: .15em; }
+
+::selection { background: var(--accent); color: #fff; }
+input { caret-color: var(--accent); }
+
 /* Text */
 .intro h1 { margin-bottom: .1em; }
 .stats, .note, .lead { color: var(--muted); }
 .note { font-size: .88rem; margin: 0 0 .5rem; }
 .lead { max-width: 66rem; }
-.notice { background: var(--soft); border-left: 3px solid var(--accent); padding: .5rem .8rem; font-size: .92rem; }
+.notice { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: .6rem 0; font-size: .92rem; }
 .more { margin: .6rem 0 0; }
 
 /* Layout */
@@ -121,7 +171,7 @@ h2 { font-size: 1.15rem; }
 .p-name { font-weight: 600; overflow-wrap: anywhere; }
 .p-owner { font-weight: 400; color: var(--muted); }
 a.p-owner:hover { color: var(--link); }
-.p-desc { margin: .1rem 0 .15rem; font-size: .93rem; text-wrap: pretty; }
+.p-desc { margin: .1rem 0 .15rem; max-width: 68ch; font-size: .93rem; text-wrap: pretty; }
 .p-meta { display: flex; flex-wrap: wrap; gap: .1rem .9rem; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .p-lang::before { content: ""; display: inline-block; width: .5em; height: .5em; border-radius: 50%; background: var(--muted); margin-right: .35em; vertical-align: .08em; }
 .p-trend.up { color: var(--up); font-weight: 600; }
@@ -139,6 +189,7 @@ a.p-owner:hover { color: var(--link); }
 .avatar { display: inline-block; flex: none; border-radius: 50%; background: var(--soft); border: 1px solid var(--line); object-fit: cover; vertical-align: middle; }
 .avatar-24 { width: 24px; height: 24px; font-size: .7rem; }
 .avatar-36 { width: 36px; height: 36px; font-size: .95rem; }
+.avatar-48 { width: 48px; height: 48px; font-size: 1.2rem; }
 .avatar-96 { width: 96px; height: 96px; font-size: 2.4rem; }
 .avatar-initial { display: inline-grid; place-items: center; color: var(--muted); font-weight: 600; }
 
@@ -336,7 +387,7 @@ a.p-owner:hover { color: var(--link); }
 .catgrid li { border-top: 2px solid var(--line); padding-top: .4rem; }
 .catgrid a { color: var(--fg); }
 .catgrid .count { color: var(--muted); font-size: .85rem; margin-left: .3rem; }
-.catgrid p { margin: .15rem 0 0; font-size: .82rem; color: var(--muted); }
+.catgrid p { margin: .15rem 0 0; font-size: .82rem; color: var(--muted); text-wrap: pretty; }
 
 /* Sort and search (revealed by app.js) */
 .sort { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .85rem; color: var(--muted); margin: .4rem 0; }
@@ -406,3 +457,8 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
 .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .75rem; row-gap: .1rem; margin: 1.6em 0 .35rem; }
 .sec-head h2 { margin: 0; }
 .sec-head .note { margin: 0; }
+
+/* Home sections below the wall: bigger, heavier headings and more air between them. */
+.hero ~ section, .hero ~ .cols { margin-top: 3.2rem; }
+.hero ~ section > h2, .hero ~ section > .sec-head > h2, .hero ~ .cols h2 { font-size: clamp(1.45rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -.01em; margin-top: 0; }
+.hero ~ .cols section + section { margin-top: 2.6rem; }

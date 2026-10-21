@@ -551,6 +551,12 @@
   });
 
   input.addEventListener("focus", load, { once: true });
+  // Arriving from the home page search (/projects/?q=…): run that search.
+  const asked = new URLSearchParams(location.search).get("q");
+  if (asked) {
+    input.value = asked;
+    queueMicrotask(() => input.dispatchEvent(new Event("input")));
+  }
   input.addEventListener("input", async () => {
     const query = input.value.trim().toLowerCase();
     if (!query) {

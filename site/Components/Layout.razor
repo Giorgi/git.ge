@@ -37,7 +37,7 @@
         @((MarkupString)$"<script type=\"application/ld+json\">{ld}</script>")
     }
 </head>
-<body>
+<body class="@(IsHome ? "home" : null)">
     <a class="skip" href="#main"><T K="skip" /></a>
     <header class="site-header">
         <div class="wrap bar">
@@ -50,6 +50,9 @@
             </nav>
             <button class="lang" type="button" hidden data-i18n-title="lang.switchTitle" title="@Site.Strings.Ka("lang.switchTitle")"><T K="lang.switch" /></button>
         </div>
+        @* The home page lists the categories in its own section, so no strip there. *@
+        @if (!IsHome)
+        {
         <div class="cats-bar">
             <nav class="wrap cats" aria-labelledby="cats-label">
                 <span class="cats-label" id="cats-label"><T K="home.categories" /></span>
@@ -60,6 +63,7 @@
                 }
             </nav>
         </div>
+        }
     </header>
     <main id="main" class="wrap">
         @ChildContent

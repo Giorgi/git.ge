@@ -1,8 +1,49 @@
 <Layout Path="/" TitleKey="site.tagline" JsonLd="@(new object[] { Seo.WebSite() })">
-    <section class="intro">
-        <h1><T K="site.tagline" /></h1>
-        <p class="stats"><T K="home.stats" Args="@([Format.Number(Site.Listed.Count()), Format.Number(Site.Data.Developers)])" /></p>
+    @* The people are the identity: the real counts at poster size, then a wall of the
+       developers' avatars (most stars first, so the colour of this week's active ones
+       means something; ordered by recent change, the whole wall was active). *@
+    <section class="hero">
+        <h1 class="hero-title">
+            <span class="hero-line"><span class="n">@Format.Number(Site.Data.Developers)</span> <T K="home.heroDevs" /></span>
+            <span class="hero-line"><span class="n hot">@Format.Number(Site.Listed.Count())</span> <T K="home.heroProjects" /></span>
+        </h1>
+        <div class="hero-side">
+            <p class="hero-lead"><T K="home.heroLead" /></p>
+            <form class="hero-search" action="/projects/" method="get" role="search">
+                <label for="hero-q" class="visually-hidden"><T K="projects.searchLabel" /></label>
+                <input id="hero-q" name="q" type="search" autocomplete="off" spellcheck="false"
+                       placeholder="@Site.Strings.Ka("projects.search")" data-i18n-placeholder="projects.search">
+                <button type="submit"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M3 12h17M14 5l7 7-7 7" /></svg><span class="visually-hidden"><T K="home.searchGo" /></span></button>
+            </form>
+        </div>
+        <nav class="hero-cats" aria-labelledby="hero-cats-label">
+            <span id="hero-cats-label" class="visually-hidden"><T K="home.categories" /></span>
+            @foreach (var cat in Site.Data.Categories)
+            {
+                <a href="/c/@cat/"><T K="@($"cat.{cat}")" /><span class="n">@Site.Listed.Count(p => p.Category == cat)</span></a>
+            }
+        </nav>
     </section>
+
+    @if (Wall.Count > 0)
+    {
+        <section class="wall-wrap" aria-labelledby="wall-title">
+            <h2 id="wall-title" class="visually-hidden"><T K="home.wallTitle" /></h2>
+            <ul class="wall">
+                @foreach (var d in Wall)
+                {
+                    <li class="@(IsActive(d) ? "on" : null)">
+                        <a href="@d.Path" title="@d.DisplayName" aria-label="@d.DisplayName"><Avatar Login="@d.Login" Size="48" /></a>
+                    </li>
+                }
+            </ul>
+            <p class="wall-cap">
+                <span><T K="home.wallCaption" /></span>
+                <span><T K="home.wallActive" /></span>
+                <a class="go" href="/developers/"><T K="home.allDevelopers" /><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="square"><path d="M3 12h17M14 5l7 7-7 7" /></svg></a>
+            </p>
+        </section>
+    }
 
     @if (!Site.Data.Trend.HasHistory)
     {
@@ -33,7 +74,7 @@
                 <p class="note"><T K="home.topStarsNote" Args="@([Site.Data.DormantMonths])" /></p>
             }
             <ProjectList Items="@TopItems" />
-            <p class="more"><a href="/projects/"><T K="home.allProjects" /></a></p>
+            <p class="more"><a class="go" href="/projects/"><T K="home.allProjects" /><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="square"><path d="M3 12h17M14 5l7 7-7 7" /></svg></a></p>
         </section>
 
         <div>
@@ -67,6 +108,21 @@
 
 @code {
     const int TopCount = 25;
+    const int WallSize = 156;  // six rows of 26 at desktop width
+    const int ActiveDays = 7;
+
+    // Developers with listed projects and a saved avatar (a letter circle would break
+    // the wall), most stars first; colour then marks who changed something this week.
+    static List<SiteDeveloper> Wall => Site.Data.DeveloperPages
+        .Where(d => d.Projects.Count > 0 && Site.Avatar(d.Login) is not null)
+        .OrderByDescending(d => d.Stars).ThenBy(d => d.Login, StringComparer.OrdinalIgnoreCase)
+        .Take(WallSize).ToList();
+
+    // Relative to the data date, not the clock, like everything else on the site.
+    static bool IsActive(SiteDeveloper d) =>
+        d.LastPush is { } push && DataDate - push.UtcDateTime.Date <= TimeSpan.FromDays(ActiveDays);
+
+    static DateTime DataDate => DateTime.ParseExact(Site.Data.Trend.Current, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     // Trending once there is history; before that, the most-starred active projects
     // (dormant and archived ones would make the list look like a museum).
