@@ -80,6 +80,13 @@ public sealed class SiteTrend
     public string? Baseline { get; set; }
     public int WindowDays { get; set; }
 
+    // The days the trend actually covers: from the baseline snapshot to the current one.
+    // The baseline is the snapshot closest to WindowDays back (within a tolerance), so
+    // this can differ from WindowDays by a few days; labels show this number.
+    public int Days => Baseline is null ? WindowDays
+        : DateOnly.ParseExact(Current, "yyyy-MM-dd", CultureInfo.InvariantCulture).DayNumber
+          - DateOnly.ParseExact(Baseline, "yyyy-MM-dd", CultureInfo.InvariantCulture).DayNumber;
+
     public bool HasHistory => Baseline is not null;
 
     // First date on which a baseline can exist: oldest snapshot + window - tolerance.
@@ -203,6 +210,13 @@ public static class Site
 public static class Format
 {
     public static string Number(int? n) => n is { } v ? v.ToString("#,0", CultureInfo.InvariantCulture) : "—";
+
+    // CSS class for a language's colour dot ("C#" → "lang-c-sharp", "Jupyter Notebook"
+    // → "lang-jupyter-notebook"); the colours live in site.css, since the CSP forbids
+    // inline styles. Languages without a colour there get the neutral dot.
+    public static string LangClass(string language) =>
+        "lang-" + System.Text.RegularExpressions.Regex.Replace(
+            language.ToLowerInvariant().Replace("#", "-sharp").Replace("++", "pp"), "[^a-z0-9]+", "-").Trim('-');
 
     public static string Trend(int? t) => t switch
     {

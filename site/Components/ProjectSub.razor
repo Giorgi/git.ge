@@ -1,0 +1,14 @@
+@* The quiet line under a project name in home-page rows: the owner, optionally the
+   star count. *@
+<span class="row-sub">
+    <a href="@Site.OwnerHref(P.Owner)">@P.Owner</a>
+    @if (ShowStars && P.Stars is not null)
+    {
+        <span>@Format.Number(P.Stars) <Stars /></span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public SiteProject P { get; set; } = default!;
+    [Parameter] public bool ShowStars { get; set; }
+}

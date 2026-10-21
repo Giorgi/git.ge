@@ -1,0 +1,8 @@
+@* A project owner's face at the start of a home-page row, linking to their page.
+   Decorative for screen readers: the owner's name follows as text in ProjectSub. *@
+<a class="row-face" href="@Site.OwnerHref(P.Owner)" tabindex="-1" aria-hidden="true"><Avatar Login="@P.Owner" Size="@Size" /></a>
+
+@code {
+    [Parameter, EditorRequired] public SiteProject P { get; set; } = default!;
+    [Parameter] public int Size { get; set; } = 40;
+}

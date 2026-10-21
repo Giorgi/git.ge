@@ -146,8 +146,8 @@ html[lang="en"] .hero-title { font-size: clamp(2rem, 5vw, 4.6rem); }
 @media (prefers-reduced-motion: reduce) { .wall .avatar { transition: none; } }
 
 /* Home: links in ink, so red marks only what is live this week. */
-.home .p-name, .home .wall-cap a, .home .more a, .home .catgrid a, .home .p-owner:hover, .home .site-footer a, .home .hero-cats a { color: var(--fg); }
-.home .site-footer a:hover, .home .hero-cats a:hover { text-decoration: underline; text-underline-offset: .15em; }
+.home .p-name, .home .wall-cap a, .home .more a, .home .p-owner:hover, .home .site-footer a, .home .hero-cats a { color: var(--fg); }
+.home .p-name:hover, .home .wall-cap a:hover, .home .more a:hover, .home .site-footer a:hover, .home .hero-cats a:hover { text-decoration: underline; text-underline-offset: .15em; }
 /* A drawn arrow after "see all" links (no glyph in the translatable text). */
 .go { display: inline-flex; align-items: center; gap: .35em; }
 .go svg { flex: none; }
@@ -197,7 +197,9 @@ a.p-owner:hover { color: var(--link); }
 .avatar { display: inline-block; flex: none; border-radius: 50%; background: var(--soft); border: 1px solid var(--line); object-fit: cover; vertical-align: middle; }
 .avatar-24 { width: 24px; height: 24px; font-size: .7rem; }
 .avatar-36 { width: 36px; height: 36px; font-size: .95rem; }
+.avatar-40 { width: 40px; height: 40px; font-size: 1.05rem; }
 .avatar-48 { width: 48px; height: 48px; font-size: 1.2rem; }
+.avatar-64 { width: 64px; height: 64px; font-size: 1.6rem; }
 .avatar-96 { width: 96px; height: 96px; font-size: 2.4rem; }
 .avatar-initial { display: inline-grid; place-items: center; color: var(--muted); font-weight: 600; }
 
@@ -391,11 +393,6 @@ a.p-owner:hover { color: var(--link); }
 .dev-dir[data-metric="followed"] .m-metric, .dev-dir[data-metric="pushed"] .m-metric, .dev-dir[data-metric="first"] .m-metric { display: block; }
 
 /* Category overview */
-.catgrid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem 1.5rem; }
-.catgrid li { border-top: 2px solid var(--line); padding-top: .4rem; }
-.catgrid a { color: var(--fg); }
-.catgrid .count { color: var(--muted); font-size: .85rem; margin-left: .3rem; }
-.catgrid p { margin: .15rem 0 0; font-size: .82rem; color: var(--muted); text-wrap: pretty; }
 
 /* Sort and search (revealed by app.js) */
 .sort { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .85rem; color: var(--muted); margin: .4rem 0; }
@@ -466,7 +463,108 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
 .sec-head h2 { margin: 0; }
 .sec-head .note { margin: 0; }
 
-/* Home sections below the wall: bigger, heavier headings and more air between them. */
-.hero ~ section, .hero ~ .cols { margin-top: 3.2rem; }
-.hero ~ section > h2, .hero ~ section > .sec-head > h2, .hero ~ .cols h2 { font-size: clamp(1.45rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -.01em; margin-top: 0; }
-.hero ~ .cols section + section { margin-top: 2.6rem; }
+/* Home section headings: bigger and heavier. */
+.home-sec .sec-head h2 { font-size: clamp(1.45rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -.01em; }
+
+/* Home sections below the wall: one family of rows. Each row leads with a person
+   (the project owner's face, in colour) and its key number; the colour comes from
+   the content: faces, the rising green of star gains, the language dots. */
+.home-sec { margin-top: 3.6rem; }
+.home-sec .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem 1rem; border-bottom: 2px solid var(--fg); padding-bottom: .45rem; margin-bottom: .2rem; }
+.home-sec .sec-head h2 { margin: 0; }
+.home-sec .sec-head .note { margin: 0; }
+.home-sec .sec-head > a { color: var(--fg); white-space: nowrap; }
+.sec-lead { color: var(--muted); margin: .7rem 0 .2rem; max-width: 62ch; }
+/* Two equal columns whose rows share one height, so the hairlines line up across. */
+.home-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 3.5rem; }
+@media (max-width: 52rem) { .home-cols { grid-template-columns: minmax(0, 1fr); } }
+/* In the two columns the note always sits under the heading, so both header rules
+   are at the same height whatever the note's length. */
+.home-cols .sec-head { flex-direction: column; align-items: flex-start; gap: .15rem; }
+.home-sec ol, .home-sec ul { list-style: none; margin: 0; padding: 0; }
+
+/* Spotlight: three picks side by side, the name at headline size. */
+.spot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 2.5rem; }
+@media (max-width: 52rem) { .spot { grid-template-columns: minmax(0, 1fr); } .spot-item + .spot-item { border-top: 1px solid var(--line); } }
+/* Each pick is a column; the stars line sits at the bottom, level across all three. */
+.spot-item { display: flex; flex-direction: column; align-items: flex-start; padding: 1.3rem 0 .4rem; min-width: 0; }
+.spot-by { display: flex; align-items: center; gap: .7rem; color: var(--muted); }
+.spot-by a { color: var(--muted); }
+.spot-by a:hover { text-decoration: underline; text-underline-offset: .15em; }
+.spot-by .avatar { width: 64px; height: 64px; }
+.spot-item h3 { margin: .8rem 0 .45rem; font-size: clamp(1.6rem, 2.4vw, 2.1rem); line-height: 1.05; font-weight: 800; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.spot-item h3 a { color: var(--fg); }
+/* Name and language as two flex items: the language drops to its own line before a
+   long name would be broken to make room for it. */
+.spot-item h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .7rem; }
+.spot-item h3 a { min-width: 0; }
+.spot-item h3 .ldot { font-size: .85rem; font-weight: 400; letter-spacing: 0; color: var(--muted); white-space: nowrap; }
+.spot-desc { margin: 0; max-width: 36ch; color: var(--fg); text-wrap: pretty; }
+.spot-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .9rem; margin: auto 0 0; padding-top: .8rem; font-size: .85rem; color: var(--muted); }
+.spot-meta .big { font-size: 1.5rem; font-weight: 800; color: var(--fg); font-variant-numeric: tabular-nums; }
+.rise { color: var(--up); font-weight: 700; }
+
+/* Rows: face, name, quiet line under it, a number at the end. */
+.row-face { flex: none; display: block; border-radius: 50%; }
+.row-face .avatar { display: block; }
+.row-face .avatar-initial { display: grid; }
+.row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.row-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .6rem; }
+.row-title { min-width: 0; color: var(--fg); font-weight: 700; overflow-wrap: anywhere; }
+.row-head .ldot { font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.row-sub { display: flex; flex-wrap: wrap; gap: 0 .7rem; font-size: .82rem; color: var(--muted); }
+.row-sub a { color: var(--muted); }
+.row-end { flex: none; margin-left: auto; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row-title:hover, .row-sub a:hover, .spot-item h3 a:hover { text-decoration: underline; text-underline-offset: .15em; }
+
+/* Trending: rank, the gain as the lead number, then the row. */
+.rank li, .rows-list li { box-sizing: border-box; min-height: 4.75rem; }
+.rank li { display: flex; align-items: center; gap: .8rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
+.rank-n { flex: none; width: 1.4rem; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.rank-gain { flex: none; width: 5.2rem; font-size: 1.65rem; line-height: 1.05; font-weight: 900; letter-spacing: -.02em; color: var(--up); font-variant-numeric: tabular-nums; }
+/* The period under each gain ("30 დღეში"), so the number never stands alone. */
+.rank-per { display: block; font-size: .72rem; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+.rank-gain.plain { color: var(--fg); font-size: 1.3rem; }
+.rank li:nth-child(-n+3) .rank-gain { font-size: 2.05rem; }
+@media (max-width: 36rem) { .rank-gain { width: 4rem; font-size: 1.3rem; } .rank li:nth-child(-n+3) .rank-gain { font-size: 1.5rem; } .rank .row-end { display: none; } }
+
+/* New projects. */
+.rows-list li { display: flex; align-items: center; gap: .7rem; padding: .62rem 0; border-bottom: 1px solid var(--line); }
+
+/* Help wanted: projects that want contributors, three across. */
+.hw-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 2.5rem; }
+@media (max-width: 64rem) { .hw-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 36rem) { .hw-grid { grid-template-columns: minmax(0, 1fr); } }
+.hw-grid li { display: flex; align-items: flex-start; gap: .85rem; padding: 1.05rem 0; border-bottom: 1px solid var(--line); }
+.hw-grid .row-title { font-size: 1.1rem; font-weight: 800; }
+.hw-issue { margin-top: .35rem; font-size: .9rem; color: var(--fg); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hw-issue:hover { text-decoration: underline; text-underline-offset: .15em; }
+.hw-count { flex: none; text-align: right; font-size: .75rem; color: var(--muted); line-height: 1.2; }
+.hw-count b { display: block; font-size: 1.8rem; font-weight: 900; line-height: 1; color: var(--up); font-variant-numeric: tabular-nums; }
+
+/* Categories as an index. */
+.cat-index li { display: grid; grid-template-columns: minmax(0, 22rem) 4rem minmax(0, 1fr); align-items: baseline; gap: .3rem 1rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
+.cat-name { font-size: clamp(1.4rem, 2.4vw, 1.9rem); font-weight: 800; letter-spacing: -.01em; color: var(--fg); }
+.cat-name:hover { text-decoration: underline; text-underline-offset: .12em; }
+.cat-count { font-size: 1.15rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cat-top { font-size: .9rem; color: var(--muted); text-wrap: pretty; }
+@media (max-width: 36rem) { .cat-index li { grid-template-columns: minmax(0, 1fr) auto; } .cat-top { grid-column: 1 / -1; } }
+
+/* Language dots, GitHub's colours for the languages listed here; any other
+   language gets the neutral dot. A hairline ring keeps dark dots visible in dark mode. */
+.ldot::before { content: ""; display: inline-block; width: .6em; height: .6em; border-radius: 50%; margin-right: .32em; vertical-align: .04em; background: var(--muted); box-shadow: 0 0 0 1px var(--line); }
+.lang-javascript::before { background: #f1e05a; } .lang-python::before { background: #3572a5; }
+.lang-typescript::before { background: #3178c6; } .lang-php::before { background: #4f5d95; }
+.lang-c-sharp::before { background: #178600; } .lang-go::before { background: #00add8; }
+.lang-java::before { background: #b07219; } .lang-rust::before { background: #dea584; }
+.lang-c::before { background: #555555; } .lang-cpp::before { background: #f34b7d; }
+.lang-html::before { background: #e34c26; } .lang-shell::before { background: #89e051; }
+.lang-kotlin::before { background: #a97bff; } .lang-swift::before { background: #f05138; }
+.lang-ruby::before { background: #701516; } .lang-css::before { background: #663399; }
+.lang-jupyter-notebook::before { background: #da5b0b; } .lang-nim::before { background: #ffc200; }
+.lang-dart::before { background: #00b4ab; } .lang-lua::before { background: #000080; }
+.lang-vue::before { background: #41b883; } .lang-elixir::before { background: #6e4a7e; }
+.lang-objective-c::before { background: #438eff; } .lang-clojure::before { background: #db5855; }
+.lang-hcl::before { background: #844fba; } .lang-dockerfile::before { background: #384d54; }
+.lang-scss::before { background: #c6538c; } .lang-svelte::before { background: #ff3e00; }
+.lang-haskell::before { background: #5e5086; } .lang-crystal::before { background: #000100; }

@@ -185,7 +185,7 @@ string SearchIndex()
     {
         trend = Site.Data.Trend.HasHistory,
         dormantMonths = Site.Data.DormantMonths,
-        window = Site.Data.Trend.WindowDays,
+        window = Site.Data.Trend.Days,
         projects = items,
     }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) });
 }

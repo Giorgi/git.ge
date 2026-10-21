@@ -1,0 +1,15 @@
+@* A project's name in a home-page row, with its language right after it (the
+   language belongs to the project, not to the owner on the line below). Href
+   defaults to the project itself. *@
+<span class="row-head">
+    <a class="row-title" href="@(Href ?? P.Url)" rel="@(Href is null && P.IsSubmittedUrl ? "nofollow ugc" : null)">@P.Name</a>
+    @if (P.Language is not null)
+    {
+        <span class="ldot @Format.LangClass(P.Language)">@P.Language</span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public SiteProject P { get; set; } = default!;
+    [Parameter] public string? Href { get; set; }
+}

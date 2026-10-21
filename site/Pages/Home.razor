@@ -40,7 +40,7 @@
             <p class="wall-cap">
                 <span><T K="home.wallCaption" /></span>
                 <span><T K="home.wallActive" /></span>
-                <a class="go" href="/developers/"><T K="home.allDevelopers" /><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="square"><path d="M3 12h17M14 5l7 7-7 7" /></svg></a>
+                <a class="go" href="/developers/"><T K="home.allDevelopers" /><Arrow /></a>
             </p>
         </section>
     }
@@ -50,56 +50,151 @@
         <p class="notice"><T K="home.coldStart" Args="@([Site.Data.Trend.FirstTrendDate, Site.Data.DormantMonths])" /></p>
     }
 
+    @* Spotlight: each pick as a person and their work, at headline size. *@
     @if (Site.Data.Spotlight.Count > 0)
     {
-        <section class="spotlight" aria-labelledby="spotlight">
+        <section class="home-sec" aria-labelledby="spotlight">
             <div class="sec-head">
                 <h2 id="spotlight"><T K="home.spotlight" /></h2>
                 <p class="note"><T K="home.spotlightNote" /></p>
             </div>
-            <ProjectList Items="@Site.Data.Spotlight.Select(Site.Project)" />
+            <div class="spot">
+                @foreach (var p in Site.Data.Spotlight.Select(Site.Project))
+                {
+                    <article class="spot-item">
+                        <div class="spot-by">
+                            <a href="@Site.OwnerHref(p.Owner)" tabindex="-1" aria-hidden="true"><Avatar Login="@p.Owner" Size="64" /></a>
+                            <a href="@Site.OwnerHref(p.Owner)">@p.Owner</a>
+                        </div>
+                        <h3><a href="@p.Url" rel="@(p.IsSubmittedUrl ? "nofollow ugc" : null)">@p.Name</a>@if (p.Language is not null) {<span class="ldot @Format.LangClass(p.Language)">@p.Language</span>}</h3>
+                        @if (p.DescriptionKa is not null)
+                        {
+                            <p class="spot-desc" data-desc-en="@p.Description">@p.DescriptionKa</p>
+                        }
+                        else if (p.Description is not null)
+                        {
+                            <p class="spot-desc">@p.Description</p>
+                        }
+                        <p class="spot-meta">
+                            @if (p.Stars is not null)
+                            {
+                                <span><span class="big">@Format.Number(p.Stars)</span> <T K="home.stars" /></span>
+                            }
+                            @if (Site.Data.Trend.HasHistory && p.Trend > 0)
+                            {
+                                <span class="rise"><T K="home.gain" Args="@([Format.Number(p.Trend), Site.Data.Trend.Days])" /></span>
+                            }
+                        </p>
+                    </article>
+                }
+            </div>
         </section>
     }
 
-    <div class="cols">
-        <section aria-labelledby="top">
-            @if (Site.Data.Trend.HasHistory)
-            {
-                <h2 id="top"><T K="home.trending" /></h2>
-                <p class="note"><T K="home.trendingNote" Args="@([Site.Data.Trend.WindowDays])" /></p>
-            }
-            else
-            {
-                <h2 id="top"><T K="home.topStars" /></h2>
-                <p class="note"><T K="home.topStarsNote" Args="@([Site.Data.DormantMonths])" /></p>
-            }
-            <ProjectList Items="@TopItems" />
-            <p class="more"><a class="go" href="/projects/"><T K="home.allProjects" /><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="square"><path d="M3 12h17M14 5l7 7-7 7" /></svg></a></p>
+    <div class="home-cols">
+        @* Trending (or, before there is history, the most-starred active projects):
+           the star gain leads each row. *@
+        <section class="home-sec" aria-labelledby="top">
+            <div class="sec-head">
+                @if (Site.Data.Trend.HasHistory)
+                {
+                    <h2 id="top"><T K="home.trending" /></h2>
+                    <p class="note"><T K="home.trendingNote" Args="@([Site.Data.Trend.Days])" /></p>
+                }
+                else
+                {
+                    <h2 id="top"><T K="home.topStars" /></h2>
+                    <p class="note"><T K="home.topStarsNote" Args="@([Site.Data.DormantMonths])" /></p>
+                }
+            </div>
+            <ol class="rank">
+                @foreach (var (p, i) in TopItems.Select((p, i) => (p, i)))
+                {
+                    <li>
+                        <span class="rank-n">@(i + 1)</span>
+                        @if (Site.Data.Trend.HasHistory)
+                        {
+                            <span class="rank-gain">@Format.Trend(p.Trend)<span class="rank-per"><T K="home.gainPeriod" Args="@([Site.Data.Trend.Days])" /></span></span>
+                        }
+                        else
+                        {
+                            <span class="rank-gain plain">@Format.Number(p.Stars)</span>
+                        }
+                        <ProjectFace P="p" Size="40" />
+                        <span class="row-text">
+                            <ProjectTitle P="p" />
+                            <ProjectSub P="p" />
+                        </span>
+                        @if (Site.Data.Trend.HasHistory && p.Stars is not null)
+                        {
+                            <span class="row-end">@Format.Number(p.Stars) <Stars /></span>
+                        }
+                    </li>
+                }
+            </ol>
+            <p class="more"><a class="go" href="/projects/"><T K="home.allProjects" /><Arrow /></a></p>
         </section>
 
-        <div>
-            <section aria-labelledby="new">
+        @* New this month: who made it, and when. *@
+        <section class="home-sec" aria-labelledby="new">
+            <div class="sec-head">
                 <h2 id="new"><T K="home.new" /></h2>
                 <p class="note"><T K="home.newNote" /></p>
-                <ProjectList Items="@Site.Data.NewThisMonth.Select(Site.Project)" />
-            </section>
-            <section aria-labelledby="active">
-                <h2 id="active"><T K="home.active" /></h2>
-                <p class="note"><T K="home.activeNote" /></p>
-                <ProjectList Items="@Site.Data.RecentlyActive.Select(Site.Project)" />
-            </section>
-        </div>
+            </div>
+            <ul class="rows-list">
+                @foreach (var p in Site.Data.NewThisMonth.Select(Site.Project).Take(NewCount))
+                {
+                    <li>
+                        <ProjectFace P="p" Size="40" />
+                        <span class="row-text">
+                            <ProjectTitle P="p" />
+                            <ProjectSub P="p" ShowStars="true" />
+                        </span>
+                        <RelTime Value="@p.CreatedAt" Class="row-end" Verb="card.created" />
+                    </li>
+                }
+            </ul>
+        </section>
     </div>
 
-    <section aria-labelledby="categories">
-        <h2 id="categories"><T K="home.categories" /></h2>
-        <ul class="catgrid">
+    @* Help wanted: the projects that want contributors, in the help-wanted page's
+       ranking, each with its owner, how many issues are open and the newest title. *@
+    @if (HelpWanted.Count > 0)
+    {
+        <section class="home-sec" aria-labelledby="hw">
+            <div class="sec-head">
+                <h2 id="hw"><T K="hw.title" /></h2>
+                <a class="go" href="/help-wanted/"><T K="home.hwAll" Args="@([Site.Data.Issues.Count])" /><Arrow /></a>
+            </div>
+            <p class="sec-lead"><T K="home.hwLead" Args="@([HelpWantedProjects])" /></p>
+            <ul class="hw-grid">
+                @foreach (var (p, issues) in HelpWanted)
+                {
+                    <li>
+                        <ProjectFace P="p" Size="48" />
+                        <span class="row-text">
+                            <ProjectTitle P="p" Href="@($"/help-wanted/#{p.Anchor}")" />
+                            <ProjectSub P="p" />
+                            <a class="hw-issue" href="@issues[0].Url">@issues[0].Title</a>
+                        </span>
+                        <span class="hw-count"><b>@issues.Count</b> <T K="@(issues.Count == 1 ? "home.hwIssuesOne" : "home.hwIssues")" /></span>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    @* Categories as an index: the name at headline size, the count, the top projects. *@
+    <section class="home-sec" aria-labelledby="categories">
+        <div class="sec-head"><h2 id="categories"><T K="home.categories" /></h2></div>
+        <ul class="cat-index">
             @foreach (var cat in Site.Data.Categories)
             {
                 var projects = Site.Listed.Where(p => p.Category == cat).ToList();
                 <li>
-                    <a href="/c/@cat/"><strong><T K="@($"cat.{cat}")" /></strong> <span class="count">@projects.Count</span></a>
-                    <p>@string.Join(", ", Site.DefaultOrder(projects).Take(4).Select(p => p.Name))</p>
+                    <a class="cat-name" href="/c/@cat/"><T K="@($"cat.{cat}")" /></a>
+                    <span class="cat-count">@projects.Count</span>
+                    <span class="cat-top">@string.Join(", ", Site.DefaultOrder(projects).Take(4).Select(p => p.Name))</span>
                 </li>
             }
         </ul>
@@ -107,7 +202,9 @@
 </Layout>
 
 @code {
-    const int TopCount = 25;
+    const int TopCount = 10;
+    const int NewCount = 8;
+    const int HelpWantedCount = 12;
     const int WallSize = 156;  // six rows of 26 at desktop width
     const int ActiveDays = 7;
 
@@ -129,4 +226,13 @@
     static IEnumerable<SiteProject> TopItems => (Site.Data.Trend.HasHistory
         ? Site.DefaultOrder(Site.Listed)
         : Site.Listed.Where(p => !p.Inactive).OrderByDescending(p => p.Stars ?? 0).ThenByDescending(p => p.PushedAt)).Take(TopCount);
+
+    // Issues arrive in the help-wanted page's ranked order; group them by project in
+    // that order (first appearance), newest issue first within a project.
+    static List<(SiteProject Project, List<HelpWantedIssue> Issues)> HelpWanted => Site.Data.Issues
+        .GroupBy(i => i.Project)
+        .Select(g => (Project: Site.Project(g.Key), Issues: g.OrderByDescending(i => i.CreatedAt).ToList()))
+        .Take(HelpWantedCount).ToList();
+
+    static int HelpWantedProjects => Site.Data.Issues.Select(i => i.Project).Distinct().Count();
 }
