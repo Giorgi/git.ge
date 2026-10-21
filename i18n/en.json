@@ -49,7 +49,7 @@
   "card.verified": "Verified",
   "card.starsTitle": "Stars on GitHub",
   "card.trendTitle": "Stars in the last {0} days",
-  "card.pushedTitle": "Last change",
+  "card.pushed": "updated",
   "date.months": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
   "rel.today": "today",
   "rel.yesterday": "yesterday",
@@ -84,7 +84,7 @@
   "hw.countProjectsOne": "1 project",
   "hw.assigned": "assigned",
   "hw.facetLabel": "Label",
-  "hw.openedTitle": "Opened",
+  "hw.opened": "opened",
   "hw.noMatch": "No issues match these filters.",
 
   "roundups.title": "Roundups",

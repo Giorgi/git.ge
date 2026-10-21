@@ -85,7 +85,8 @@
   // <time data-rel datetime="YYYY-MM-DD"> shows how long ago, counted in calendar days
   // from the viewer's today: დღეს / გუშინ, days under 2 weeks, weeks under 9 weeks,
   // months under a year, then years ("3 დღის წინ", "3 days ago"). The tooltip keeps the
-  // readable date ("29 სექ. 2026"), after the data-rel-label string when there is one.
+  // readable date ("29 სექ. 2026"). A verb before the date ("შეიცვალა") is a separate
+  // data-i18n span, so it switches language with the rest of the page.
   // Without Intl.RelativeTimeFormat the readable date stays as the text. Browsers whose
   // Intl has no Georgian data (it falls back to English) use the rel.* strings instead.
 
@@ -122,18 +123,27 @@
     const iso = (el.getAttribute("datetime") || "").slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
     el.textContent = relDate(iso);
-    const label = el.dataset.relLabel;
-    el.title = label ? `${t(label)}: ${absDate(iso)}` : absDate(iso);
+    el.title = absDate(iso);
   }
-  // A new <time data-rel> (search results, developer metric lines).
-  function relTime(iso, cls, label) {
-    const el = document.createElement("time");
-    if (cls) el.className = cls;
-    el.setAttribute("datetime", iso);
-    el.dataset.rel = "";
-    if (label) el.dataset.relLabel = label;
-    renderTime(el);
-    return el;
+  // A new <time data-rel> (search results, developer metric lines). With a verb (an
+  // i18n key) it comes wrapped as RelTime.razor renders it: <span class>verb <time></span>.
+  function relTime(iso, cls, verb) {
+    const time = document.createElement("time");
+    time.setAttribute("datetime", iso);
+    time.dataset.rel = "";
+    renderTime(time);
+    if (!verb) {
+      if (cls) time.className = cls;
+      return time;
+    }
+    const wrap = document.createElement("span");
+    if (cls) wrap.className = cls;
+    const word = document.createElement("span");
+    word.dataset.i18n = verb;
+    word.dataset.ka = I18N.ka[verb] ?? verb;  // applyLanguage restores Georgian from this
+    word.textContent = t(verb);
+    wrap.append(word, " ", time);
+    return wrap;
   }
   const renderTimes = () => { for (const el of document.querySelectorAll("time[data-rel]")) renderTime(el); };
   languageHooks.push(renderTimes);
@@ -597,7 +607,7 @@
       meta.append(el("span", "p-trend" + (t > 0 ? " up" : t < 0 ? " down" : ""),
         t === undefined ? "—" : t > 0 ? "+" + t : t < 0 ? "−" + -t : "0"));
     }
-    if (p.p) meta.append(relTime(p.p, "p-pushed" + (p.o && !p.a ? " dim" : ""), "card.pushedTitle"));
+    if (p.p) meta.append(relTime(p.p, "p-pushed" + (p.o && !p.a ? " dim" : ""), "card.pushed"));
     if (p.o && !p.a) meta.append(el("span", "badge dormant", t("card.dormant", index.dormantMonths ?? 12)));
     li.append(meta);
     return li;

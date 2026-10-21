@@ -49,7 +49,7 @@
   "card.verified": "დადასტურებული",
   "card.starsTitle": "ვარსკვლავები GitHub-ზე",
   "card.trendTitle": "ვარსკვლავები ბოლო {0} დღეში",
-  "card.pushedTitle": "ბოლო ცვლილება",
+  "card.pushed": "შეიცვალა",
   "date.months": "იან.,თებ.,მარ.,აპრ.,მაი.,ივნ.,ივლ.,აგვ.,სექ.,ოქტ.,ნოე.,დეკ.",
   "rel.today": "დღეს",
   "rel.yesterday": "გუშინ",
@@ -84,7 +84,7 @@
   "hw.countProjectsOne": "1 პროექტი",
   "hw.assigned": "ჰყავს შემსრულებელი",
   "hw.facetLabel": "ჭდე",
-  "hw.openedTitle": "გაიხსნა",
+  "hw.opened": "გაიხსნა",
   "hw.noMatch": "ამ ფილტრებით issue ვერ მოიძებნა.",
 
   "roundups.title": "მიმოხილვები",
