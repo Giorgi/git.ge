@@ -2156,9 +2156,9 @@ static class Social
 }
 
 // ---------------------------------------------------------------------------
-// Avatars: self-hosted 96px avatars of developers with a page, so the site loads
-// nothing from GitHub. Written to the avatar cache (default _cache/avatars/, not
-// committed); the site build copies them to _site/avatars/. Files older than a
+// Avatars: self-hosted avatars of developers with a page, so the site loads
+// nothing from GitHub. Fetched at 256px into the avatar cache (default _cache/avatars/,
+// not committed); the site build makes 96px and 224px WebP from them. Files older than a
 // week are re-downloaded; avatars of people without a page (e.g. after opting out)
 // are deleted. Needs _build/site-data.json (run prepare first).
 // ---------------------------------------------------------------------------
@@ -2166,6 +2166,7 @@ static class Social
 static class Avatars
 {
     static readonly TimeSpan MaxAge = TimeSpan.FromDays(7);
+    const int Size = 256;
 
     public static async Task Run(Paths paths, Options options)
     {
@@ -2192,8 +2193,8 @@ static class Avatars
         await Parallel.ForEachAsync(todo, new ParallelOptions { MaxDegreeOfParallelism = 8 }, async (d, ct) =>
         {
             var url = ids.TryGetValue(d.Login, out var id) && id > 0
-                ? $"https://avatars.githubusercontent.com/u/{id}?s=96&v=4"
-                : $"https://github.com/{d.Login}.png?size=96";
+                ? $"https://avatars.githubusercontent.com/u/{id}?s={Size}&v=4"
+                : $"https://github.com/{d.Login}.png?size={Size}";
             try
             {
                 using var response = await http.GetAsync(url, ct);

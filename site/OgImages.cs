@@ -66,7 +66,7 @@ static class OgImages
         var fx = (float)Pad;
         foreach (var login in faces.Take(MaxFaces))
         {
-            Face(c, Path.Combine(output, Site.Avatar(login)!.TrimStart('/')), fx, 330);
+            Face(c, Path.Combine(output, Site.AvatarLarge(login)!.TrimStart('/')), fx, 330);
             fx += FaceSize + FaceGap;
         }
         if (faces.Count > MaxFaces) Text(c, $"+{faces.Count - MaxFaces}", fx + 6, 330 + FaceSize / 2f + 12, 32, false, Muted);

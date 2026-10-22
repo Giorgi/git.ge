@@ -202,6 +202,10 @@ public static class Site
 
     public static string? Avatar(string login) => Avatars.GetValueOrDefault(login.ToLowerInvariant());
 
+    // The 224px version, for faces shown large (developer page, share images).
+    public static Dictionary<string, string> AvatarsLarge { get; set; } = [];
+    public static string? AvatarLarge(string login) => AvatarsLarge.GetValueOrDefault(login.ToLowerInvariant()) ?? Avatar(login);
+
     // Changed code in the last week: the red ring on the home wall and on developer
     // pages. Relative to the data date, not the clock, like everything else on the site.
     const int ActiveDays = 7;

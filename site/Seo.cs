@@ -99,7 +99,7 @@ public static class Seo
             ["url"] = Site.Url(d.Path),
             ["sameAs"] = new[] { d.Url },
         };
-        if (Site.Avatar(d.Login) is { } avatar) entity[d.IsOrg ? "logo" : "image"] = Site.Url(avatar);
+        if (Site.AvatarLarge(d.Login) is { } avatar) entity[d.IsOrg ? "logo" : "image"] = Site.Url(avatar);
         if (!d.IsOrg && d.Languages.Count > 0) entity["knowsAbout"] = d.Languages;
         return new Dictionary<string, object?>
         {

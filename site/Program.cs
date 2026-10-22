@@ -60,20 +60,12 @@ Write("assets/i18n.js", "window.GITGE_I18N = " + JsonSerializer.Serialize(new { 
 foreach (var file in Directory.GetFiles(Path.Combine(output, "assets"), "*.*", SearchOption.TopDirectoryOnly))
     Site.AssetVersions[$"assets/{Path.GetFileName(file)}"] = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)))[..10];
 
-// Self-hosted avatars from the cache that `gitge.cs avatars` fills; only people with a page.
+// Self-hosted avatars from the cache that `gitge.cs avatars` fills; only people with a
+// page, re-encoded as small and large WebP (AvatarImages).
 var avatarCache = Environment.GetEnvironmentVariable("GITGE_AVATARS") is { Length: > 0 } avatarDir
     ? avatarDir : Path.Combine(root, "_cache", "avatars");
 if (Directory.Exists(avatarCache))
-{
-    Directory.CreateDirectory(Path.Combine(output, "avatars"));
-    foreach (var file in Directory.GetFiles(avatarCache))
-    {
-        var login = Path.GetFileNameWithoutExtension(file);
-        if (!Site.Developers.ContainsKey(login)) continue;
-        File.Copy(file, Path.Combine(output, "avatars", Path.GetFileName(file)), overwrite: true);
-        Site.Avatars[login] = $"/avatars/{Path.GetFileName(file)}";
-    }
-}
+    AvatarImages.Build(avatarCache, output);
 
 // Share images for roundups (needs the avatars above), before the pages that point at them.
 Site.OgImages = OgImages.Roundups(root, output, Site.Roundups);

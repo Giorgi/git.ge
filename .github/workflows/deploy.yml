@@ -67,8 +67,8 @@ jobs:
         uses: actions/cache@v6
         with:
           path: _cache/avatars
-          key: avatars-${{ steps.week.outputs.id }}
-          restore-keys: avatars-
+          key: avatars256-${{ steps.week.outputs.id }}
+          restore-keys: avatars256-   # 256px sources; the old 96px cache (avatars-) is not reused
 
       - name: Download new or stale avatars
         continue-on-error: true

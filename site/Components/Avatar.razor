@@ -1,7 +1,7 @@
 @* A developer's avatar, self-hosted under /avatars/ (see `gitge.cs avatars`).
    Without a cached image it falls back to the first letter in a neutral circle.
    Decorative: the name is always next to it or in the link's title. *@
-@if (Site.Avatar(Login) is { } src)
+@if ((Size >= 64 ? Site.AvatarLarge(Login) : Site.Avatar(Login)) is { } src)
 {
     <img class="@Classes" src="@src" width="@Size" height="@Size" alt="" loading="@(Size >= 96 ? "eager" : "lazy")">
 }
