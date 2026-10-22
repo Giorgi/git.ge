@@ -105,6 +105,9 @@
   "roundups.title": "Roundups",
   "roundups.intro": "A monthly roundup of what was built and what moved.",
   "roundups.none": "No roundups published yet.",
+  "roundups.published": "Published",
+  "roundups.people": "{0} developers in this roundup",
+  "roundups.peopleOne": "{0} developer in this roundup",
   "roundups.rss": "RSS feed",
   "roundups.back": "← All roundups",
 

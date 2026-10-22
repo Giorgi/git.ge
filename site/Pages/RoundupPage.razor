@@ -1,16 +1,35 @@
 @* Roundups are written by hand (or drafted with the /roundup skill and then
    reviewed) in content/roundups/. Georgian and English versions are both
-   rendered; CSS shows the one matching <html lang>, so it works without JS. *@
+   rendered; CSS shows the one matching <html lang>, so it works without JS.
+   The Markdown is cut up by RoundupView and laid out in the site's grammar: the
+   month at poster size with the faces of everyone featured, project entries with
+   the owner's face, release and pick lists as rows, the numbers as big figures. *@
 <Layout Path="@($"/roundups/{R.Slug}/")" Title="@R.Ka.Title" Description="@(R.Ka.Summary ?? Site.Strings.Ka("meta.roundup", R.Ka.Title))" OgType="article"
         Crumbs="@([(Site.Strings.Ka("roundups.title"), "/roundups/"), (R.Ka.Title, $"/roundups/{R.Slug}/")])" JsonLd="@(new object[] { Seo.Article(R) })">
-    <article class="prose">
-        <p class="note"><a href="/roundups/"><T K="roundups.back" /></a></p>
+    <article class="rnd">
+        <p class="note rnd-back"><a href="/roundups/"><T K="roundups.back" /></a></p>
         @foreach (var (lang, text) in Versions)
         {
             <div class="l10n" lang="@lang">
-                <h1>@text.Title</h1>
-                <p class="note"><time datetime="@R.Date.ToString("yyyy-MM-dd")">@R.Date.ToString("yyyy-MM-dd")</time></p>
-                @((MarkupString)text.Html)
+                <header class="rnd-head">
+                    <h1 class="rnd-title">@text.Title</h1>
+                    <p class="rnd-date"><T K="roundups.published" /> <time datetime="@R.Date.ToString("yyyy-MM-dd")">@R.Date.ToString("yyyy-MM-dd")</time></p>
+                </header>
+                @foreach (var section in text.Sections)
+                {
+                    @if (section.Title is null)
+                    {
+                        <div class="rnd-intro">@Parts(section.Parts)</div>
+                        <RoundupFaces Owners="R.Owners" />
+                    }
+                    else
+                    {
+                        <section class="sec">
+                            <div class="sec-head"><h2>@((MarkupString)section.Title)</h2></div>
+                            @Parts(section.Parts)
+                        </section>
+                    }
+                }
             </div>
         }
     </article>
@@ -20,4 +39,71 @@
     [Parameter, EditorRequired] public Roundup R { get; set; } = default!;
 
     IEnumerable<(string Lang, RoundupText Text)> Versions => [("ka", R.Ka), ("en", R.En)];
+
+    RenderFragment Parts(List<RoundupPart> parts) => @<text>
+        @foreach (var part in Group(parts))
+        {
+            @switch (part)
+            {
+                case List<RoundupEntry> entries:
+                    <div class="rnd-entries">
+                        @foreach (var e in entries)
+                        {
+                            <article class="rnd-entry">
+                                <a class="row-face" href="@Site.OwnerHref(e.Repo.Owner)" tabindex="-1" aria-hidden="true"><Avatar Login="@e.Repo.Owner" Size="48" /></a>
+                                <div class="rnd-entry-head">
+                                    <h3><a class="row-title" href="@e.Repo.Url">@e.Repo.Name</a></h3>
+                                    <p class="row-sub"><a href="@Site.OwnerHref(e.Repo.Owner)">@e.Repo.Owner</a>
+                                        @if (e.Meta is not null) { <span>@((MarkupString)e.Meta)</span> }</p>
+                                </div>
+                                <div class="rnd-entry-body">
+                                    @if (e.Quote is not null) { <blockquote class="rnd-quote">@((MarkupString)e.Quote)</blockquote> }
+                                    @if (e.Body is not null) { @((MarkupString)e.Body) }
+                                </div>
+                            </article>
+                        }
+                    </div>
+                    break;
+                case RoundupRows rows:
+                    <ul class="rows-list rnd-rows">
+                        @foreach (var (repo, rest) in rows.Rows)
+                        {
+                            <li>
+                                <a class="row-face" href="@Site.OwnerHref(repo.Owner)" tabindex="-1" aria-hidden="true"><Avatar Login="@repo.Owner" Size="36" /></a>
+                                <span class="row-text">
+                                    <a class="row-title" href="@repo.Url">@repo.Name</a>
+                                    <span class="row-sub"><a href="@Site.OwnerHref(repo.Owner)">@repo.Owner</a>
+                                        @if (rest is not null) { <span>@((MarkupString)rest)</span> }</span>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                    break;
+                case RoundupFigures figures:
+                    <ul class="rnd-figures">
+                        @foreach (var (number, rest) in figures.Figures)
+                        {
+                            <li><b>@number</b> <span>@((MarkupString)rest)</span></li>
+                        }
+                    </ul>
+                    break;
+                case RoundupHtml html:
+                    <div class="prose rnd-text">@((MarkupString)html.Html)</div>
+                    break;
+            }
+        }
+    </text>;
+
+    // Consecutive project entries share one grid.
+    static IEnumerable<object> Group(List<RoundupPart> parts)
+    {
+        List<RoundupEntry>? run = null;
+        foreach (var part in parts)
+        {
+            if (part is RoundupEntry e) { (run ??= []).Add(e); continue; }
+            if (run is not null) { yield return run; run = null; }
+            yield return part;
+        }
+        if (run is not null) yield return run;
+    }
 }

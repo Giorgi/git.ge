@@ -149,11 +149,15 @@ public sealed class HelpWantedIssue
 
 // One roundup: Georgian, plus English when <slug>.en.md exists (otherwise the
 // Georgian text is used for both).
-public sealed record RoundupText(string Title, string? Summary, string Html);
+// Html is the whole body (RSS feed); Sections the same body cut up for the page (RoundupView).
+public sealed record RoundupText(string Title, string? Summary, string Html, List<RoundupSection> Sections);
 
 public sealed record Roundup(string Slug, DateOnly Date, RoundupText Ka, RoundupText En)
 {
     public bool HasEnglish => !ReferenceEquals(Ka, En);
+
+    // The people a roundup features, in order of first mention (the list page's faces).
+    public List<string> Owners { get; } = RoundupView.Owners(Ka.Sections);
 }
 
 // Everything a page needs, loaded once. The renderer is a batch job that runs

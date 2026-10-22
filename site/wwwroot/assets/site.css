@@ -510,10 +510,54 @@ input { caret-color: var(--accent); }
 .devs-main .hw-project:first-child { margin-top: .4rem; }
 
 /* Roundups and long text */
-.roundups { list-style: none; padding: 0; }
-.roundups li { padding: .5rem 0; border-bottom: 1px solid var(--line); }
-.roundups time { color: var(--muted); font-size: .85rem; margin-right: .6rem; font-variant-numeric: tabular-nums; }
-.roundups p { margin: .1rem 0 0; color: var(--muted); font-size: .92rem; }
+/* Roundup list: each month a big heading, its summary, the faces it features. */
+.roundups { list-style: none; margin: 2rem 0 0; padding: 0; }
+.roundups > li { padding: 1.4rem 0 1.5rem; border-top: 2px solid var(--fg); }
+.roundups > li + li { border-top-width: 1px; border-top-color: var(--line); }
+.roundups h2 { margin: 0; font-size: clamp(1.7rem, 3.4vw, 2.6rem); font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+.roundups h2 a { color: var(--fg); }
+.roundups h2 a:hover { text-decoration: underline; text-underline-offset: .12em; }
+.roundups-summary { margin: .5rem 0 0; color: var(--muted); font-size: 1.05rem; }
+.roundups-date { margin: .7rem 0 0; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Roundup page: the month at poster size, the intro as a lead, then sections in the
+   home grammar (rule under the heading, faces leading each row). */
+.rnd-back { margin-top: 1.2rem; }
+.rnd-head { margin-top: 1rem; }
+.rnd-title { margin: 0; font-size: clamp(2.4rem, 6vw, 4.6rem); font-weight: 900; letter-spacing: -.03em; line-height: 1; }
+.rnd-date { margin: 1rem 0 0; font-size: .88rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rnd-intro { margin-top: 1.4rem; font-size: 1.2rem; line-height: 1.55; }
+.rnd-intro p { margin: 0 0 .6em; }
+.rnd-faces { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin-top: 1.2rem; font-size: .85rem; color: var(--muted); }
+.rnd-faces ul { list-style: none; display: flex; flex-wrap: wrap; gap: .35rem; margin: 0; padding: 0; }
+.rnd-faces a { display: block; border-radius: 50%; }
+.rnd-faces .avatar { display: block; }
+.rnd-faces a:hover .avatar, .rnd-faces a:focus-visible .avatar { outline: 2px solid var(--fg); outline-offset: 2px; }
+.rnd .sec { margin-top: 3rem; }
+.rnd .rnd-text { margin-top: .8rem; max-width: none; }   /* the full column: beats .prose's measure, which comes later */
+.rnd-text p { margin: 0 0 .6em; }
+/* A section's own short lead (under the heading) is quiet, like the home section notes. */
+.sec-head + .rnd-text { color: var(--muted); font-size: .92rem; max-width: none; }
+/* New projects: two columns of entries, each led by the owner's face. */
+.rnd-entries { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 28rem), 1fr)); gap: 0 2.5rem; }
+/* Face beside the name; the quote and prose hang under the name, and take the full
+   width on phones, where a face-wide gutter would leave a narrow column. */
+.rnd-entry { display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: .85rem; align-items: start; align-content: start; padding: 1.1rem 0 1.2rem; border-bottom: 1px solid var(--line); }
+.rnd-entry-body { grid-column: 2; }
+@media (max-width: 36rem) { .rnd-entry { align-items: center; } .rnd-entry-body { grid-column: 1 / -1; } }
+.rnd-entry h3 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: 0; }
+.rnd-entry h3 .row-title { font-weight: 800; }
+.rnd-entry .row-sub { margin: .15rem 0 0; }
+.rnd-entry p { margin: .55rem 0 0; }
+.rnd-quote { margin: .6rem 0 0; padding-left: .8rem; border-left: 2px solid var(--line); color: var(--muted); font-size: .92rem; }
+/* Releases and picks: rows in two columns. */
+.rnd .rnd-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); column-gap: 2.5rem; }
+.rnd .rnd-rows li { min-height: 0; }
+.rnd-rows .row-sub span a { color: var(--fg); }   /* the release name links to the release */
+/* In numbers: the developer page's big figures. */
+.rnd .rnd-figures { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1.2rem 2.5rem; }
+.rnd-figures li { display: flex; flex-direction: column; gap: .35rem; color: var(--muted); font-size: .92rem; }   /* the number on top, its description under it */
+.rnd-figures b { font-size: clamp(1.8rem, 3.4vw, 2.6rem); line-height: 1; font-weight: 900; letter-spacing: -.02em; color: var(--fg); font-variant-numeric: tabular-nums; }
 .prose { max-width: 54rem; }
 .prose h2 { margin-top: 1.8em; }
 .prose li { margin: .2rem 0; }

@@ -280,7 +280,7 @@ static List<Roundup> LoadRoundups(string dir, MarkdownPipeline markdown)
         var title = meta.GetValueOrDefault("title") ?? throw new InvalidOperationException($"{file}: missing 'title' in front matter");
         var date = DateOnly.ParseExact(meta.GetValueOrDefault("date") ?? throw new InvalidOperationException($"{file}: missing 'date' in front matter"),
                                        "yyyy-MM-dd", CultureInfo.InvariantCulture);
-        return (new RoundupText(title, meta.GetValueOrDefault("summary"), Markdown.ToHtml(body, markdown)), date);
+        return (new RoundupText(title, meta.GetValueOrDefault("summary"), Markdown.ToHtml(body, markdown), RoundupView.Parse(body, markdown)), date);
     }
 }
 

@@ -105,6 +105,9 @@
   "roundups.title": "მიმოხილვები",
   "roundups.intro": "ყოველთვიური მიმოხილვა: რა შეიქმნა და რა განვითარდა.",
   "roundups.none": "მიმოხილვები ჯერ არ გამოქვეყნებულა.",
+  "roundups.published": "გამოქვეყნდა",
+  "roundups.people": "{0} დეველოპერი ამ მიმოხილვაში",
+  "roundups.peopleOne": "{0} დეველოპერი ამ მიმოხილვაში",
   "roundups.rss": "RSS არხი",
   "roundups.back": "← ყველა მიმოხილვა",
 

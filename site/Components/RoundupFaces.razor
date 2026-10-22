@@ -1,0 +1,21 @@
+@* The people a roundup features: a short strip of faces (only those with a saved
+   avatar, like the home wall), each linking to their page, with a count. *@
+@if (Faces.Count > 0)
+{
+    <div class="rnd-faces">
+        <ul>
+            @foreach (var owner in Faces.Take(Max))
+            {
+                <li><a href="@Site.OwnerHref(owner)" title="@owner" aria-label="@owner"><Avatar Login="@owner" Size="36" /></a></li>
+            }
+        </ul>
+        <span><T K="@(Owners.Count == 1 ? "roundups.peopleOne" : "roundups.people")" Args="@([Owners.Count])" /></span>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<string> Owners { get; set; } = [];
+    [Parameter] public int Max { get; set; } = 24;
+
+    List<string> Faces => Owners.Where(o => Site.Avatar(o) is not null).ToList();
+}

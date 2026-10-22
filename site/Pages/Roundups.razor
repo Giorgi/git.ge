@@ -1,3 +1,5 @@
+@* The roundup list: newest first, each month as a big heading with its summary and
+   the faces of the people it features. *@
 <Layout Path="/roundups/" TitleKey="roundups.title" Crumbs="@([(Site.Strings.Ka("roundups.title"), "/roundups/")])" Description="@Site.Strings.Ka("meta.roundups")">
     <h1><T K="roundups.title" /></h1>
     <p class="lead"><T K="roundups.intro" /> <a href="/roundups/feed.xml"><T K="roundups.rss" /></a></p>
@@ -12,17 +14,18 @@
             @foreach (var r in Site.Roundups)
             {
                 <li>
-                    <time datetime="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToString("yyyy-MM-dd")</time>
                     @foreach (var (lang, text) in new[] { ("ka", r.Ka), ("en", r.En) })
                     {
-                        <span class="l10n" lang="@lang">
-                            <a href="/roundups/@r.Slug/">@text.Title</a>
+                        <div class="l10n" lang="@lang">
+                            <h2><a href="/roundups/@r.Slug/">@text.Title</a></h2>
                             @if (text.Summary is not null)
                             {
-                                <p>@text.Summary</p>
+                                <p class="roundups-summary">@text.Summary</p>
                             }
-                        </span>
+                        </div>
                     }
+                    <RoundupFaces Owners="r.Owners" Max="16" />
+                    <p class="roundups-date"><T K="roundups.published" /> <time datetime="@r.Date.ToString("yyyy-MM-dd")">@r.Date.ToString("yyyy-MM-dd")</time></p>
                 </li>
             }
         </ol>
