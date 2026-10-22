@@ -5,7 +5,14 @@
 <Layout Path="/developers/" TitleKey="devs.title" Crumbs="@([(Site.Strings.Ka("devs.title"), "/developers/")])"
         Description="@Site.Strings.Ka("meta.developers", Format.Number(All.Count))">
     <h1><T K="devs.title" /></h1>
-    <p class="note"><T K="devs.intro" Args="@([Format.Number(All.Count)])" /></p>
+    <p class="note">
+        <T K="devs.intro" Args="@([Format.Number(All.Count)])" />
+        @if (ActiveCount > 0)
+        {
+            @* The key for the red ring on faces (the home wall and developer pages use it too). *@
+            <span class="devs-key"><span class="devs-key-ring" aria-hidden="true"></span><T K="devs.activeKey" Args="@([Format.Number(ActiveCount)])" /></span>
+        }
+    </p>
 
     @* Filters and sort (app.js, DevSidebar): one category and one language at a time,
        combined with AND. Category + language means ONE project with both (data-pairs);
@@ -36,6 +43,7 @@
 
 @code {
     List<SiteDeveloper> All => Site.Data.DeveloperPages;
+    int ActiveCount => All.Count(Site.IsActive);
     List<SiteDeveloper> Listed => All.Where(d => d.Projects.Count > 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
     List<SiteDeveloper> More => All.Where(d => d.Projects.Count == 0).OrderBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
 }

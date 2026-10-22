@@ -252,8 +252,8 @@
       }
     };
     if (metricHost) {
-      // The default meta line is plain Georgian in the HTML; rebuild it (and its
-      // tooltip) from data-projects and data-cats in the current language.
+      // The default meta line is plain Georgian in the HTML; rebuild it from
+      // data-projects and data-cats in the current language.
       const rebuildMeta = () => {
         for (const li of metricHost.querySelectorAll("li[data-cats]")) {
           const meta = li.querySelector(".m-default");
@@ -261,11 +261,10 @@
           const shown = (li.dataset.cats || "").split(";")[0];
           const cats = shown ? shown.split(",") : [];
           meta.textContent = [t("devs.projects", li.dataset.projects), ...cats.map(c => t("cat." + c))].join(" · ");
-          meta.title = meta.textContent;
         }
       };
       languageHooks.push(rebuildMeta, () => showMetric(metricHost.dataset.metric));
-      rebuildMeta();   // also sets the tooltips
+      rebuildMeta();
     }
 
     bar.addEventListener("click", e => {

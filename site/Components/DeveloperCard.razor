@@ -5,7 +5,7 @@
    feeds the category filter: the categories shown on the card, then ";" and the
    rest of the developer's categories. data-langs feeds the language filter, and
    data-pairs (only where needed) the category + language combination. *@
-<li class="dev-cell" data-projects="@Projects" data-followed="@Followers" data-pushed="@Format.Date(D.LastPush)" data-first="@D.FirstSeenAt" data-stars="@D.Stars" data-cats="@CatsAttribute" data-langs="@string.Join(",", DeveloperFilters.LanguagesOf(D))" data-pairs="@DeveloperFilters.PairsOf(D)"><a class="dev-card" href="@D.Path"><Avatar Login="@D.Login" Size="36" /><span class="dev-card-text"><strong>@D.DisplayName</strong><span class="dev-card-login">@D.Login</span><span class="dev-card-meta m-default">@DefaultMeta</span></span></a></li>
+<li class="dev-cell" data-projects="@Projects" data-followed="@Followers" data-pushed="@Format.Date(D.LastPush)" data-first="@D.FirstSeenAt" data-stars="@D.Stars" data-cats="@CatsAttribute" data-langs="@string.Join(",", DeveloperFilters.LanguagesOf(D))" data-pairs="@DeveloperFilters.PairsOf(D)"><a class="dev-card" href="@D.Path"><Avatar Login="@D.Login" Size="40" Class="@(Site.IsActive(D) ? "on" : null)" /><span class="dev-card-text"><strong>@D.DisplayName</strong><span class="dev-card-login">@D.Login</span><span class="dev-card-meta m-default">@DefaultMeta</span></span></a></li>
 
 @code {
     [Parameter, EditorRequired] public SiteDeveloper D { get; set; } = default!;
@@ -24,8 +24,7 @@
         }
     }
 
-    // One line with an ellipsis; app.js adds the full text as the tooltip (kept out
-    // of the HTML, where it would repeat the Georgian text on ~900 cards).
+    // Project count and the top two categories; wraps rather than being cut.
     string DefaultMeta => string.Join(" · ",
         new[] { Site.Strings.Ka("devs.projects", Projects) }.Concat(Categories.Select(c => Site.Strings.Ka($"cat.{c}"))));
 }

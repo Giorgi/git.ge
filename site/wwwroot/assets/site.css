@@ -305,13 +305,18 @@ input { caret-color: var(--accent); }
 /* Developer directory (/u/): cells stretch to the row's height, so bottom borders align. */
 .dev-grid { list-style: none; padding: 0; margin: .6rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0 1.2rem; align-items: stretch; }
 .dev-cell { display: flex; min-width: 0; }
-.dev-card { display: flex; flex: 1; gap: .6rem; align-items: center; min-width: 0; padding: .45rem 0; border-bottom: 1px solid var(--line); color: var(--fg); }
+.dev-card { display: flex; flex: 1; gap: .7rem; align-items: center; min-width: 0; padding: .45rem 0; border-bottom: 1px solid var(--line); color: var(--fg); }
 .dev-card:hover { text-decoration: none; }
+.dev-card .avatar.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.devs-key { display: inline-flex; align-items: center; gap: .45rem; margin-left: 1rem; }
+@media (max-width: 36rem) { .devs-key { display: flex; margin: .2rem 0 0; } }
+.devs-key-ring { flex: none; width: .75rem; height: .75rem; border-radius: 50%; border: 2px solid var(--accent); }
 .dev-card:hover strong { text-decoration: underline; text-underline-offset: .15em; }
 .dev-card-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
 .dev-card-text strong { overflow-wrap: anywhere; }
 .dev-card-login, .dev-card-meta { font-size: .78rem; color: var(--muted); }
-.dev-card-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Wraps rather than cutting a category name with "…"; cells in a row stretch, so rules still line up. */
+.dev-card-meta { overflow-wrap: anywhere; }
 .dev-group { margin-top: 2rem; }
 /* Filter sidebar (FilterSidebar: /developers/ and /help-wanted/): a toolbar across the top (the panel-left toggle, the
    filter tags while the column is hidden, the sort links, the result), then the
@@ -332,13 +337,14 @@ input { caret-color: var(--accent); }
 
 /* The toggle: a button with a panel-left icon (left pane filled while the lists are
    shown), the word "ფილტრები" and a count badge while filters are active. */
+/* Text with an icon, like the sort controls: no box. */
 .devs-toggle {
   display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
-  min-width: 2rem; min-height: 2rem; padding: .2rem .65rem .2rem .45rem;
-  font: inherit; font-size: .9rem; color: var(--fg); background: var(--soft);
-  border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+  min-height: 2rem; padding: .2rem 0;
+  font: inherit; font-size: .95rem; font-weight: 600; color: var(--fg); background: none;
+  border: 0; cursor: pointer;
 }
-.devs-toggle:hover { border-color: var(--muted); }
+.devs-toggle:hover .devs-toggle-text { text-decoration: underline; text-underline-offset: .3em; }
 .devs-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .devs-toggle[hidden], .devs-toggle-badge[hidden] { display: none; }
 .devs-toggle-icon { flex: none; display: block; }

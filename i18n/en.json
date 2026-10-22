@@ -119,6 +119,7 @@
   "nav.developers": "Developers",
   "devs.title": "Developers",
   "devs.intro": "{0} developers and organizations with projects on git.ge.",
+  "devs.activeKey": "Red ring: authors of projects changed this week ({0})",
   "devs.projects": "projects: {0}",
   "sort.name": "A–Z",
   "sort.projects": "Projects",
