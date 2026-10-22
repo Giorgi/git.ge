@@ -195,7 +195,6 @@ input { caret-color: var(--accent); }
 .badge.cat { color: var(--muted); }
 /* No push in 12+ months: the date steps back and a quiet outlined marker follows it. */
 .p-pushed.dim { color: var(--dim); }
-.badge.dormant { color: var(--muted); background: none; border: 1px solid var(--line); padding: 0 .35rem; }
 
 /* Avatars (self-hosted; see gitge.cs avatars). Sizes are classes: the CSP forbids inline styles. */
 .avatar { display: inline-block; flex: none; border-radius: 50%; background: var(--soft); border: 1px solid var(--line); object-fit: cover; vertical-align: middle; }
@@ -207,14 +206,52 @@ input { caret-color: var(--accent); }
 .avatar-96 { width: 96px; height: 96px; font-size: 2.4rem; }
 .avatar-initial { display: inline-grid; place-items: center; color: var(--muted); font-weight: 600; }
 
-/* Developer page */
-.dev-head { display: flex; flex-wrap: wrap; gap: .6rem 1.25rem; align-items: flex-start; margin-top: 1.4rem; }
-.dev-id { flex: 1 1 14rem; min-width: 0; }
-/* Share: top right beside the name; wraps under the header on phones. */
-.dev-share { display: flex; align-items: center; gap: .5rem; }
+/* Developer page: the home poster at the scale of one person. The face large (the
+   wall's red ring when they changed code this week), the name at poster size, the
+   numbers set large over a 2px ink rule. */
+.dev-head {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "face id share" "stats stats stats" "chips chips chips";
+  gap: 0 1.6rem; align-items: center; margin-top: 2rem;
+}
+.dev-face { grid-area: face; display: block; border-radius: 50%; }
+.dev-face .avatar { display: block; width: 112px; height: 112px; font-size: 2.8rem; }
+.dev-face .avatar-initial { display: grid; }
+.dev-face.on .avatar { outline: 3px solid var(--accent); outline-offset: 3px; }
+.dev-id { grid-area: id; min-width: 0; }
+.dev-name { margin: .1rem 0 0; font-size: clamp(1.9rem, 4vw, 3.2rem); line-height: .98; font-weight: 900; letter-spacing: -.03em; overflow-wrap: break-word; text-wrap: balance; }
+.dev-last { white-space: nowrap; }
+.dev-last.on { color: var(--accent); }
+.dev-last::before { content: "· "; color: var(--muted); }
+/* Share: bottom right, on the rule at the height of the name; ink text, no box. */
+.dev-share { grid-area: share; align-self: end; display: flex; align-items: center; gap: .6rem; padding-bottom: .35rem; }
+.dev-share-btn { display: inline-flex; align-items: center; gap: .4rem; font: inherit; font-size: 1rem; font-weight: 600; color: var(--fg); background: none; border: 0; padding: .3rem 0; cursor: pointer; }
+.dev-share-btn[hidden] { display: none; }
+.dev-share-btn svg { flex: none; display: block; }
+.dev-share-btn:hover { color: var(--fg); text-decoration: underline; text-underline-offset: .2em; }
 .dev-share-status { font-size: .85rem; color: var(--muted); }
 .dev-share-status:empty { display: none; }
-@media (max-width: 36rem) { .dev-share { flex-basis: 100%; } }
+.dev-stats {
+  grid-area: stats; list-style: none; margin: 1.6rem 0 0; padding: .9rem 0 0; border-top: 2px solid var(--fg);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem 2.6rem;
+}
+.dev-stats li { display: flex; align-items: baseline; gap: .45rem; color: var(--muted); font-size: .9rem; }
+.dev-stats b { font-size: clamp(1.8rem, 3.4vw, 2.6rem); line-height: 1; font-weight: 900; letter-spacing: -.02em; color: var(--fg); font-variant-numeric: tabular-nums; }
+.dev-stats .rise { font-weight: 400; }
+.dev-stats .rise b { color: var(--up); }
+/* Languages and categories: the quiet end of the numbers line. */
+.dev-stats .dev-tags { flex-wrap: wrap; align-items: center; gap: .3rem .9rem; margin-left: auto; font-size: .92rem; }
+.dev-tags .ldot { color: var(--muted); }
+.dev-tags .badge { font-size: .8rem; padding: .1rem .45rem; }
+.dev-head .chips { grid-area: chips; margin-top: .7rem; }
+@media (max-width: 36rem) {
+  .dev-head { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "face share" "id id" "stats stats" "chips chips"; gap: 0 1rem; margin-top: 1.4rem; }
+  .dev-share { align-self: center; padding-bottom: 0; }
+  .dev-id { margin-top: .8rem; }
+  .dev-face .avatar { width: 64px; height: 64px; font-size: 1.6rem; }
+  .dev-face { justify-self: start; }
+  .dev-stats { gap: .5rem 1.6rem; margin-top: 1rem; }
+  .dev-stats .dev-tags { margin-left: 0; flex-basis: 100%; }
+}
 /* A quiet button: soft background, hairline border (same look as the filter toggle). */
 .btn {
   display: inline-flex; align-items: center; gap: .4rem; min-height: 2rem; padding: .2rem .7rem .2rem .55rem;
@@ -224,27 +261,30 @@ input { caret-color: var(--accent); }
 .btn:hover { border-color: var(--muted); }
 .btn[hidden] { display: none; }
 .btn svg { flex: none; display: block; }
-.dev-id h1 { margin: 0 0 .15rem; }
-.dev-login, .dev-summary { margin: .1rem 0; color: var(--muted); font-size: .92rem; }
+.dev-login { margin: 0; color: var(--muted); font-size: .92rem; }
 .dev-login a { color: var(--muted); }
 .chips { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-wrap: wrap; gap: .35rem; }
 .chips { gap: .2rem 1.1rem; }
 .chip { font-size: .88rem; color: var(--fg); }
 .chip a { color: var(--fg); }
-/* Aligned with the header's text column on wide screens (avatar 96px + gap). */
-.dev-ranks { margin: .6rem 0 0 calc(96px + 1.25rem); }
-@media (max-width: 36rem) { .dev-ranks { margin-left: 0; } }
-.dev-ranks h2 { font-size: .85rem; font-weight: 600; color: var(--muted); margin: 0 0 .15rem; }
+.dev-label { margin: 0 0 .35rem; font-size: .85rem; font-weight: 600; letter-spacing: 0; color: var(--muted); }
+.dev-ranks { margin-top: 2rem; }
 .dev-ranks ul { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
-.dev-ranks li { padding: .08rem 0; overflow-wrap: anywhere; }
-/* The best ranks lead: body size, ordinal and category in bold. */
-.dev-ranks .dev-ranks-top { font-size: 1rem; }
-.dev-ranks-top li { padding: .12rem 0; }
+.dev-ranks li { display: flex; align-items: center; gap: .6rem; padding: .08rem 0; overflow-wrap: anywhere; }
+/* Medals for top-three ranks: metal colours from the place itself (content, not decoration). */
+.medal { flex: none; display: block; transform: translateY(-15%); }  /* the disc's centre, not the ribbon's, level with the text */
+.medal-n { font: 800 13px var(--font, sans-serif); }
+.medal-1 .medal-disc { fill: #e3b23c; } .medal-1 .medal-rim { fill: none; stroke: #b8871a; } .medal-1 .medal-ribbon { fill: #b8871a; } .medal-1 .medal-n { fill: #4a3300; }
+.medal-2 .medal-disc { fill: #c3c7cc; } .medal-2 .medal-rim { fill: none; stroke: #8d939a; } .medal-2 .medal-ribbon { fill: #8d939a; } .medal-2 .medal-n { fill: #2c3035; }
+.medal-3 .medal-disc { fill: #d08a52; } .medal-3 .medal-rim { fill: none; stroke: #9c5a2a; } .medal-3 .medal-ribbon { fill: #9c5a2a; } .medal-3 .medal-n { fill: #3d1d06; }
+/* The best ranks lead: larger, ordinal and category in bold. */
+.dev-ranks .dev-ranks-top { font-size: 1.15rem; }
+.dev-ranks-top li { padding: .4rem 0; }
 .dev-ranks-more { margin-top: .2rem; }
 .dev-ranks-more summary { cursor: pointer; color: var(--muted); font-size: .88rem; width: fit-content; }
 .dev-ranks-more ul { margin-top: .15rem; }
-.dev-social { display: flex; flex-wrap: wrap; gap: .6rem 2.5rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 1.2rem 0 .4rem; padding: .6rem 0 .5rem; }
-.dev-social-title { flex-basis: 100%; margin: 0; font-size: .88rem; font-weight: 600; }
+.dev-social { display: flex; flex-wrap: wrap; gap: .6rem 3rem; margin-top: 2rem; }
+.dev-social .dev-label { flex-basis: 100%; margin: 0; }
 .people-text { margin: 0 0 .35rem; font-size: .85rem; color: var(--muted); }
 .people-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; }
 .people-more { font-size: .82rem; color: var(--muted); margin-left: .3rem; }
@@ -253,21 +293,14 @@ input { caret-color: var(--accent); }
   .people-list .people-wide { display: none; }
   .people-list .people-narrow { display: list-item; }
 }
-.dev-cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1.4fr); gap: 0 2.5rem; }
+.dev-cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1.6fr); gap: 0 2.5rem; }
 .dev-cols > :only-child { grid-column: 1 / -1; }
 @media (max-width: 52rem) { .dev-cols { grid-template-columns: minmax(0, 1fr); } }
 .dev-smaller { margin-top: .8rem; }
 .dev-smaller summary { cursor: pointer; color: var(--muted); font-size: .92rem; }
-.dev-side h2 { font-size: 1rem; }
-/* Side-column rows (contributes to, contributors, help wanted): one markup, one layout.
-   Avatar, main text and note sit in a single centered flex row with the same gap. */
-.rows { list-style: none; padding: 0; margin: 0; font-size: .92rem; }
-.row { display: flex; align-items: center; gap: .5rem; padding: .35rem 0; border-bottom: 1px solid var(--line); line-height: 1.35; }
-.row-avatar { display: flex; flex: none; }
-.row-main { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
-/* At most 40% of the row, cut with "…" (full text in the title), so a long project
-   name doesn't squeeze the issue title onto three lines. */
-.row-note { flex: none; max-width: 40%; color: var(--muted); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev-side .sec .sec-head h2 { font-size: 1.1rem; }
+.dev-side .rows-list li { min-height: 0; }
+.dev-issues .hw-issue { margin-top: 0; }
 
 /* Developer directory (/u/): cells stretch to the row's height, so bottom borders align. */
 .dev-grid { list-style: none; padding: 0; margin: .6rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0 1.2rem; align-items: stretch; }
@@ -459,8 +492,6 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
   .logo { grid-area: logo; }
   .nav { grid-area: nav; gap: .3rem 1rem; }
   .lang { grid-area: lang; }
-  .dev-head { gap: .8rem; }
-  .dev-head .avatar-96 { width: 64px; height: 64px; font-size: 1.6rem; }
 }
 
 /* Home Spotlight: the short heading and its note share one line (the note wraps under it on phones). */
@@ -469,16 +500,16 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
 .sec-head .note { margin: 0; }
 
 /* Home section headings: bigger and heavier. */
-.home-sec .sec-head h2 { font-size: clamp(1.45rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -.01em; }
+.sec .sec-head h2 { font-size: clamp(1.45rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -.01em; }
 
 /* Home sections below the wall: one family of rows. Each row leads with a person
    (the project owner's face, in colour) and its key number; the colour comes from
    the content: faces, the rising green of star gains, the language dots. */
-.home-sec { margin-top: 3.6rem; }
-.home-sec .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem 1rem; border-bottom: 2px solid var(--fg); padding-bottom: .45rem; margin-bottom: .2rem; }
-.home-sec .sec-head h2 { margin: 0; }
-.home-sec .sec-head .note { margin: 0; }
-.home-sec .sec-head > a { color: var(--fg); white-space: nowrap; }
+.sec { margin-top: 3.6rem; }
+.sec .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem 1rem; border-bottom: 2px solid var(--fg); padding-bottom: .45rem; margin-bottom: .2rem; }
+.sec .sec-head h2 { margin: 0; }
+.sec .sec-head .note { margin: 0; }
+.sec .sec-head > a { color: var(--fg); white-space: nowrap; }
 .sec-lead { color: var(--muted); margin: .7rem 0 .2rem; max-width: 62ch; }
 /* Two equal columns whose rows share one height, so the hairlines line up across. */
 .home-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 3.5rem; }
@@ -486,7 +517,7 @@ html[lang="ka"] .l10n[lang="en"], html[lang="en"] .l10n[lang="ka"] { display: no
 /* In the two columns the note always sits under the heading, so both header rules
    are at the same height whatever the note's length. */
 .home-cols .sec-head { flex-direction: column; align-items: flex-start; gap: .15rem; }
-.home-sec ol, .home-sec ul { list-style: none; margin: 0; padding: 0; }
+.sec ol, .sec ul { list-style: none; margin: 0; padding: 0; }
 
 /* Spotlight: three picks side by side, the name at headline size. */
 .spot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 2.5rem; }

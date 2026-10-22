@@ -189,6 +189,14 @@ public static class Site
 
     public static string? Avatar(string login) => Avatars.GetValueOrDefault(login.ToLowerInvariant());
 
+    // Changed code in the last week: the red ring on the home wall and on developer
+    // pages. Relative to the data date, not the clock, like everything else on the site.
+    const int ActiveDays = 7;
+    public static bool IsActive(SiteDeveloper d) =>
+        d.LastPush is { } push && DataDate - push.UtcDateTime.Date <= TimeSpan.FromDays(ActiveDays);
+
+    static DateTime DataDate => DateTime.ParseExact(Data.Trend.Current, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
     // Default order: trend when there is history to compute it from, "Popular" otherwise.
     public static IEnumerable<SiteProject> DefaultOrder(IEnumerable<SiteProject> projects) =>
         Data.Trend.HasHistory

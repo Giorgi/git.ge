@@ -663,7 +663,7 @@
       stars.append(sign, p.s.toLocaleString("en-US"), srWords("card.starsSr"));
       meta.append(stars);
     }
-    if (index.trend && p.s !== undefined) {
+    if (index.trend && p.s !== undefined && p.t !== 0) {
       const t = p.t;
       const trend = el("span", "p-trend" + (t > 0 ? " up" : t < 0 ? " down" : ""),
         t === undefined ? "—" : t > 0 ? "+" + t : t < 0 ? "−" + -t : "0");
@@ -671,7 +671,6 @@
       meta.append(trend);
     }
     if (p.p) meta.append(relTime(p.p, "p-pushed" + (p.o && !p.a ? " dim" : ""), "card.pushed"));
-    if (p.o && !p.a) meta.append(el("span", "badge dormant", t("card.dormant", index.dormantMonths ?? 12)));
     body.append(meta);
     li.append(body);
     return li;

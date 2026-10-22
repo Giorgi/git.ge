@@ -32,7 +32,7 @@
             <ul class="wall">
                 @foreach (var d in Wall)
                 {
-                    <li class="@(IsActive(d) ? "on" : null)">
+                    <li class="@(Site.IsActive(d) ? "on" : null)">
                         <a href="@d.Path" title="@d.DisplayName" aria-label="@d.DisplayName"><Avatar Login="@d.Login" Size="48" /></a>
                     </li>
                 }
@@ -53,7 +53,7 @@
     @* Spotlight: each pick as a person and their work, at headline size. *@
     @if (Site.Data.Spotlight.Count > 0)
     {
-        <section class="home-sec" aria-labelledby="spotlight">
+        <section class="sec" aria-labelledby="spotlight">
             <div class="sec-head">
                 <h2 id="spotlight"><T K="home.spotlight" /></h2>
                 <p class="note"><T K="home.spotlightNote" /></p>
@@ -94,7 +94,7 @@
     <div class="home-cols">
         @* Trending (or, before there is history, the most-starred active projects):
            the star gain leads each row. *@
-        <section class="home-sec" aria-labelledby="top">
+        <section class="sec" aria-labelledby="top">
             <div class="sec-head">
                 @if (Site.Data.Trend.HasHistory)
                 {
@@ -136,7 +136,7 @@
         </section>
 
         @* New this month: who made it, and when. *@
-        <section class="home-sec" aria-labelledby="new">
+        <section class="sec" aria-labelledby="new">
             <div class="sec-head">
                 <h2 id="new"><T K="home.new" /></h2>
                 <p class="note"><T K="home.newNote" /></p>
@@ -161,7 +161,7 @@
        ranking, each with its owner, how many issues are open and the newest title. *@
     @if (HelpWanted.Count > 0)
     {
-        <section class="home-sec" aria-labelledby="hw">
+        <section class="sec" aria-labelledby="hw">
             <div class="sec-head">
                 <h2 id="hw"><T K="hw.title" /></h2>
                 <a class="go" href="/help-wanted/"><T K="home.hwAll" Args="@([Site.Data.Issues.Count])" /><Arrow /></a>
@@ -185,7 +185,7 @@
     }
 
     @* Categories as an index: the name at headline size, the count, the top projects. *@
-    <section class="home-sec" aria-labelledby="categories">
+    <section class="sec" aria-labelledby="categories">
         <div class="sec-head"><h2 id="categories"><T K="home.categories" /></h2></div>
         <ul class="cat-index">
             @foreach (var cat in Site.Data.Categories)
@@ -206,7 +206,6 @@
     const int NewCount = 8;
     const int HelpWantedCount = 12;
     const int WallSize = 156;  // six rows of 26 at desktop width
-    const int ActiveDays = 7;
 
     // Developers with listed projects and a saved avatar (a letter circle would break
     // the wall), most stars first; colour then marks who changed something this week.
@@ -215,11 +214,6 @@
         .OrderByDescending(d => d.Stars).ThenBy(d => d.Login, StringComparer.OrdinalIgnoreCase)
         .Take(WallSize).ToList();
 
-    // Relative to the data date, not the clock, like everything else on the site.
-    static bool IsActive(SiteDeveloper d) =>
-        d.LastPush is { } push && DataDate - push.UtcDateTime.Date <= TimeSpan.FromDays(ActiveDays);
-
-    static DateTime DataDate => DateTime.ParseExact(Site.Data.Trend.Current, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     // Trending once there is history; before that, the most-starred active projects
     // (dormant and archived ones would make the list look like a museum).

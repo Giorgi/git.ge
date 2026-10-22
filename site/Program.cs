@@ -444,7 +444,8 @@ static void DormantMarkerChecks(Action<bool, string> check, string built)
             var href = System.Net.WebUtility.HtmlDecode(Regex.Match(m.Groups[2].Value, "class=\"p-name\" href=\"([^\"]*)\"").Groups[1].Value);
             if (!flags.TryGetValue(href, out var f)) { bad.Add($"{where}: {href} not in index.json"); continue; }
             cards++;
-            var badge = m.Groups[2].Value.Contains("class=\"badge dormant\"");
+            // Dormant projects show their code date dimmed (the date itself says how long).
+            var badge = m.Groups[2].Value.Contains("class=\"p-pushed dim\"");
             if (badge) marked++;
             if (badge != (f.Dormant && !f.Archived)) bad.Add($"{where}: {href} marker {badge}, dormant {f.Dormant}, archived {f.Archived}");
             if (m.Groups[1].Value.Contains("data-dormant=\"1\"") != (f.Dormant || f.Archived)) bad.Add($"{where}: {href} data-dormant");

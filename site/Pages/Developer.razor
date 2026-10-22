@@ -5,53 +5,69 @@
 <Layout Path="@D.Path" Title="@PageTitle" Description="@Summary" OgType="profile"
         Crumbs="@Crumbs" JsonLd="@(new object[] { Seo.Profile(D) })">
     <article class="dev">
+        @* The home poster at the scale of one person: the face large (with the wall's red
+           ring when they changed code this week), the name at poster size, and the
+           numbers set large over a 2px rule. *@
         <header class="dev-head">
-            <Avatar Login="@D.Login" Size="96" />
+            <span class="dev-face@(Active ? " on" : null)"><Avatar Login="@D.Login" Size="112" /></span>
             <div class="dev-id">
-                <h1>@D.DisplayName</h1>
                 <p class="dev-login">
                     <a href="@D.Url">github.com/@D.Login</a> ·
                     <T K="@(D.IsOrg ? "dev.org" : "dev.person")" />
+                    @* Red within the week, matching the ring on the face. *@
+                    <RelTime Value="@D.LastPush" Class="@(Active ? "dev-last on" : "dev-last")" Verb="dev.lastChange" />
                 </p>
-                <p class="dev-summary">
-                    <T K="dev.projectCount" Args="@([Format.Number(D.Projects.Count + D.Smaller.Count)])" /> ·
-                    @Format.Number(D.Stars) <Stars />
-                    @if (D.Languages.Count > 0)
-                    {
-                        <span> · @string.Join(", ", D.Languages)</span>
-                    }
-                    @foreach (var cat in D.Categories)
-                    {
-                        <span> · </span><a href="/c/@cat/"><T K="@($"cat.{cat}")" /></a>
-                    }
-                </p>
-                @if (D.Spotlight.Count > 0 || D.Roundups.Count > 0)
-                {
-                    <ul class="chips">
-                        @foreach (var week in D.Spotlight)
-                        {
-                            @* Both languages, CSS shows one: the dates have month names. *@
-                            <li class="chip">@foreach (var (lang, s) in Langs)
-                                {<span class="l10n" lang="@lang">@s["dev.spotlight"].Replace("{0}", Format.WeekText(week, s))</span>}</li>
-                        }
-                        @foreach (var slug in D.Roundups)
-                        {
-                            <li class="chip"><a href="/roundups/@slug/">@foreach (var (lang, s) in Langs)
-                                {<span class="l10n" lang="@lang">@s["dev.roundup"].Replace("{0}", Format.MonthText(slug, s))</span>}</a></li>
-                        }
-                    </ul>
-                }
+                <h1 class="dev-name">@D.DisplayName</h1>
             </div>
-            @* Shown by app.js: the share sheet on touch devices, otherwise copies the link. *@
-            <div class="dev-share">
-                <button type="button" class="btn" hidden data-share>
-                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            @* Shown by app.js: the share sheet on touch devices, otherwise copies the link.
+               Bottom right, on the rule, at the height of the name. *@
+            <span class="dev-share">
+                <button type="button" class="dev-share-btn" hidden data-share>
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 3.5v11M7.75 7.75 12 3.5l4.25 4.25M5.5 12.5v5.75c0 .97.78 1.75 1.75 1.75h9.5c.97 0 1.75-.78 1.75-1.75V12.5" />
                     </svg>
                     <T K="dev.share" />
                 </button>
                 <span class="dev-share-status" role="status" data-share-status></span>
-            </div>
+            </span>
+            <ul class="dev-stats">
+                <li><b>@Format.Number(ProjectCount)</b> <T K="@(ProjectCount == 1 ? "dev.statProjectOne" : "dev.statProjects")" /></li>
+                <li><b>@Format.Number(D.Stars)</b> <T K="@(D.Stars == 1 ? "dev.statStarOne" : "dev.statStars")" /></li>
+                @if (Gain > 0)
+                {
+                    <li class="rise"><b>+@Format.Number(Gain)</b> <T K="home.gainPeriod" Args="@([Site.Data.Trend.Days])" /></li>
+                }
+                @if (D.Languages.Count > 0 || D.Categories.Count > 0)
+                {
+                    <li class="dev-tags">
+                        @foreach (var lang in D.Languages)
+                        {
+                            <span class="ldot @Format.LangClass(lang)">@lang</span>
+                        }
+                        @foreach (var cat in D.Categories)
+                        {
+                            @* Category badges, as in the project rows: dot = language, badge = category. *@
+                            <a class="badge cat" href="/c/@cat/"><T K="@($"cat.{cat}")" /></a>
+                        }
+                    </li>
+                }
+            </ul>
+            @if (D.Spotlight.Count > 0 || D.Roundups.Count > 0)
+            {
+                <ul class="chips">
+                    @foreach (var week in D.Spotlight)
+                    {
+                        @* Both languages, CSS shows one: the dates have month names. *@
+                        <li class="chip">@foreach (var (lang, s) in Langs)
+                            {<span class="l10n" lang="@lang">@s["dev.spotlight"].Replace("{0}", Format.WeekText(week, s))</span>}</li>
+                    }
+                    @foreach (var slug in D.Roundups)
+                    {
+                        <li class="chip"><a href="/roundups/@slug/">@foreach (var (lang, s) in Langs)
+                            {<span class="l10n" lang="@lang">@s["dev.roundup"].Replace("{0}", Format.MonthText(slug, s))</span>}</a></li>
+                    }
+                </ul>
+            }
         </header>
 
         @* Below the header (not beside the avatar), so the sentences get the full width on phones.
@@ -59,11 +75,11 @@
         @if (D.Ranks.Count > 0)
         {
             <section class="dev-ranks" aria-labelledby="dev-ranks">
-                <h2 id="dev-ranks"><T K="dev.ranking" /></h2>
+                <h2 id="dev-ranks" class="dev-label"><T K="dev.ranking" /></h2>
                 <ul class="dev-ranks-top">
                     @foreach (var r in D.Ranks.Take(TopRanks))
                     {
-                        <li><RankLine R="r" Strong="true" /></li>
+                        <li><Medal Rank="r.Rank" Size="34" /><RankLine R="r" Strong="true" /></li>
                     }
                 </ul>
                 @if (D.Ranks.Count > TopRanks)
@@ -74,7 +90,7 @@
                         <ul>
                             @foreach (var r in D.Ranks.Skip(TopRanks))
                             {
-                                <li><RankLine R="r" /></li>
+                                <li><Medal Rank="r.Rank" Size="18" /><RankLine R="r" /></li>
                             }
                         </ul>
                     </details>
@@ -85,7 +101,7 @@
         @if (D.Mutual.Count > 0 || D.FollowedBy.Count > 0 || D.Follows.Count > 0)
         {
             <section class="dev-social" aria-labelledby="dev-social">
-                <h2 id="dev-social" class="dev-social-title"><T K="dev.socialLabel" /></h2>
+                <h2 id="dev-social" class="dev-label"><T K="dev.socialLabel" /></h2>
                 <PeopleRow Logins="@D.Mutual" TextKey="dev.mutual" />
                 <PeopleRow Logins="@D.FollowedBy" TextKey="dev.followedBy" />
                 <PeopleRow Logins="@D.Follows" TextKey="dev.follows" />
@@ -93,8 +109,8 @@
         }
 
         <div class="dev-cols">
-            <section aria-labelledby="dev-projects">
-                <h2 id="dev-projects"><T K="dev.projects" /></h2>
+            <section class="sec" aria-labelledby="dev-projects">
+                <div class="sec-head"><h2 id="dev-projects"><T K="dev.projects" /></h2></div>
                 @if (D.Projects.Count > 0)
                 {
                     <ProjectList Items="@D.Projects.Select(Site.Project)" ShowOwner="false" />
@@ -118,16 +134,19 @@
                 <aside class="dev-side">
                     @if (D.ContributesTo.Count > 0)
                     {
-                        <section aria-labelledby="dev-contributes">
-                            <h2 id="dev-contributes"><T K="dev.contributesTo" /></h2>
-                            <ul class="rows">
+                        <section class="sec" aria-labelledby="dev-contributes">
+                            <div class="sec-head"><h2 id="dev-contributes"><T K="dev.contributesTo" /></h2></div>
+                            <ul class="rows-list">
                                 @foreach (var c in D.ContributesTo)
                                 {
                                     var project = Site.Project(c.Project);
-                                    <li class="row">
-                                        <a class="row-avatar" href="@Site.OwnerHref(project.Owner)" title="@(Site.Developer(project.Owner)?.DisplayName ?? project.Owner)" aria-hidden="true" tabindex="-1"><Avatar Login="@project.Owner" Size="24" /></a>
-                                        <span class="row-main"><a class="p-owner" href="@Site.OwnerHref(project.Owner)">@(project.Owner)/</a><a href="@project.Url" rel="@(project.IsSubmittedUrl ? "nofollow ugc" : null)">@project.Name</a></span>
-                                        <span class="row-note"><T K="@(c.Commits == 1 ? "dev.commitsOne" : "dev.commits")" Args="@([c.Commits])" /></span>
+                                    <li>
+                                        <ProjectFace P="project" Size="40" />
+                                        <span class="row-text">
+                                            <ProjectTitle P="project" />
+                                            <ProjectSub P="project" />
+                                        </span>
+                                        <span class="row-end"><T K="@(c.Commits == 1 ? "dev.commitsOne" : "dev.commits")" Args="@([c.Commits])" /></span>
                                     </li>
                                 }
                             </ul>
@@ -135,15 +154,22 @@
                     }
                     @if (D.Contributors.Count > 0)
                     {
-                        <section aria-labelledby="dev-contributors">
-                            <h2 id="dev-contributors"><T K="dev.contributors" /></h2>
-                            <ul class="rows">
+                        <section class="sec" aria-labelledby="dev-contributors">
+                            <div class="sec-head"><h2 id="dev-contributors"><T K="dev.contributors" /></h2></div>
+                            <ul class="rows-list">
                                 @foreach (var c in D.Contributors)
                                 {
-                                    <li class="row">
-                                        <a class="row-avatar" href="@Site.OwnerHref(c.Login)" aria-hidden="true" tabindex="-1"><Avatar Login="@c.Login" Size="24" /></a>
-                                        <span class="row-main"><a href="@Site.OwnerHref(c.Login)">@(Site.Developer(c.Login)?.DisplayName ?? c.Login)</a></span>
-                                        <span class="row-note"><T K="@(c.Commits == 1 ? "dev.commitsOne" : "dev.commits")" Args="@([c.Commits])" /></span>
+                                    var name = Site.Developer(c.Login)?.DisplayName ?? c.Login;
+                                    <li>
+                                        <a class="row-face" href="@Site.OwnerHref(c.Login)" aria-hidden="true" tabindex="-1"><Avatar Login="@c.Login" Size="40" /></a>
+                                        <span class="row-text">
+                                            <span class="row-head"><a class="row-title" href="@Site.OwnerHref(c.Login)">@name</a></span>
+                                            @if (!name.Equals(c.Login, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <span class="row-sub">@c.Login</span>
+                                            }
+                                        </span>
+                                        <span class="row-end"><T K="@(c.Commits == 1 ? "dev.commitsOne" : "dev.commits")" Args="@([c.Commits])" /></span>
                                     </li>
                                 }
                             </ul>
@@ -151,14 +177,17 @@
                     }
                     @if (Issues.Count > 0)
                     {
-                        <section aria-labelledby="dev-hw">
-                            <h2 id="dev-hw"><T K="hw.title" /></h2>
-                            <ul class="rows">
+                        <section class="sec" aria-labelledby="dev-hw">
+                            <div class="sec-head"><h2 id="dev-hw"><T K="hw.title" /></h2></div>
+                            <ul class="rows-list dev-issues">
                                 @foreach (var issue in Issues.Take(MaxIssues))
                                 {
-                                    <li class="row">
-                                        <span class="row-main"><a href="@issue.Url">@issue.Title</a></span>
-                                        <span class="row-note" title="@Site.Project(issue.Project).Name">@Site.Project(issue.Project).Name</span>
+                                    var project = Site.Project(issue.Project);
+                                    <li>
+                                        <span class="row-text">
+                                            <a class="hw-issue" href="@issue.Url">@issue.Title</a>
+                                            <span class="row-sub"><a href="/help-wanted/#@project.Anchor">@project.Name</a></span>
+                                        </span>
                                     </li>
                                 }
                             </ul>
@@ -181,6 +210,15 @@
     static (string Lang, Dictionary<string, string> Strings)[] Langs => [("ka", Site.Strings.Georgian), ("en", Site.Strings.English)];
 
     [Parameter, EditorRequired] public SiteDeveloper D { get; set; } = default!;
+
+    bool Active => Site.IsActive(D);
+    int ProjectCount => D.Projects.Count + D.Smaller.Count;
+
+    // Stars gained over the trend window across all their projects: real deltas, so
+    // shown only when there is history and the sum is positive.
+    int Gain => Site.Data.Trend.HasHistory
+        ? D.Projects.Concat(D.Smaller).Select(Site.Project).Sum(p => p.Trend ?? 0)
+        : 0;
 
     List<HelpWantedIssue> Issues =>
         Site.Data.Issues.Where(i => D.Projects.Contains(i.Project) || D.Smaller.Contains(i.Project))
