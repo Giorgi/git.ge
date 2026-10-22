@@ -613,37 +613,49 @@
     // "o": no push in 12+ months. Archived ones sort with them but keep their own badge.
     if (p.o || p.a) li.dataset.dormant = "1";
 
+    // The owner's face (search results always show the owner), as ProjectFace.razor.
+    const slash = p.n.indexOf("/");
+    const ownerLogin = slash > 0 ? p.n.slice(0, slash) : null;
+    const ownerHref = ownerLogin && (p.w ? "/@" + ownerLogin.toLowerCase() + "/" : "https://github.com/" + ownerLogin);
+    if (ownerLogin) {
+      const face = el("a", "row-face");
+      face.href = ownerHref;
+      face.tabIndex = -1;
+      face.setAttribute("aria-hidden", "true");
+      if (p.f) {
+        const img = el("img", "avatar avatar-40");
+        img.src = p.f; img.width = 40; img.height = 40; img.alt = ""; img.loading = "lazy";
+        face.append(img);
+      } else face.append(el("span", "avatar avatar-40 avatar-initial", ownerLogin[0].toUpperCase()));
+      li.append(external(face));
+    }
+    const body = el("div", "p-body");
+
     const head = el("div", "p-head");
-    const title = el("span", "p-title");
-    const name = el("a", "p-name");
+    const name = el("a", "p-name", slash > 0 ? p.n.slice(slash + 1) : p.n);
     name.href = p.u || "https://github.com/" + p.n;
     // "u" is only set for URLs from submissions (not GitHub): don't vouch for them.
     if (p.u) name.rel = "nofollow ugc";
-    const slash = p.n.indexOf("/");
-    if (slash > 0) {
-      const ownerLogin = p.n.slice(0, slash);
-      const owner = el("a", "p-owner", ownerLogin + "/");
-      // "w": the owner has a developer page on git.ge.
-      owner.href = p.w ? "/@" + ownerLogin.toLowerCase() + "/" : "https://github.com/" + ownerLogin;
-      title.append(external(owner));
-      name.textContent = p.n.slice(slash + 1);
-    } else name.textContent = p.n;
-    external(name);
-    title.append(name);
-    head.append(title);
+    head.append(external(name));
+    // The language belongs to the project: right after the name (Format.LangClass).
+    if (p.l) head.append(el("span", "ldot lang-" + p.l.toLowerCase().replace(/#/g, "-sharp").replace(/\+\+/g, "pp").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""), p.l));
     if (p.a) head.append(el("span", "badge", t("card.archived")));
     if (p.h) {
       const hw = el("a", "badge hw", t("card.helpWanted", p.h));
       hw.href = "/help-wanted/#" + p.x;
       head.append(hw);
     }
-    li.append(head);
+    body.append(head);
 
     const desc = root.lang === "en" ? p.d : (p.k || p.d);
-    if (desc) li.append(el("p", "p-desc", desc));
+    if (desc) body.append(el("p", "p-desc", desc));
 
     const meta = el("div", "p-meta");
-    if (p.l) meta.append(el("span", "p-lang", p.l));
+    if (ownerLogin) {
+      const owner = el("a", "p-owner", ownerLogin);
+      owner.href = ownerHref;
+      meta.append(external(owner));
+    }
     if (p.s !== undefined) {
       const stars = el("span", "p-stars");
       const sign = el("span", null, "★ ");
@@ -660,7 +672,8 @@
     }
     if (p.p) meta.append(relTime(p.p, "p-pushed" + (p.o && !p.a ? " dim" : ""), "card.pushed"));
     if (p.o && !p.a) meta.append(el("span", "badge dormant", t("card.dormant", index.dormantMonths ?? 12)));
-    li.append(meta);
+    body.append(meta);
+    li.append(body);
     return li;
   }
 })();

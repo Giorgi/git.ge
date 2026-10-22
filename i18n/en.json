@@ -61,7 +61,7 @@
   "card.verified": "Verified",
   "card.starsTitle": "Stars on GitHub",
   "card.trendTitle": "Stars in the last {0} days",
-  "card.pushed": "updated",
+  "card.pushed": "code updated",
   "card.created": "created",
   "date.months": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
   "rel.today": "today",

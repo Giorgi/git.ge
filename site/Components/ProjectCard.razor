@@ -1,60 +1,72 @@
-@* One project row. data-* attributes feed the client-side sort in app.js;
-   the card itself is complete without JavaScript. Keep the markup in step
-   with card() in wwwroot/assets/app.js, which renders search results. *@
+@* One project row, in the home rows' grammar: the owner's face, then the name with
+   its language beside it and any badges, the description, and a quiet meta line
+   (owner, stars, trend, last change). data-* attributes feed the client-side sort
+   in app.js; the row is complete without JavaScript. Keep the markup in step with
+   card() in wwwroot/assets/app.js, which renders search results. *@
 <li class="p" data-stars="@(P.Stars ?? 0)" data-trend="@P.Trend" data-pushed="@Format.Date(P.PushedAt)" data-created="@Format.Date(P.CreatedAt)" data-dormant="@(P.Inactive ? "1" : null)">
-    <div class="p-head">
-        <span class="p-title">@if (ShowOwner && P.FullName is not null)
-            {<a class="p-owner" href="@Site.OwnerHref(P.Owner)">@(P.Owner)/</a>}<a class="p-name" href="@P.Url" rel="@(P.IsSubmittedUrl ? "nofollow ugc" : null)">@P.Name</a></span>
-        @if (!ShowOwner)
-        {
-            <a class="badge cat" href="/c/@P.Category/"><T K="@($"cat.{P.Category}")" /></a>
-        }
-        @if (P.Archived)
-        {
-            <span class="badge"><T K="card.archived" /></span>
-        }
-        @if (P.Verified)
-        {
-            <span class="badge ok"><T K="card.verified" /></span>
-        }
-        @if (P.HelpWanted > 0)
-        {
-            <a class="badge hw" href="/help-wanted/#@P.Anchor"><T K="card.helpWanted" Args="@([P.HelpWanted])" /></a>
-        }
-    </div>
-    @if (P.DescriptionKa is not null)
+    @if (ShowOwner)
     {
-        <p class="p-desc" data-desc-en="@P.Description">@P.DescriptionKa</p>
+        <ProjectFace P="P" Size="40" />
     }
-    else if (P.Description is not null)
-    {
-        <p class="p-desc">@P.Description</p>
-    }
-    <div class="p-meta">
-        @if (P.Language is not null)
+    <div class="p-body">
+        <div class="p-head">
+            <a class="p-name" href="@P.Url" rel="@(P.IsSubmittedUrl ? "nofollow ugc" : null)">@P.Name</a>
+            @if (P.Language is not null)
+            {
+                <span class="ldot @Format.LangClass(P.Language)">@P.Language</span>
+            }
+            @if (!ShowOwner)
+            {
+                <a class="badge cat" href="/c/@P.Category/"><T K="@($"cat.{P.Category}")" /></a>
+            }
+            @if (P.Archived)
+            {
+                <span class="badge"><T K="card.archived" /></span>
+            }
+            @if (P.Verified)
+            {
+                <span class="badge ok"><T K="card.verified" /></span>
+            }
+            @if (P.HelpWanted > 0)
+            {
+                <a class="badge hw" href="/help-wanted/#@P.Anchor"><T K="card.helpWanted" Args="@([P.HelpWanted])" /></a>
+            }
+        </div>
+        @if (P.DescriptionKa is not null)
         {
-            <span class="p-lang">@P.Language</span>
+            <p class="p-desc" data-desc-en="@P.Description">@P.DescriptionKa</p>
         }
-        @if (P.Stars is not null)
+        else if (P.Description is not null)
         {
-            <span class="p-stars" title="@Site.Strings.Ka("card.starsTitle")" data-i18n-title="card.starsTitle"><span aria-hidden="true">★ </span>@Format.Number(P.Stars)<span class="visually-hidden">@(" ")<T K="card.starsSr" /></span></span>
+            <p class="p-desc">@P.Description</p>
         }
-        @if (Site.Data.Trend.HasHistory && P.Stars is not null)
-        {
-            <span class="p-trend @TrendClass" title="@Site.Strings.Ka("card.trendTitle", Site.Data.Trend.Days)"
-                  data-i18n-title="card.trendTitle" data-i18n-title-args="@($"[{Site.Data.Trend.Days}]")">@Format.Trend(P.Trend)<span class="visually-hidden">@(" ")<T K="card.trendSr" Args="@([Site.Data.Trend.Days])" /></span></span>
-        }
-        <RelTime Value="@P.PushedAt" Class="@(P.ShowDormant ? "p-pushed dim" : "p-pushed")" Verb="card.pushed" />
-        @if (P.ShowDormant)
-        {
-            <span class="badge dormant"><T K="card.dormant" Args="@([Site.Data.DormantMonths])" /></span>
-        }
+        <div class="p-meta">
+            @if (ShowOwner && P.FullName is not null)
+            {
+                <a class="p-owner" href="@Site.OwnerHref(P.Owner)">@P.Owner</a>
+            }
+            @if (P.Stars is not null)
+            {
+                <span class="p-stars" title="@Site.Strings.Ka("card.starsTitle")" data-i18n-title="card.starsTitle"><span aria-hidden="true">★ </span>@Format.Number(P.Stars)<span class="visually-hidden">@(" ")<T K="card.starsSr" /></span></span>
+            }
+            @if (Site.Data.Trend.HasHistory && P.Stars is not null)
+            {
+                <span class="p-trend @TrendClass" title="@Site.Strings.Ka("card.trendTitle", Site.Data.Trend.Days)"
+                      data-i18n-title="card.trendTitle" data-i18n-title-args="@($"[{Site.Data.Trend.Days}]")">@Format.Trend(P.Trend)<span class="visually-hidden">@(" ")<T K="card.trendSr" Args="@([Site.Data.Trend.Days])" /></span></span>
+            }
+            <RelTime Value="@P.PushedAt" Class="@(P.ShowDormant ? "p-pushed dim" : "p-pushed")" Verb="card.pushed" />
+            @if (P.ShowDormant)
+            {
+                <span class="badge dormant"><T K="card.dormant" Args="@([Site.Data.DormantMonths])" /></span>
+            }
+        </div>
     </div>
 </li>
 
 @code {
     [Parameter, EditorRequired] public SiteProject P { get; set; } = default!;
-    // False on a developer's own page: the owner is obvious there, so show the category instead.
+    // False on a developer's own page: the owner is obvious there, so no face or
+    // owner name, and the category instead.
     [Parameter] public bool ShowOwner { get; set; } = true;
 
     string TrendClass => P.Trend switch { > 0 => "up", < 0 => "down", _ => "" };

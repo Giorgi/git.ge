@@ -64,13 +64,16 @@ body {
   overflow-wrap: break-word;
 }
 
-a { color: var(--link); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: var(--fg); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: .15em; }
+/* Links inside running text keep a quiet underline, so they read as links in ink. */
+.prose a, .note a, .lead a, .sec-lead a, .notice a, .dev-ranks a { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: .15em; }
+.prose a:hover, .note a:hover, .lead a:hover, .sec-lead a:hover, .notice a:hover, .dev-ranks a:hover { text-decoration-color: currentColor; }
 a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 h1, h2, h3 { line-height: 1.25; margin: 1.6em 0 .3em; text-wrap: balance; }
-h1 { font-size: 1.6rem; margin-top: 1.2em; }
-h2 { font-size: 1.15rem; }
+h1 { font-size: clamp(1.8rem, 3.6vw, 2.6rem); font-weight: 900; letter-spacing: -.02em; line-height: 1.1; margin-top: 1.1em; }
+h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 
 .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem; }
 
@@ -94,16 +97,13 @@ h2 { font-size: 1.15rem; }
 /* Category bar: its own strip, a label, and chips with counts, so it doesn't read
    as a second row of the main menu. */
 .cats-bar { border-top: 1px solid var(--line); background: var(--bg); }
-.cats { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .4rem; font-size: .85rem; padding-top: .45rem; padding-bottom: .45rem; }
+.cats { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem 1.1rem; font-size: .85rem; padding-top: .45rem; padding-bottom: .45rem; }
 .cats-label { color: var(--muted); margin-right: .3rem; }
-.cats a {
-  color: var(--fg); background: var(--soft); border: 1px solid var(--line);
-  border-radius: 999px; padding: .08rem .6rem; white-space: nowrap;
-}
-.cats a:hover { border-color: var(--muted); text-decoration: none; }
-.cats a[aria-current] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.cats a { color: var(--fg); white-space: nowrap; padding: .1rem 0; }
+.cats a:hover { text-decoration: underline; text-underline-offset: .15em; }
+.cats a[aria-current] { font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: .3em; }
 .cats .n { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
-.cats a[aria-current] .n { color: inherit; opacity: .7; }
+.cats a[aria-current] .n { color: var(--muted); }
 
 /* Footer */
 .site-footer { border-top: 1px solid var(--line); margin-top: 3rem; padding: 1rem 0 2rem; color: var(--muted); font-size: .85rem; }
@@ -173,15 +173,19 @@ input { caret-color: var(--accent); }
 
 /* Project rows */
 .plist { list-style: none; margin: 0; padding: 0; }
-.p { padding: .55rem 0; border-bottom: 1px solid var(--line); }
+.p { display: flex; align-items: flex-start; gap: .8rem; padding: .7rem 0; border-bottom: 1px solid var(--line); }
+.p > .row-face { margin-top: .15rem; }
+.p-body { flex: 1; min-width: 0; }
 .p-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .5rem; }
-.p-title { overflow-wrap: anywhere; }
-.p-name { font-weight: 600; overflow-wrap: anywhere; }
-.p-owner { font-weight: 400; color: var(--muted); }
-a.p-owner:hover { color: var(--link); }
-.p-desc { margin: .1rem 0 .15rem; max-width: 68ch; font-size: .93rem; text-wrap: pretty; }
+.p-name { font-weight: 700; color: var(--fg); overflow-wrap: anywhere; min-width: 0; }
+.p-owner { color: var(--muted); }
+.p-head .ldot { font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.p-desc { margin: .1rem 0 .15rem; max-width: 100ch; font-size: .93rem; text-wrap: pretty; }
 .p-meta { display: flex; flex-wrap: wrap; gap: .1rem .9rem; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.p-lang::before { content: ""; display: inline-block; width: .5em; height: .5em; border-radius: 50%; background: var(--muted); margin-right: .35em; vertical-align: .08em; }
+/* Stars and their gain are one unit; the code date is set apart by a dot, so
+   "კოდი შეიცვალა" can't be read as being about the stars. */
+.p-stars + .p-trend { margin-left: -.5rem; }
+.p-meta > * + .p-pushed::before { content: "·"; margin-right: .9rem; color: var(--dim); }
 .p-trend.up { color: var(--up); font-weight: 600; }
 .p-trend.down { color: var(--down); }
 
@@ -224,7 +228,8 @@ a.p-owner:hover { color: var(--link); }
 .dev-login, .dev-summary { margin: .1rem 0; color: var(--muted); font-size: .92rem; }
 .dev-login a { color: var(--muted); }
 .chips { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-wrap: wrap; gap: .35rem; }
-.chip { font-size: .8rem; background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: .08rem .6rem; }
+.chips { gap: .2rem 1.1rem; }
+.chip { font-size: .88rem; color: var(--fg); }
 .chip a { color: var(--fg); }
 /* Aligned with the header's text column on wide screens (avatar 96px + gap). */
 .dev-ranks { margin: .6rem 0 0 calc(96px + 1.25rem); }
@@ -269,7 +274,7 @@ a.p-owner:hover { color: var(--link); }
 .dev-cell { display: flex; min-width: 0; }
 .dev-card { display: flex; flex: 1; gap: .6rem; align-items: center; min-width: 0; padding: .45rem 0; border-bottom: 1px solid var(--line); color: var(--fg); }
 .dev-card:hover { text-decoration: none; }
-.dev-card:hover strong { color: var(--link); }
+.dev-card:hover strong { text-decoration: underline; text-underline-offset: .15em; }
 .dev-card-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
 .dev-card-text strong { overflow-wrap: anywhere; }
 .dev-card-login, .dev-card-meta { font-size: .78rem; color: var(--muted); }
@@ -315,7 +320,7 @@ a.p-owner:hover { color: var(--link); }
 .devs-tag {
   display: inline-flex; align-items: center; gap: .3rem;
   font: inherit; font-size: .8rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
-  border-radius: 999px; padding: .08rem .5rem .08rem .55rem; cursor: pointer;
+  border-radius: 3px; padding: .08rem .5rem .08rem .55rem; cursor: pointer;
 }
 /* A small "×" icon (tags, the phone panel's close button): two strokes in currentColor. */
 .icon-x { flex: none; width: .7rem; height: .7rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
@@ -349,7 +354,7 @@ a.p-owner:hover { color: var(--link); }
 /* Sort links wrap between entries (never clipped); the result goes right, or to the
    next line when there is no room. */
 .devs-topbar .sort { margin: 0; gap: .15rem .35rem; flex: 0 1 auto; min-width: 0; }
-.sort.devs-sort button { font: inherit; color: var(--link); background: none; border: 0; border-radius: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+.sort.devs-sort button { font: inherit; color: var(--muted); background: none; border: 0; border-radius: 0; padding: 0; cursor: pointer; white-space: nowrap; }
 .sort.devs-sort button:hover { text-decoration: underline; }
 .sort.devs-sort button[aria-pressed="true"] { background: none; color: var(--fg); border: 0; font-weight: 600; text-decoration: underline; text-underline-offset: .2em; }
 .devs-sort-sep { color: var(--muted); }
@@ -383,7 +388,7 @@ a.p-owner:hover { color: var(--link); }
   .devs-panel-done { display: block; width: 100%; margin: 1rem 0 0; font: inherit; color: var(--bg); background: var(--fg); border: 0; border-radius: 6px; padding: .45rem; cursor: pointer; }
   .devs-facet-item { padding: .3rem .3rem; }
 }
-.linklike { font: inherit; color: var(--link); background: none; border: 0; padding: 0; margin-left: .6rem; cursor: pointer; }
+.linklike { font: inherit; color: var(--fg); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: .15em; background: none; border: 0; padding: 0; margin-left: .6rem; cursor: pointer; }
 .linklike:hover { text-decoration: underline; }
 /* Elements above set a display value, which would otherwise override [hidden]. */
 .dev-cell[hidden], .dev-group[hidden], .sort[hidden], .devs-side[hidden], .hw-project[hidden] { display: none; }
@@ -396,15 +401,15 @@ a.p-owner:hover { color: var(--link); }
 
 /* Sort and search (revealed by app.js) */
 .sort { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .85rem; color: var(--muted); margin: .4rem 0; }
-.sort button {
-  font: inherit; color: var(--fg); background: none; border: 1px solid var(--line);
-  border-radius: 3px; padding: .1rem .55rem; cursor: pointer;
-}
-.sort button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.sort { gap: .3rem 1rem; }
+.sort button { font: inherit; color: var(--muted); background: none; border: 0; padding: .15rem 0; cursor: pointer; white-space: nowrap; }
+.sort button:hover { color: var(--fg); text-decoration: underline; text-underline-offset: .3em; }
+.sort button[aria-pressed="true"] { color: var(--fg); font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: .3em; }
 .search input {
-  width: 100%; max-width: 36rem; font: inherit; color: var(--fg); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 4px; padding: .45rem .65rem; margin: .3rem 0;
+  width: 100%; max-width: 36rem; font: inherit; font-size: 1.05rem; color: var(--fg); background: none;
+  border: 0; border-bottom: 3px solid var(--fg); border-radius: 0; padding: .5rem 0; margin: .3rem 0;
 }
+.search input:focus-visible { outline: none; border-bottom-color: var(--accent); }
 .pager { display: flex; gap: 1.2rem; align-items: center; margin: 1.2rem 0; font-size: .92rem; }
 .pager span { color: var(--muted); }
 

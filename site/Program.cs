@@ -179,6 +179,7 @@ string SearchIndex()
         ["v"] = p.Verified ? 1 : null,
         ["x"] = p.HelpWanted > 0 ? p.Anchor : null,
         ["w"] = Site.Developer(p.Owner) is not null ? 1 : null,   // owner has a developer page (/@login/)
+        ["f"] = Site.Avatar(p.Owner),   // the owner's saved avatar, for the face in search results
     }.Where(kv => kv.Value is not null).ToDictionary());
 
     return JsonSerializer.Serialize(new
