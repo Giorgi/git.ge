@@ -15,10 +15,6 @@
     }
     else
     {
-        <details class="hw-ranking">
-            <summary><T K="hw.howOrdered" /></summary>
-            <p><T K="hw.ranking" /></p>
-        </details>
         <FilterSidebar FilterFor="hw-list" Items="li[data-labels]" Facets="cat,lang,label" StorageKey="gitge.hwSidebar" Inline
                        CountKey="hw.countIssues" CountOneKey="hw.countIssuesOne" GroupKey="hw.countProjects" GroupOneKey="hw.countProjectsOne"
                        EmptyKey="hw.noMatch">
@@ -27,22 +23,31 @@
                 <DevFacet Kind="lang" TitleKey="devs.facetLanguage" Options="@HelpWantedFilters.LanguageOptions(Issues).ToList()" Total="@Issues.Count" Top="12" />
                 <DevFacet Kind="label" TitleKey="hw.facetLabel" Options="@HelpWantedFilters.LabelOptions(Issues).ToList()" Total="@Issues.Count" />
             </Lists>
+            <AfterStatus>
+                @* On the toolbar line after the result. Without JavaScript the toolbar's result
+                   stays empty, so the static total stands in for it. The ranking note opens as
+                   a popover under its summary. *@
+                <span class="hw-total"><T K="@(Issues.Count == 1 ? "hw.countIssuesOne" : "hw.countIssues")" Args="@([Issues.Count])" /> · <T K="@(Groups.Count == 1 ? "hw.countProjectsOne" : "hw.countProjects")" Args="@([Groups.Count])" /></span>
+                <details class="hw-ranking">
+                    <summary><T K="hw.howOrdered" /></summary>
+                    <p><T K="hw.ranking" /></p>
+                </details>
+            </AfterStatus>
             <ChildContent>
-                <p class="note hw-total"><T K="@(Issues.Count == 1 ? "hw.countIssuesOne" : "hw.countIssues")" Args="@([Issues.Count])" /> · <T K="@(Groups.Count == 1 ? "hw.countProjectsOne" : "hw.countProjects")" Args="@([Groups.Count])" /></p>
                 <div id="hw-list">
                     @foreach (var (project, issues) in Groups)
                     {
+                        @* The home help-wanted grammar: the owner's face, the project name with its
+                           language, owner and stars under it, the open-issue count as a green number. *@
                         <section class="hw-project" id="@project.Anchor" data-filter-group>
-                            <h2>
-                                <a href="@project.Url" rel="@(project.IsSubmittedUrl ? "nofollow ugc" : null)"><span class="p-owner">@(project.Owner)/</span>@project.Name</a>
-                                <span class="p-meta">
-                                    @if (project.Language is not null)
-                                    {
-                                        <span class="p-lang">@project.Language</span>
-                                    }
-                                    <span class="p-stars">★ @Format.Number(project.Stars)</span>
+                            <div class="hw-head">
+                                <ProjectFace P="project" Size="40" />
+                                <span class="row-text">
+                                    <h2><ProjectTitle P="project" /></h2>
+                                    <ProjectSub P="project" ShowStars="true" />
                                 </span>
-                            </h2>
+                                <span class="hw-count"><b>@issues.Count</b> <T K="@(issues.Count == 1 ? "home.hwIssuesOne" : "home.hwIssues")" /></span>
+                            </div>
                             <ul class="issues">
                                 @foreach (var issue in issues)
                                 {
@@ -50,9 +55,11 @@
                                         <a href="@issue.Url">@issue.Title</a>
                                         <span class="issue-meta">
                                             #@issue.Number
-                                            @foreach (var label in issue.Labels)
+                                            @* Only the labels the filter knows (good first issue, help wanted):
+                                               repository-specific ones (priority/*, area/*, …) were noise. *@
+                                            @foreach (var label in HelpWantedFilters.LabelsOf(issue))
                                             {
-                                                <span class="label">@label</span>
+                                                <span class="label">@HelpWantedFilters.LabelText(label)</span>
                                             }
                                             @if (issue.Assigned)
                                             {

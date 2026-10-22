@@ -455,21 +455,36 @@ input { caret-color: var(--accent); }
 .pager span { color: var(--muted); }
 
 /* Help wanted */
-.hw-project h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .8rem; font-size: 1rem; }
-.hw-project h2 .p-meta { font-weight: 400; }
-.issues { margin: 0; padding-left: 1.1rem; }
-.issues li { margin: .25rem 0; }
-.issue-meta { display: inline-flex; flex-wrap: wrap; gap: .1rem .5rem; margin-left: .3rem; font-size: .78rem; color: var(--muted); }
+.hw-project { margin-top: .9rem; border-top: 1px solid var(--line); padding-top: .7rem; }
+.hw-head { display: flex; align-items: flex-start; gap: .8rem; }
+.hw-head h2 { margin: 0; font-size: 1.1rem; font-weight: 800; letter-spacing: 0; }
+.hw-head .row-title { font-weight: 800; }
+.hw-head h2 .ldot { font-size: .8rem; font-weight: 400; }
+/* Issues hang under the project name (face 40px + gap), one hairline row each. */
+.issues { list-style: none; margin: .35rem 0 0 calc(40px + .8rem); padding: 0; }
+/* Title and meta share a line; the meta wraps under a long title. */
+.issues li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .8rem; padding: .3rem 0; border-top: 1px solid var(--line); }
+.issues li > a { color: var(--fg); }
+.issues li > a:hover { text-decoration: underline; text-underline-offset: .15em; }
+.issue-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .6rem; font-size: .78rem; color: var(--muted); }
+@media (max-width: 36rem) { .issues { margin-left: 0; } }
 .label { background: var(--badge); border-radius: 3px; padding: 0 .35rem; color: var(--fg); }
 /* Someone is already assigned: a quiet outlined note, not a label. */
 .issue-assigned { border: 1px solid var(--line); border-radius: 3px; padding: 0 .35rem; }
 /* "How is this ordered?": one quiet line under the lead, as wide as the lead. */
-.hw-ranking { max-width: 66rem; margin: -.4rem 0 .4rem; color: var(--muted); font-size: .85rem; }
+.hw-total { color: var(--muted); }
+.hw-ranking { position: relative; color: var(--muted); }
 .hw-ranking summary { cursor: pointer; width: fit-content; }
-.hw-ranking p { margin: .3rem 0 0; }
+.hw-ranking summary:hover { color: var(--fg); }
+.hw-ranking p {
+  position: absolute; z-index: 5; top: calc(100% + .4rem); left: 0; width: min(36rem, calc(100vw - 2rem));
+  margin: 0; padding: .7rem .9rem; font-size: .85rem; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgb(0 0 0 / .12);
+}
+@media (max-width: 36rem) { .hw-ranking { position: static; } .devs-topbar { position: relative; } .hw-ranking p { left: 0; } }
 /* The filter toolbar shows the (live) count, so the static one is for no-JS only. */
 .devs-layout.ready .hw-total { display: none; }
-.devs-main .hw-project:first-child h2 { margin-top: .2rem; }
+.devs-main .hw-project:first-child { margin-top: .4rem; }
 
 /* Roundups and long text */
 .roundups { list-style: none; padding: 0; }
