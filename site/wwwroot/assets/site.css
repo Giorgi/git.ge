@@ -131,7 +131,7 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 @media (max-width: 52rem) { .hero { grid-template-columns: minmax(0, 1fr); margin-top: 1.6rem; } }
 
 .wall-wrap { margin-top: 2.4rem; }
-.wall { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: .4rem; }
+.wall { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: .7rem; } /* holds two rings (3px + 2px offset each) */
 .wall a { display: block; border-radius: 50%; }
 .wall .avatar { width: 100%; height: auto; aspect-ratio: 1; filter: grayscale(1); opacity: .85; transition: filter .2s, opacity .2s; }
 .wall .on .avatar { filter: none; opacity: 1; outline: 3px solid var(--accent); outline-offset: 2px; }
@@ -143,7 +143,7 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 .wall-cap a { margin-left: auto; }
 /* Fewer, larger faces on smaller screens: three full rows each time. */
 @media (max-width: 64rem) { .wall { grid-template-columns: repeat(16, minmax(0, 1fr)); } .wall li:nth-child(n+97) { display: none; } }
-@media (max-width: 36rem) { .wall { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .3rem; } .wall li:nth-child(n+61) { display: none; } .wall-cap a { margin-left: 0; } }
+@media (max-width: 36rem) { .wall { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .5rem; } .wall .on .avatar { outline-width: 2px; outline-offset: 1px; } .wall li:nth-child(n+61) { display: none; } .wall-cap a { margin-left: 0; } }
 /* Easter egg (app.js): the red ".ge" turns the wall into a GitHub contribution graph,
    shaded by when each developer's projects last changed. Faces fade, circles square
    off; JS staggers the delay diagonally. */
