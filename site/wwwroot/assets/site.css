@@ -163,7 +163,12 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 .wall-key-scale { display: inline-flex; align-items: center; gap: .2rem; }
 .wall-key-scale i { width: .75rem; height: .75rem; border-radius: 2px; }
 .wall-key-scale i:first-of-type { margin-left: .3rem; } .wall-key-scale i:last-of-type { margin-right: .3rem; }
-@media (prefers-reduced-motion: reduce) { .wall a, .wall .avatar { transition: none !important; } }
+/* Reduced motion: no ripple and no scaling, just a short cross-fade (fades are not motion). */
+@media (prefers-reduced-motion: reduce) {
+  .wall a { transition: border-radius .3s, background-color .3s; }
+  .wall .avatar { transition: opacity .3s; }
+  .wall.gh a, .wall.gh a:hover, .wall.gh a:focus-visible { transform: none; }
+}
 
 /* Home: links in ink, so red marks only what is live this week. */
 .home .p-name, .home .wall-cap a, .home .more a, .home .p-owner:hover, .home .site-footer a, .home .hero-cats a { color: var(--fg); }
