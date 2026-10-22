@@ -144,9 +144,7 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 /* Fewer, larger faces on smaller screens: three full rows each time. */
 @media (max-width: 64rem) { .wall { grid-template-columns: repeat(16, minmax(0, 1fr)); } .wall li:nth-child(n+97) { display: none; } }
 @media (max-width: 36rem) { .wall { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .5rem; } .wall .on .avatar { outline-width: 2px; outline-offset: 1px; } .wall li:nth-child(n+61) { display: none; } .wall-cap a { margin-left: 0; } }
-/* Easter egg (app.js): the red ".ge" turns the wall into a GitHub contribution graph,
-   shaded by when each developer's projects last changed. Faces fade, circles square
-   off; JS staggers the delay diagonally. */
+/* .wall.gh (app.js): squares shaded by each developer's last change; JS sets the delays. */
 .wall a { transition: border-radius .35s, background-color .35s, transform .35s; }
 .wall .avatar { transition: filter .2s, opacity .35s; }
 .wall.gh a { border-radius: 22%; transform: scale(.86); }

@@ -197,7 +197,7 @@ public static class Site
     public static int? DaysSinceChange(SiteDeveloper d) =>
         d.LastPush is { } push ? (int)(DataDate - push.UtcDateTime.Date).TotalDays : null;
 
-    // The home wall's hidden GitHub-style view: a green shade per developer from when
+    // The home wall's .gh view: a green shade per developer from when
     // their projects last changed. 4 this week … 1 this year, 0 older or unknown.
     public static int GreenLevel(SiteDeveloper d) => DaysSinceChange(d) switch
     {

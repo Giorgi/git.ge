@@ -528,9 +528,8 @@
     apply();
   }
 
-  // ---- Green wall (home easter egg) -----------------------------------------
-  // The red ".ge" in the logo turns the wall into a GitHub contribution graph and back
-  // (CSS .wall.gh). Delays ripple diagonally across the grid; reduced motion skips them.
+  // ---- Wall view -------------------------------------------------------------
+  // Toggles .wall.gh; delays ripple diagonally, none with reduced motion.
 
   const wall = document.querySelector(".home .wall");
   const ge = document.querySelector(".home .logo span");
