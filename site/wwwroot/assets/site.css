@@ -114,7 +114,7 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 /* The title takes the full width (each line one phrase, never broken mid-word);
    the lead and the search share the row under it. */
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 27rem); gap: 1.6rem 3.5rem; align-items: end; margin-top: 2.6rem; }
-.hero-title { grid-column: 1 / -1; margin: 0; font-size: clamp(2.2rem, 7.2vw, 6.6rem); line-height: .98; font-weight: 900; letter-spacing: -.03em; text-wrap: wrap; overflow-wrap: normal; }
+.hero-title { grid-column: 1 / -1; margin: 0; font-size: clamp(2.2rem, 5.4vw, 5rem); line-height: .98; font-weight: 900; letter-spacing: -.03em; text-wrap: wrap; overflow-wrap: normal; }
 .hero-side { display: contents; }
 .hero-line { display: block; }
 html[lang="en"] .hero-title { font-size: clamp(2rem, 5vw, 4.6rem); }
