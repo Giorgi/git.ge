@@ -52,7 +52,12 @@
                             <article class="rnd-entry">
                                 <a class="row-face" href="@Site.OwnerHref(e.Repo.Owner)" tabindex="-1" aria-hidden="true"><Avatar Login="@e.Repo.Owner" Size="48" /></a>
                                 <div class="rnd-entry-head">
-                                    <h3><a class="row-title" href="@e.Repo.Url">@e.Repo.Name</a></h3>
+                                    <h3><a class="row-title" href="@e.Repo.Url">@e.Repo.Name</a>
+                                        @* The category, so a reader spots their field and can go on to its page. *@
+                                        @if (Site.ProjectByUrl(e.Repo.Url) is { } p)
+                                        {
+                                            <a class="badge cat" href="/c/@p.Category/"><T K="@($"cat.{p.Category}")" /></a>
+                                        }</h3>
                                     <p class="row-sub"><a href="@Site.OwnerHref(e.Repo.Owner)">@e.Repo.Owner</a>
                                         @if (e.Meta is not null) { <span>@((MarkupString)e.Meta)</span> }</p>
                                 </div>

@@ -547,6 +547,7 @@ input { caret-color: var(--accent); }
 @media (max-width: 36rem) { .rnd-entry { align-items: center; } .rnd-entry-body { grid-column: 1 / -1; } }
 .rnd-entry h3 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: 0; }
 .rnd-entry h3 .row-title { font-weight: 800; }
+.rnd-entry h3 .badge { margin-left: .5rem; font-size: .75rem; font-weight: 400; vertical-align: .2em; }
 .rnd-entry .row-sub { margin: .15rem 0 0; }
 .rnd-entry p { margin: .55rem 0 0; }
 .rnd-quote { margin: .6rem 0 0; padding-left: .8rem; border-left: 2px solid var(--line); color: var(--muted); font-size: .92rem; }

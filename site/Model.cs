@@ -175,6 +175,14 @@ public static class Site
     public static int FirstSeenSortMin { get; set; } = 20;
 
     static Dictionary<string, SiteProject>? byKey;
+    static Dictionary<string, SiteProject>? byUrl;
+
+    // A project by its GitHub URL (roundups link to repos by URL), or null. Not only
+    // listed ones: a roundup's new projects can be below the 10-star bar.
+    public static SiteProject? ProjectByUrl(string url) =>
+        (byUrl ??= Data.Projects.GroupBy(p => p.Url.TrimEnd('/'), StringComparer.OrdinalIgnoreCase)
+                         .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase))
+        .GetValueOrDefault(url.TrimEnd('/'));
     public static SiteProject Project(string key) => (byKey ??= Data.Projects.ToDictionary(p => p.Key))[key];
 
     public static IEnumerable<SiteProject> Listed => Data.Projects.Where(p => p.Listed);
