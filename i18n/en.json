@@ -108,6 +108,9 @@
   "roundups.published": "Published",
   "roundups.people": "{0} developers in this roundup",
   "roundups.peopleOne": "{0} developer in this roundup",
+  "roundups.ogKind": "Roundup",
+  "roundups.ogCreated": "{0} new repositories",
+  "roundups.ogReleases": "{0} new releases",
   "roundups.rss": "RSS feed",
   "roundups.back": "← All roundups",
 

@@ -18,12 +18,12 @@
     <meta property="og:url" content="@Site.Url(Path)">
     <meta property="og:locale" content="ka_GE">
     <meta property="og:locale:alternate" content="en_US">
-    <meta property="og:image" content="@Site.Url("/og.png")">
+    <meta property="og:image" content="@Site.Url(OgImage ?? "/og.png")">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="git.ge · @Site.Strings.Ka("site.tagline")">
+    <meta property="og:image:alt" content="@(OgImageAlt ?? $"git.ge · {Site.Strings.Ka("site.tagline")}")">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="@Site.Url("/og.png")">
+    <meta name="twitter:image" content="@Site.Url(OgImage ?? "/og.png")">
     <meta name="color-scheme" content="light dark">
     <link rel="preload" href="/assets/fonts/noto-sans-georgian.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/assets/fonts/noto-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -93,6 +93,9 @@
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string OgType { get; set; } = "website";
+    // A page's own share image (site path) and its alt text; the shared /og.png otherwise.
+    [Parameter] public string? OgImage { get; set; }
+    [Parameter] public string? OgImageAlt { get; set; }
     // e.g. "noindex" for the 404 page.
     [Parameter] public string? Robots { get; set; }
     // Breadcrumb trail after "git.ge" (the home page): (name, path) pairs ending with this page.

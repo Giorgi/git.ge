@@ -4,6 +4,8 @@ using Markdig.Renderers;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 
+namespace GitGe.Site;
+
 // A roundup's Markdown cut into the pieces RoundupPage lays out in the site's own
 // grammar: the opening paragraphs, then one section per "##" heading. Inside a
 // section, "### [owner/repo](https://github.com/…)" starts a project entry (meta line,

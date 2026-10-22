@@ -75,6 +75,9 @@ if (Directory.Exists(avatarCache))
     }
 }
 
+// Share images for roundups (needs the avatars above), before the pages that point at them.
+Site.OgImages = OgImages.Roundups(root, output, Site.Roundups);
+
 // Razor escapes all text; allow every Unicode range so Georgian stays readable UTF-8
 // instead of numeric entities, which would roughly triple its size.
 var services = new ServiceCollection()
@@ -380,6 +383,15 @@ static int SiteSelfTest(string built)
         Check(problems.Count == 0, $"built _site: unique titles and descriptions, valid JSON-LD ({problems.Count} problems)");
     }
     else Console.Error.WriteLine("  (no _site: skipping built-site checks)");
+
+    // Every roundup page points at its own share image, and the file is there.
+    var roundupPages = Directory.Exists(Path.Combine(built, "roundups"))
+        ? Directory.GetFiles(Path.Combine(built, "roundups"), "index.html", SearchOption.AllDirectories).Where(f => Path.GetDirectoryName(f) != Path.Combine(built, "roundups")).ToList()
+        : [];
+    var missingOg = roundupPages.Where(f =>
+        Regex.Match(File.ReadAllText(f), @"<meta property=""og:image"" content=""https?://[^/""]+(/og/roundup-[^""]+\.png)""") is not { Success: true } m
+        || !File.Exists(Path.Combine(built, m.Groups[1].Value.TrimStart('/')))).ToList();
+    Check(missingOg.Count == 0, $"every roundup has its own share image ({roundupPages.Count} roundups, {missingOg.Count} without)");
 
     // Help-wanted label filter: spellings normalise to the two values, anything else drops.
     List<string> Labels(params string[] labels) => HelpWantedFilters.LabelsOf(new HelpWantedIssue { Labels = [.. labels] });

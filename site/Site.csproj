@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="1.4.0" />
+    <PackageReference Include="SkiaSharp" Version="4.152.3" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.152.3" />
   </ItemGroup>
 
 </Project>
