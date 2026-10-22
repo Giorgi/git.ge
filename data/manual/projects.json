@@ -1,9 +1,14 @@
 [
+  {"fullName":"7even/loc_counter","category":"tools"},
   {"fullName":"akalongman/ubuntu-configuration","category":"tools"},
+  {"fullName":"andreyvit/yoursway-eclipse-osx-repackager","category":"tools"},
   {"fullName":"ArtemZarubin/PixelArtWeatherML","category":"mobile"},
   {"fullName":"BAINDA/itstep-website","category":"web"},
   {"fullName":"bssth/sacred-sdk","category":"games"},
   {"fullName":"c6-dev/fose-fps-fix","category":"games"},
   {"fullName":"dominnya/portfolio","category":"web"},
-  {"fullName":"sepivip/meta-ads-skill","category":"data"}
+  {"fullName":"dudupopkhadze/jeka","category":"systems"},
+  {"fullName":"gozaltech/NVDARemoteCompanion","category":"tools"},
+  {"fullName":"sepivip/meta-ads-skill","category":"data"},
+  {"fullName":"t1meshift/VecDraw","category":"games"}
 ]
