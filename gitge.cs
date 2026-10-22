@@ -947,6 +947,21 @@ static class SelfTest
         Check(bob.Ranks.Single().Rank == 2 && bob.Spotlight.SequenceEqual(["2026-W40"]), "rank #2 and Spotlight weeks on bob's page");
         Check(alice.Roundups.SequenceEqual(["2026-10"]) && bob.Roundups.Count == 0, "roundup mentions match the exact repo (b10 isn't b1)");
 
+        // Category inference: a strong rule's words beat another rule's topic.
+        var cats = new CategoryConfig
+        {
+            Rules =
+            [
+                new() { Category = "georgian", Strong = true, Words = ["georgian"] },
+                new() { Category = "data", Topics = ["database"], Words = ["dataset"] },
+            ],
+        };
+        Check(cats.Infer(new Project { FullName = "a/words", Description = "Georgian word list", Topics = ["database"] }) == "georgian",
+              "a strong rule's word wins over another rule's topic");
+        Check(cats.Infer(new Project { FullName = "a/db", Description = "A dataset", Topics = ["database"] }) == "data"
+              && cats.Infer(new Project { FullName = "a/x", Description = "Something else" }) == "other",
+              "without the strong word, the usual passes apply");
+
         var withoutCarol = published.Where(p => p.Owner != "carol").ToList();   // carol excluded or opted out
         var pagesWithoutCarol = Build(withoutCarol);
         Check(pagesWithoutCarol.All(d => d.Login != "carol" && !d.FollowedBy.Contains("carol") && d.Contributors.All(c => c.Login != "carol")),
@@ -2358,16 +2373,20 @@ sealed class CategoryConfig
     public List<CategoryRule> Rules { get; set; } = [];
     public Dictionary<string, string> FallbackLanguages { get; set; } = [];
 
-    // Strongest signal first: the owner's own topics, then the primary language, then
-    // words in the name/description, then a language fallback. Within each pass the
-    // first rule in config order wins. See config/categories.json.
+    // Strongest signal first: a "strong" rule's topics or words (a project about Georgia
+    // is Georgian whatever else it is), then the owner's own topics, then the primary
+    // language, then words in the name/description, then a language fallback. Within
+    // each pass the first rule in config order wins. See config/categories.json.
     public string Infer(Project p)
     {
         var ignoreCase = StringComparer.OrdinalIgnoreCase;
         var text = $"{p.FullName.Split('/').Last().Replace('-', ' ').Replace('_', ' ')} {p.Description}";
-        return Rules.FirstOrDefault(r => p.Topics is not null && p.Topics.Any(t => r.Topics.Contains(t, ignoreCase)))?.Category
+        bool HasTopic(CategoryRule r) => p.Topics is not null && p.Topics.Any(t => r.Topics.Contains(t, ignoreCase));
+        bool HasWord(CategoryRule r) => r.Words.Any(w => Regex.IsMatch(text, $@"\b{Regex.Escape(w)}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+        return Rules.FirstOrDefault(r => r.Strong && (HasTopic(r) || HasWord(r)))?.Category
+            ?? Rules.FirstOrDefault(HasTopic)?.Category
             ?? Rules.FirstOrDefault(r => p.Language is not null && r.Languages.Contains(p.Language, ignoreCase))?.Category
-            ?? Rules.FirstOrDefault(r => r.Words.Any(w => Regex.IsMatch(text, $@"\b{Regex.Escape(w)}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)))?.Category
+            ?? Rules.FirstOrDefault(HasWord)?.Category
             ?? (p.Language is not null && FallbackLanguages.TryGetValue(p.Language, out var fallback) ? fallback : null)
             ?? "other";
     }
@@ -2376,6 +2395,8 @@ sealed class CategoryConfig
 sealed class CategoryRule
 {
     public string Category { get; set; } = "";
+    // Checked before every other pass (topics and words both).
+    public bool Strong { get; set; }
     public List<string> Languages { get; set; } = [];
     public List<string> Topics { get; set; } = [];
     public List<string> Words { get; set; } = [];
