@@ -1860,6 +1860,9 @@ static class Submit
 // (content/roundups/YYYY-MM.ka.md and .en.md). Every fact comes from the data;
 // the prose is left as TODO markers for a person (or the /roundup skill, with
 // a person reviewing) to write. Same data in, same skeleton out.
+// Run it between the 15th and 25th of the following month: repos created late in
+// the month get time to collect stars, and discovery time to find them. Stars and
+// counts are as of the run day, and the files say so.
 // ---------------------------------------------------------------------------
 
 static class Roundup
@@ -1920,7 +1923,7 @@ static class Roundup
             .SelectMany(w => w.Picks).Distinct()
             .Select(k => data.Projects.FirstOrDefault(p => p.Key == k)).OfType<SiteProject>().ToList();
 
-        var facts = new Facts(first, last, created.Count(p => p.Stars >= minStars), topNew, start, end, gains, releases, spotlight,
+        var facts = new Facts(first, last, DateOnly.FromDateTime(now), created.Count(p => p.Stars >= minStars), topNew, start, end, gains, releases, spotlight,
                               data.Projects.Count(p => p.Listed), data.Developers, data.Issues.Count, minStars);
         Directory.CreateDirectory(dir);
         File.WriteAllText(kaPath, Render(facts, ka: true), new UTF8Encoding(false));
@@ -1934,7 +1937,8 @@ static class Roundup
 
     sealed record Release(SiteProject Project, string Name, string Url, DateTimeOffset PublishedAt);
 
-    sealed record Facts(DateOnly First, DateOnly Last, int CreatedCount, List<SiteProject> TopNew,
+    // AsOf: the run day. It's the published date, and the day stars and counts are from.
+    sealed record Facts(DateOnly First, DateOnly Last, DateOnly AsOf, int CreatedCount, List<SiteProject> TopNew,
                         DateOnly? Start, DateOnly? End, List<(SiteProject Project, int Delta)> Gains,
                         List<Release> Releases, List<SiteProject> Spotlight,
                         int Listed, int Developers, int HelpWanted, int MinStars);
@@ -1979,7 +1983,7 @@ static class Roundup
         md.Append($"""
             ---
             title: {monthName}
-            date: {f.Last.AddDays(1):yyyy-MM-dd}
+            date: {f.AsOf:yyyy-MM-dd}
             summary: TODO: {T("ერთი წინადადება სიისა და RSS-ისთვის.", "One sentence for the list and the RSS feed.")}
             ---
 
@@ -1989,8 +1993,8 @@ static class Roundup
 
         md.Append($"\n## {T("თვის ახალი პროექტები", "New this month")}\n\n");
         var monthIn = $"{f.First.Year} წლის {MonthsKa[f.First.Month - 1].TrimEnd('ი')}ში";   // "2026 წლის სექტემბერში"
-        md.Append(T($"ყველაზე პოპულარული რეპოზიტორიები, რომლებიც {monthIn} შეიქმნა, ვარსკვლავების მიხედვით.\n",
-                    $"The most popular repositories created in {monthName}, by stars.\n"));
+        md.Append(T($"ყველაზე პოპულარული რეპოზიტორიები, რომლებიც {monthIn} შეიქმნა, ვარსკვლავების მიხედვით ({f.AsOf:yyyy-MM-dd}-ის მდგომარეობით).\n",
+                    $"The most popular repositories created in {monthName}, by stars as of {f.AsOf:yyyy-MM-dd}.\n"));
         if (f.TopNew.Count == 0) md.Append(T("\nამ თვეში ახალი პროექტი არ შექმნილა.\n", "\nNo new projects this month.\n"));
         foreach (var p in f.TopNew)
             Entry(md, p, $"★ {p.Stars:#,0} · {p.Language ?? "—"} · {T("შეიქმნა", "created")} {p.CreatedAt:yyyy-MM-dd}", ka);
@@ -2017,6 +2021,7 @@ static class Roundup
         }
 
         md.Append($"\n## {T("რიცხვებში", "In numbers")}\n\n");
+        md.Append(T($"{f.AsOf:yyyy-MM-dd}-ის მდგომარეობით:\n\n", $"As of {f.AsOf:yyyy-MM-dd}:\n\n"));
         md.Append(T($"- {f.Listed:#,0} პროექტი სიაში, {f.Developers:#,0} დეველოპერი\n- {f.CreatedCount:#,0} ახალი რეპოზიტორია სულ მცირე {f.MinStars} ვარსკვლავით\n- {f.HelpWanted:#,0} ღია issue ჭდით „good first issue“ ან „help wanted“\n",
                     $"- {f.Listed:#,0} listed projects, {f.Developers:#,0} developers\n- {f.CreatedCount:#,0} new repositories with at least {f.MinStars} stars\n- {f.HelpWanted:#,0} open issues labelled \"good first issue\" or \"help wanted\"\n"));
         return md.ToString();
