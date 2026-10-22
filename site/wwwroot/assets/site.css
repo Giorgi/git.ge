@@ -186,6 +186,8 @@ input { caret-color: var(--accent); }
    "კოდი შეიცვალა" can't be read as being about the stars. */
 .p-stars + .p-trend { margin-left: -.5rem; }
 .p-meta > * + .p-pushed::before { content: "·"; margin-right: .9rem; color: var(--dim); }
+/* On phones the date often wraps to its own line, where a leading dot would dangle. */
+@media (max-width: 36rem) { .p-meta > * + .p-pushed::before { content: none; } }
 .p-trend.up { color: var(--up); font-weight: 600; }
 .p-trend.down { color: var(--down); }
 
