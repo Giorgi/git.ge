@@ -1917,13 +1917,7 @@ static class Roundup
         // 3. Releases published this month by listed projects.
         var releases = await FetchReleases(github, data.Projects.Where(p => p.Listed && nodeIds.ContainsKey(p.Key)).ToList(), nodeIds, InMonth);
 
-        // 4. Spotlight picks for weeks starting in this month.
-        var spotlight = Store.ReadList<SpotlightWeek>(paths.SpotlightHistory)
-            .Where(w => DateOnly.FromDateTime(ISOWeek.ToDateTime(int.Parse(w.Week[..4]), int.Parse(w.Week[6..]), DayOfWeek.Monday)) is var mon && mon >= first && mon <= last)
-            .SelectMany(w => w.Picks).Distinct()
-            .Select(k => data.Projects.FirstOrDefault(p => p.Key == k)).OfType<SiteProject>().ToList();
-
-        var facts = new Facts(first, last, DateOnly.FromDateTime(now), created.Count(p => p.Stars >= minStars), topNew, start, end, gains, releases, spotlight,
+        var facts = new Facts(first, last, DateOnly.FromDateTime(now), created.Count(p => p.Stars >= minStars), topNew, start, end, gains, releases,
                               data.Projects.Count(p => p.Listed), data.Developers, data.Issues.Count, minStars);
         Directory.CreateDirectory(dir);
         File.WriteAllText(kaPath, Render(facts, ka: true), new UTF8Encoding(false));
@@ -1940,7 +1934,7 @@ static class Roundup
     // AsOf: the run day. It's the published date, and the day stars and counts are from.
     sealed record Facts(DateOnly First, DateOnly Last, DateOnly AsOf, int CreatedCount, List<SiteProject> TopNew,
                         DateOnly? Start, DateOnly? End, List<(SiteProject Project, int Delta)> Gains,
-                        List<Release> Releases, List<SiteProject> Spotlight,
+                        List<Release> Releases,
                         int Listed, int Developers, int HelpWanted, int MinStars);
 
     static async Task<List<Release>> FetchReleases(GitHub github, List<SiteProject> projects, Dictionary<string, string> nodeIds, Func<DateTimeOffset?, bool> inMonth)
@@ -2014,16 +2008,10 @@ static class Roundup
         foreach (var r in f.Releases)
             md.Append($"- [{r.Project.FullName}]({r.Project.Url}): [{r.Name}]({r.Url}) ({r.PublishedAt:yyyy-MM-dd})\n");
 
-        if (f.Spotlight.Count > 0)
-        {
-            md.Append($"\n## {T("რჩეული", "Spotlight")}\n\n");
-            foreach (var p in f.Spotlight) md.Append($"- [{p.FullName ?? p.Name}]({p.Url})\n");
-        }
-
         md.Append($"\n## {T("რიცხვებში", "In numbers")}\n\n");
         md.Append(T($"{f.AsOf:yyyy-MM-dd}-ის მდგომარეობით:\n\n", $"As of {f.AsOf:yyyy-MM-dd}:\n\n"));
-        md.Append(T($"- {f.Listed:#,0} პროექტი სიაში, {f.Developers:#,0} დეველოპერი\n- {f.CreatedCount:#,0} ახალი რეპოზიტორია სულ მცირე {f.MinStars} ვარსკვლავით\n- {f.HelpWanted:#,0} ღია issue ჭდით „good first issue“ ან „help wanted“\n",
-                    $"- {f.Listed:#,0} listed projects, {f.Developers:#,0} developers\n- {f.CreatedCount:#,0} new repositories with at least {f.MinStars} stars\n- {f.HelpWanted:#,0} open issues labelled \"good first issue\" or \"help wanted\"\n"));
+        md.Append(T($"- {f.Listed:#,0} პროექტი სიაში\n- {f.Developers:#,0} დეველოპერი\n- {f.CreatedCount:#,0} ახალი რეპოზიტორია სულ მცირე {f.MinStars} ვარსკვლავით\n- {f.HelpWanted:#,0} ღია issue ჭდით „good first issue“ ან „help wanted“\n",
+                    $"- {f.Listed:#,0} listed projects\n- {f.Developers:#,0} developers\n- {f.CreatedCount:#,0} new repositories with at least {f.MinStars} stars\n- {f.HelpWanted:#,0} open issues labelled \"good first issue\" or \"help wanted\"\n"));
         return md.ToString();
     }
 
