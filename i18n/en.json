@@ -127,6 +127,8 @@
   "footer.updated": "Data from GitHub, updated {0}",
   "footer.privacy": "No cookies, no tracking",
   "footer.source": "Source code",
+  "join.notListed": "Not listed? Add your project",
+  "footer.add": "Add a project",
   "footer.removal": "Request removal",
 
   "nav.developers": "Developers",

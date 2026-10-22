@@ -139,11 +139,14 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 /* Its own focus ring: the link's red outline would sit on the active faces' red ring. */
 .wall a:focus-visible { outline: 3px solid var(--fg); outline-offset: 6px; }
 .wall-cap { display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; margin: .9rem 0 0; font-size: .88rem; color: var(--muted); }
-.wall-cap span:nth-child(2) { color: var(--accent); }
-.wall-cap a { margin-left: auto; }
+.wall-cap > span:nth-child(2) { color: var(--accent); }
+/* The two links wrap together, right-aligned. */
+.wall-cap-end { margin-left: auto; display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; }
+.home .wall-cap .wall-add { color: var(--muted); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: .15em; }
+.home .wall-cap .wall-add:hover { color: var(--fg); text-decoration-color: currentColor; }
 /* Fewer, larger faces on smaller screens: three full rows each time. */
 @media (max-width: 64rem) { .wall { grid-template-columns: repeat(16, minmax(0, 1fr)); } .wall li:nth-child(n+97) { display: none; } }
-@media (max-width: 36rem) { .wall { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .5rem; } .wall .on .avatar { outline-width: 2px; outline-offset: 1px; } .wall li:nth-child(n+61) { display: none; } .wall-cap a { margin-left: 0; } }
+@media (max-width: 36rem) { .wall { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .5rem; } .wall .on .avatar { outline-width: 2px; outline-offset: 1px; } .wall li:nth-child(n+61) { display: none; } .wall-cap-end { margin-left: 0; } }
 /* .wall.gh (app.js): squares shaded by each developer's last change; JS sets the delays. */
 .wall a { transition: border-radius .35s, background-color .35s, transform .35s; }
 .wall .avatar { transition: filter .2s, opacity .35s; }

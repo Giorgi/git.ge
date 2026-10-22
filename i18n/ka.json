@@ -127,6 +127,8 @@
   "footer.updated": "მონაცემები GitHub-იდან, განახლდა {0}",
   "footer.privacy": "ქუქი-ფაილების და თვალთვალის გარეშე",
   "footer.source": "საწყისი კოდი",
+  "join.notListed": "სიაში არ ხართ? დაამატეთ თქვენი პროექტი",
+  "footer.add": "პროექტის დამატება",
   "footer.removal": "წაშლის მოთხოვნა",
 
   "nav.developers": "დეველოპერები",
