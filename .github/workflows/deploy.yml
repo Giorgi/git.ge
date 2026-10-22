@@ -12,7 +12,9 @@
 # _headers file format, so nothing else changes.
 #
 # Called by nightly.yml with an already built `_site` artifact. Run manually
-# (workflow_dispatch) to rebuild from the current data and deploy.
+# (workflow_dispatch) to rebuild from the current data and deploy. A push to main
+# that changes content/roundups/ does the same, so a committed roundup goes live
+# right away (page and share image come from the same build).
 
 name: Deploy
 
@@ -24,6 +26,9 @@ on:
         type: string
         required: true
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["content/roundups/**"]
 
 permissions:
   contents: read
@@ -83,6 +88,11 @@ jobs:
     needs: build
     # Runs after a manual build, or directly when called (build is skipped then).
     if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    # One deploy at a time: a roundup push and the nightly can overlap. Queued,
+    # not cancelled, so the newer build always lands last.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
