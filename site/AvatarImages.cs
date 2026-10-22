@@ -11,6 +11,8 @@ namespace GitGe.Site;
 static class AvatarImages
 {
     public const int Small = 96, Large = 224;
+    // GitHub's grey default avatar; same constant as Avatars.PlaceholderSha256 in gitge.cs.
+    const string PlaceholderSha256 = "2ae73e12cb1e9989929920c4e9da0b02b6f6f8f0bd1944ac9ebfbf6b4dca746b";
     const int Quality = 80;
 
     // Writes <output>/avatars/ and fills Site.Avatars / Site.AvatarsLarge (lower-cased login → path).
@@ -26,7 +28,9 @@ static class AvatarImages
         var large = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
         Parallel.ForEach(files, x =>
         {
-            using var source = SKBitmap.Decode(x.File);
+            var bytes = File.ReadAllBytes(x.File);
+            if (Convert.ToHexStringLower(SHA256.HashData(bytes)) == PlaceholderSha256) return;   // no photo: the letter fallback
+            using var source = SKBitmap.Decode(bytes);
             if (source is null) return;
             small[x.Login] = Write(dir, x.Login, source, Small);
             large[x.Login] = Write(dir, x.Login, source, Large);

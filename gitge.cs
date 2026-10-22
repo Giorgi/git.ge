@@ -2183,6 +2183,14 @@ static class Avatars
     static readonly TimeSpan MaxAge = TimeSpan.FromDays(7);
     const int Size = 256;
 
+    // GitHub's grey default ("ghost") avatar, the same bytes at every size. The CDN also
+    // serves it in place of real photos at times (seen 2026-10-22 for ~1 in 8 accounts,
+    // torvalds included), so it is never cached: a real photo already in the cache stays,
+    // and a missing one is retried on the next run. SHA-256 of the PNG (also its ETag).
+    internal const string PlaceholderSha256 = "2ae73e12cb1e9989929920c4e9da0b02b6f6f8f0bd1944ac9ebfbf6b4dca746b";
+    internal static bool IsPlaceholder(byte[] bytes) =>
+        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes)) == PlaceholderSha256;
+
     public static async Task Run(Paths paths, Options options)
     {
         if (!File.Exists(paths.SiteData)) throw new InvalidOperationException("Run 'prepare' first: avatars needs _build/site-data.json.");
@@ -2197,6 +2205,10 @@ static class Avatars
         foreach (var file in Directory.GetFiles(dir))
             if (!wanted.Contains(Path.GetFileNameWithoutExtension(file))) { File.Delete(file); removed++; }
 
+        // Placeholders cached by older runs: drop them so those avatars are fetched again.
+        foreach (var file in Directory.GetFiles(dir))
+            if (IsPlaceholder(File.ReadAllBytes(file))) { File.Delete(file); removed++; }
+
         var existing = Directory.GetFiles(dir).ToDictionary(f => Path.GetFileNameWithoutExtension(f), f => f);
         var todo = data.DeveloperPages.Where(d => options.Force
             || !existing.TryGetValue(d.Login.ToLowerInvariant(), out var f)
@@ -2204,7 +2216,7 @@ static class Avatars
 
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("git.ge-avatars", "1.0"));
-        int ok = 0, failed = 0;
+        int ok = 0, failed = 0, placeholders = 0;
         await Parallel.ForEachAsync(todo, new ParallelOptions { MaxDegreeOfParallelism = 8 }, async (d, ct) =>
         {
             var url = ids.TryGetValue(d.Login, out var id) && id > 0
@@ -2219,6 +2231,7 @@ static class Avatars
                 };
                 if (!response.IsSuccessStatusCode || ext is null) { Interlocked.Increment(ref failed); return; }
                 var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+                if (IsPlaceholder(bytes)) { Interlocked.Increment(ref placeholders); return; }   // keep what we have
                 var name = d.Login.ToLowerInvariant();
                 foreach (var old in Directory.GetFiles(dir, name + ".*")) File.Delete(old);
                 var target = Path.Combine(dir, $"{name}.{ext}");
@@ -2233,7 +2246,7 @@ static class Avatars
         });
 
         var files = Directory.GetFiles(dir);
-        Log.Info($"Avatars: {ok} downloaded, {failed} failed, {removed} removed; {files.Length} cached, " +
+        Log.Info($"Avatars: {ok} downloaded, {placeholders} placeholders skipped, {failed} failed, {removed} removed; {files.Length} cached, " +
                  $"{files.Sum(f => new FileInfo(f).Length) / 1024} KB in {dir}");
     }
 }
