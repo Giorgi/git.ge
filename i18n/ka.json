@@ -111,6 +111,7 @@
   "roundups.ogKind": "მიმოხილვა",
   "roundups.ogCreated": "{0} ახალი რეპოზიტორია",
   "roundups.ogReleases": "{0} ახალი ვერსია",
+  "roundups.pageTitle": "{0}: git.ge-ის მიმოხილვა",
   "roundups.rss": "RSS არხი",
   "roundups.back": "← ყველა მიმოხილვა",
 

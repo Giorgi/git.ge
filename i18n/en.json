@@ -111,6 +111,7 @@
   "roundups.ogKind": "Roundup",
   "roundups.ogCreated": "{0} new repositories",
   "roundups.ogReleases": "{0} new releases",
+  "roundups.pageTitle": "{0}: git.ge roundup",
   "roundups.rss": "RSS feed",
   "roundups.back": "← All roundups",
 

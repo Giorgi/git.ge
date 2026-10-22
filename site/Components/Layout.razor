@@ -91,6 +91,8 @@
     [Parameter] public string? TitleKey { get; set; }
     [Parameter] public object?[] TitleArgs { get; set; } = [];
     [Parameter] public string? Title { get; set; }
+    // The title already names git.ge ("სექტემბერი 2026: git.ge-ის მიმოხილვა"): no " · git.ge" suffix.
+    [Parameter] public bool TitleHasSite { get; set; }
     [Parameter] public string? Description { get; set; }
     [Parameter] public string OgType { get; set; } = "website";
     // A page's own share image (site path) and its alt text; the shared /og.png otherwise.
@@ -129,7 +131,7 @@
         categoryCounts ??= Site.Listed.GroupBy(p => p.Category).ToDictionary(g => g.Key, g => g.Count());
 
     bool IsHome => Path == "/";
-    string? TitleSuffix => IsHome ? null : " · git.ge";
+    string? TitleSuffix => IsHome || TitleHasSite ? null : " · git.ge";
     string? TitleArgsJson => TitleArgs.Length == 0 ? null : System.Text.Json.JsonSerializer.Serialize(TitleArgs);
 
     string PageTitle
@@ -137,7 +139,7 @@
         get
         {
             var text = Title ?? (TitleKey is null ? "" : Site.Strings.Ka(TitleKey, TitleArgs));
-            return IsHome ? $"git.ge · {text}" : $"{text} · git.ge";
+            return IsHome ? $"git.ge · {text}" : TitleHasSite ? text : $"{text} · git.ge";
         }
     }
 

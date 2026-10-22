@@ -4,7 +4,7 @@
    The Markdown is cut up by RoundupView and laid out in the site's grammar: the
    month at poster size with the faces of everyone featured, project entries with
    the owner's face, release and pick lists as rows, the numbers as big figures. *@
-<Layout Path="@($"/roundups/{R.Slug}/")" Title="@R.Ka.Title" Description="@(R.Ka.Summary ?? Site.Strings.Ka("meta.roundup", R.Ka.Title))" OgType="article"
+<Layout Path="@($"/roundups/{R.Slug}/")" Title="@Site.Strings.Ka("roundups.pageTitle", R.Ka.Title)" TitleHasSite="true" Description="@(R.Ka.Summary ?? Site.Strings.Ka("meta.roundup", R.Ka.Title))" OgType="article"
         OgImage="@Site.OgImages.GetValueOrDefault(R.Slug)" OgImageAlt="@($"git.ge · {Site.Strings.Ka("roundups.ogKind")} · {R.Ka.Title}")"
         Crumbs="@([(Site.Strings.Ka("roundups.title"), "/roundups/"), (R.Ka.Title, $"/roundups/{R.Slug}/")])" JsonLd="@(new object[] { Seo.Article(R) })">
     <article class="rnd">
