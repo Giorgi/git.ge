@@ -27,7 +27,8 @@
   --soft: #f3f2ef;
   --accent: #b3261e;
   --link: #1f4fbf;
-  --up: #1b7536;    /* 4.5:1 on --badge too (the help-wanted badge) */
+  --up: #1b7536;
+  --g0: #ebedf0; --g1: #9be9a8; --g2: #40c463; --g3: #30a14e; --g4: #216e39;    /* 4.5:1 on --badge too (the help-wanted badge) */
   --down: #9a3b1c;
   --badge: #efeae0;
   --font: "Noto Sans Georgian", "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -46,6 +47,7 @@
     --accent: #f04a3e;   /* a true red, 5:1 on --bg */
     --link: #8ab4ff;
     --up: #6fcf8b;
+    --g0: #161b22; --g1: #0e4429; --g2: #006d32; --g3: #26a641; --g4: #39d353;
     --down: #f0a07a;
     --badge: #2a2824;
   }
@@ -142,7 +144,26 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 /* Fewer, larger faces on smaller screens: three full rows each time. */
 @media (max-width: 64rem) { .wall { grid-template-columns: repeat(16, minmax(0, 1fr)); } .wall li:nth-child(n+97) { display: none; } }
 @media (max-width: 36rem) { .wall { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .3rem; } .wall li:nth-child(n+61) { display: none; } .wall-cap a { margin-left: 0; } }
-@media (prefers-reduced-motion: reduce) { .wall .avatar { transition: none; } }
+/* Easter egg (app.js): the red ".ge" turns the wall into a GitHub contribution graph,
+   shaded by when each developer's projects last changed. Faces fade, circles square
+   off; JS staggers the delay diagonally. */
+.wall a { transition: border-radius .35s, background-color .35s, transform .35s; }
+.wall .avatar { transition: filter .2s, opacity .35s; }
+.wall.gh a { border-radius: 22%; transform: scale(.86); }
+.wall.gh .avatar { opacity: 0; }
+.wall.gh .on .avatar { outline: 0; }
+.wall.gh a:hover, .wall.gh a:focus-visible { transform: scale(1); }
+.wall.gh [data-g="0"] a, .wall-key [data-g="0"] { background-color: var(--g0); }
+.wall.gh [data-g="1"] a, .wall-key [data-g="1"] { background-color: var(--g1); }
+.wall.gh [data-g="2"] a, .wall-key [data-g="2"] { background-color: var(--g2); }
+.wall.gh [data-g="3"] a, .wall-key [data-g="3"] { background-color: var(--g3); }
+.wall.gh [data-g="4"] a, .wall-key [data-g="4"] { background-color: var(--g4); }
+.wall-key { display: flex; flex-wrap: wrap; gap: .3rem 1rem; margin: .9rem 0 0; font-size: .88rem; color: var(--muted); }
+.wall-key[hidden], .wall-cap[hidden] { display: none; }
+.wall-key-scale { display: inline-flex; align-items: center; gap: .2rem; }
+.wall-key-scale i { width: .75rem; height: .75rem; border-radius: 2px; }
+.wall-key-scale i:first-of-type { margin-left: .3rem; } .wall-key-scale i:last-of-type { margin-right: .3rem; }
+@media (prefers-reduced-motion: reduce) { .wall a, .wall .avatar { transition: none !important; } }
 
 /* Home: links in ink, so red marks only what is live this week. */
 .home .p-name, .home .wall-cap a, .home .more a, .home .p-owner:hover, .home .site-footer a, .home .hero-cats a { color: var(--fg); }

@@ -32,11 +32,17 @@
             <ul class="wall">
                 @foreach (var d in Wall)
                 {
-                    <li class="@(Site.IsActive(d) ? "on" : null)">
+                    <li class="@(Site.IsActive(d) ? "on" : null)" data-g="@Site.GreenLevel(d)">
                         <a href="@d.Path" title="@d.DisplayName" aria-label="@d.DisplayName"><Avatar Login="@d.Login" Size="48" /></a>
                     </li>
                 }
             </ul>
+            @* Easter egg: clicking the red ".ge" in the logo turns the wall into a GitHub
+               contribution graph (app.js); this key replaces the caption meanwhile. *@
+            <p class="wall-key" hidden>
+                <T K="home.greenKey" />
+                <span class="wall-key-scale"><T K="home.greenOld" /> <i data-g="0"></i><i data-g="1"></i><i data-g="2"></i><i data-g="3"></i><i data-g="4"></i> <T K="home.greenNew" /></span>
+            </p>
             <p class="wall-cap">
                 <span><T K="home.wallCaption" /></span>
                 <span><T K="home.wallActive" /></span>

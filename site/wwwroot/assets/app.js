@@ -528,6 +528,30 @@
     apply();
   }
 
+  // ---- Green wall (home easter egg) -----------------------------------------
+  // The red ".ge" in the logo turns the wall into a GitHub contribution graph and back
+  // (CSS .wall.gh). Delays ripple diagonally across the grid; reduced motion skips them.
+
+  const wall = document.querySelector(".home .wall");
+  const ge = document.querySelector(".home .logo span");
+  if (wall && ge) {
+    const key = document.querySelector(".wall-key");
+    const cap = document.querySelector(".wall-cap");
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)");
+    ge.addEventListener("click", event => {
+      event.preventDefault();
+      const columns = getComputedStyle(wall).gridTemplateColumns.split(" ").length;
+      [...wall.children].forEach((li, i) => {
+        const delay = still.matches ? "0s" : ((i % columns) + Math.floor(i / columns)) * 18 + "ms";
+        li.firstElementChild.style.transitionDelay = delay;
+        li.querySelector(".avatar").style.transitionDelay = delay;
+      });
+      const on = wall.classList.toggle("gh");
+      key.hidden = !on;
+      cap.hidden = on;
+    });
+  }
+
   // ---- Search (/projects/) --------------------------------------------------
 
   const search = document.querySelector(".search");

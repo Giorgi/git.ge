@@ -192,8 +192,21 @@ public static class Site
     // Changed code in the last week: the red ring on the home wall and on developer
     // pages. Relative to the data date, not the clock, like everything else on the site.
     const int ActiveDays = 7;
-    public static bool IsActive(SiteDeveloper d) =>
-        d.LastPush is { } push && DataDate - push.UtcDateTime.Date <= TimeSpan.FromDays(ActiveDays);
+    public static bool IsActive(SiteDeveloper d) => DaysSinceChange(d) <= ActiveDays;
+
+    public static int? DaysSinceChange(SiteDeveloper d) =>
+        d.LastPush is { } push ? (int)(DataDate - push.UtcDateTime.Date).TotalDays : null;
+
+    // The home wall's hidden GitHub-style view: a green shade per developer from when
+    // their projects last changed. 4 this week … 1 this year, 0 older or unknown.
+    public static int GreenLevel(SiteDeveloper d) => DaysSinceChange(d) switch
+    {
+        <= ActiveDays => 4,
+        <= 30 => 3,
+        <= 90 => 2,
+        <= 365 => 1,
+        _ => 0,
+    };
 
     static DateTime DataDate => DateTime.ParseExact(Data.Trend.Current, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
