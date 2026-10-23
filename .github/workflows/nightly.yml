@@ -93,6 +93,30 @@ jobs:
           include-hidden-files: true   # _headers
           retention-days: 7
 
+  # Fine-grained tokens report their expiry on every API response. Under 14 days
+  # left, this job fails, so GitHub emails about the failed run each night until
+  # the secret is replaced. A job of its own: the refresh and deploy still run.
+  token-expiry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TOKEN: ${{ secrets.GITGE_TOKEN }}
+    steps:
+      - name: Check when GITGE_TOKEN expires
+        run: |
+          if [ -z "$TOKEN" ]; then echo "No GITGE_TOKEN secret; nothing to check."; exit 0; fi
+          expires=$(curl -sS -o /dev/null -D - -H "Authorization: Bearer $TOKEN" https://api.github.com/rate_limit \
+            | tr -d '\r' | sed -n 's/^github-authentication-token-expiration: //Ip')
+          if [ -z "$expires" ]; then echo "The token reports no expiry."; exit 0; fi
+          days=$(( ( $(date -d "$expires" +%s) - $(date +%s) ) / 86400 ))
+          echo "GITGE_TOKEN expires $expires ($days days left)."
+          if [ "$days" -lt 14 ]; then
+            msg="GITGE_TOKEN expires in $days days ($expires). Regenerate it and update the repository secret."
+            echo "::error::$msg"
+            echo "### $msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
   deploy:
     needs: update
     permissions:
