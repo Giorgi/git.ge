@@ -138,10 +138,10 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 .wall a:hover .avatar, .wall a:focus-visible .avatar { filter: none; opacity: 1; }
 /* Its own focus ring: the link's red outline would sit on the active faces' red ring. */
 .wall a:focus-visible { outline: 3px solid var(--fg); outline-offset: 6px; }
-.wall-cap { display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; margin: .9rem 0 0; font-size: .88rem; color: var(--muted); }
+.wall-cap { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; margin: .9rem 0 0; font-size: .88rem; color: var(--muted); }
 .wall-cap > span:nth-child(2) { color: var(--accent); }
 /* The two links wrap together, right-aligned. */
-.wall-cap-end { margin-left: auto; display: flex; flex-wrap: wrap; gap: .3rem 1.5rem; }
+.wall-cap-end { margin-left: auto; display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
 .home .wall-cap .wall-add { color: var(--muted); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: .15em; }
 .home .wall-cap .wall-add:hover { color: var(--fg); text-decoration-color: currentColor; }
 /* Fewer, larger faces on smaller screens: three full rows each time. */
@@ -338,6 +338,11 @@ input { caret-color: var(--accent); }
 .dev-cell { display: flex; min-width: 0; }
 .dev-card { display: flex; flex: 1; gap: .7rem; align-items: center; min-width: 0; padding: .45rem 0; border-bottom: 1px solid var(--line); color: var(--fg); }
 .dev-card:hover { text-decoration: none; }
+/* Matching developers above the project results on /projects/ (app.js). */
+.q-devs { margin: .6rem 0 1.6rem; }
+.q-devs-title, .search #q-status { font-size: 1rem; font-weight: 700; color: var(--fg); margin: 0; }
+.q-devs-all { margin-top: .6rem; padding: 0; border: 0; background: none; font: inherit; font-size: .9rem; color: var(--fg); text-decoration: underline; text-underline-offset: .15em; cursor: pointer; }
+.q-devs-all[hidden] { display: none; }
 .dev-card .avatar.on { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Its own line under the intro, flush with it. */
 .devs-key { display: flex; align-items: center; gap: .45rem; margin-top: .2rem; }

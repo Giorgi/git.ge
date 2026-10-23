@@ -562,6 +562,13 @@
   const list = document.getElementById("list");
   const pager = document.querySelector(".pager");
   const note = document.getElementById("list-note");
+  const devBox = document.getElementById("q-devs");
+  const devAll = document.getElementById("q-devs-all");
+  // One row of cards on wide screens; on phones (one per row) fewer, so the projects stay close.
+  const DevsShown = matchMedia("(max-width: 36rem)").matches ? 4 : 8;
+  let devHits = [];
+  let devsExpanded = false;
+  let projectHits = null;   // count for the status line; null when not searching
   const original = [...list.children];
   let index = null;
   let loading = null;
@@ -571,6 +578,7 @@
     for (const p of data.projects) {
       p.text = [p.n, p.d, p.k, p.l, p.c, ...(p.g || [])].filter(Boolean).join(" ").toLowerCase();
     }
+    for (const d of data.developers || []) d.text = [d.l, d.n].filter(Boolean).join(" ").toLowerCase();
   });
 
   input.addEventListener("focus", load, { once: true });
@@ -586,7 +594,11 @@
       list.replaceChildren(...original);
       if (pager) pager.hidden = false;
       if (note) note.hidden = false;
-      status.textContent = "";
+      devHits = [];
+      devsExpanded = false;
+      showDevelopers();
+      projectHits = null;
+      showStatus();
       return;
     }
     await load();
@@ -598,11 +610,72 @@
     if (pager) pager.hidden = true;
     if (note) note.hidden = true;
 
-    status.textContent = hits.length ? t("projects.results", hits.length) : t("projects.noResults");
+    // Developers: a login or name starting with the query first, then most stars.
+    const starts = d => d.l.toLowerCase().startsWith(query) || (d.n || "").toLowerCase().startsWith(query) ? 0 : 1;
+    devHits = (index.developers || []).filter(d => words.every(w => d.text.includes(w)))
+      .map((d, i) => [d, starts(d), i]).sort((x, y) => x[1] - y[1] || x[2] - y[2]).map(x => x[0]);
+    devsExpanded = false;
+    showDevelopers();
+
+    projectHits = hits.length;
+    showStatus();
 
     const current = document.querySelector(".sort[data-sort-for='list']")?.dataset.current;
     if (current) sortList(list, current);
   });
+
+  // Up to DevsShown matching developers above the projects, as cards like the directory's
+  // (DeveloperCard.razor). Rebuilt on a language switch, since the meta line is translated.
+  function showDevelopers() {
+    if (!devBox) return;
+    devBox.hidden = devHits.length === 0;
+    if (devBox.hidden) return;
+    const shown = devsExpanded ? devHits : devHits.slice(0, DevsShown);
+    document.getElementById("q-devs-title").textContent = t("search.devs", devHits.length);
+    document.getElementById("q-devs-list").replaceChildren(...shown.map(developerCard));
+    if (devAll) {
+      devAll.hidden = shown.length === devHits.length;
+      devAll.textContent = t("search.devsAll", devHits.length);
+    }
+  }
+  languageHooks.push(showDevelopers);
+
+  // "პროექტები: 36", or "nothing found" when neither projects nor developers match.
+  function showStatus() {
+    status.textContent = projectHits === null ? ""
+      : projectHits ? t("projects.results", projectHits)
+      : devHits.length ? "" : t("projects.noResults");
+  }
+  languageHooks.push(showStatus);
+  devAll?.addEventListener("click", () => { devsExpanded = true; showDevelopers(); });
+
+  function developerCard(d) {
+    const el = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    };
+    const li = el("li", "dev-cell");
+    const a = el("a", "dev-card");
+    a.href = "/@" + d.l.toLowerCase() + "/";
+    let face;
+    if (d.f) {
+      face = el("img", "avatar avatar-40");
+      face.src = d.f; face.width = 40; face.height = 40; face.alt = ""; face.loading = "lazy";
+    } else {
+      face = el("span", "avatar avatar-40 avatar-initial", d.l[0].toUpperCase());
+      face.setAttribute("aria-hidden", "true");
+    }
+    if (d.a) face.classList.add("on");
+    const text = el("span", "dev-card-text");
+    text.append(el("strong", null, d.n || d.l), el("span", "dev-card-login", d.l));
+    const meta = [t("devs.projects", d.p), ...(d.c ? d.c.split(",").map(c => t("cat." + c)) : [])];
+    text.append(el("span", "dev-card-meta", meta.join(" · ")));
+    a.append(face, text);
+    li.append(a);
+    return li;
+  }
 
   // Mirrors ProjectCard.razor. textContent everywhere: index data is never parsed as HTML.
   function card(p) {

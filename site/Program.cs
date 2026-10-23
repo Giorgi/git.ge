@@ -179,12 +179,25 @@ string SearchIndex()
         ["f"] = Site.Avatar(p.Owner),   // the owner's saved avatar, for the face in search results
     }.Where(kv => kv.Value is not null).ToDictionary());
 
+    // Everyone with a developer page, most stars first: matched by login and name.
+    var developers = Site.Data.DeveloperPages.OrderByDescending(d => d.Stars).ThenBy(d => d.Login, StringComparer.OrdinalIgnoreCase)
+        .Select(d => new Dictionary<string, object?>
+        {
+            ["l"] = d.Login,
+            ["n"] = string.Equals(d.DisplayName, d.Login, StringComparison.OrdinalIgnoreCase) ? null : d.DisplayName,
+            ["f"] = Site.Avatar(d.Login),
+            ["p"] = d.Projects.Count + d.Smaller.Count,   // as on the directory card
+            ["c"] = d.Categories.Count > 0 ? string.Join(",", d.Categories.Take(2)) : null,
+            ["a"] = Site.IsActive(d) ? 1 : null,   // the red ring: changed a project this week
+        }.Where(kv => kv.Value is not null).ToDictionary());
+
     return JsonSerializer.Serialize(new
     {
         trend = Site.Data.Trend.HasHistory,
         dormantMonths = Site.Data.DormantMonths,
         window = Site.Data.Trend.Days,
         projects = items,
+        developers,
     }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) });
 }
 

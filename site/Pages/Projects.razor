@@ -10,6 +10,12 @@
         <label for="q" class="visually-hidden"><T K="projects.searchLabel" /></label>
         <input id="q" type="search" autocomplete="off" spellcheck="false"
                placeholder="@Site.Strings.Ka("projects.search")" data-i18n-placeholder="projects.search">
+        @* Developers whose login or name matches (app.js), then the project count. *@
+        <div class="q-devs" id="q-devs" hidden>
+            <h2 class="q-devs-title" id="q-devs-title"></h2>
+            <ol class="dev-grid" id="q-devs-list"></ol>
+            <button type="button" class="q-devs-all" id="q-devs-all" hidden></button>
+        </div>
         <p class="note" id="q-status" aria-live="polite"></p>
     </div>
 
