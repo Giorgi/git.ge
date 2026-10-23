@@ -30,7 +30,8 @@ What this means in practice, honestly:
 
 - **Location is self-reported and free text.** People who don't set it, or who
   live abroad, are missed. Add them to `include` in
-  [`data/manual/developers.json`](data/manual/developers.json).
+  [`data/manual/developers.json`](data/manual/developers.json), or let them use
+  the **Add an account** form.
 - **Living in Georgia isn't the same as being Georgian**, and many people who
   moved to Tbilisi or Batumi are matched. That is deliberate, not a bug. Use
   `exclude` for accounts that shouldn't be listed (wrong match, bots, etc.).
@@ -44,18 +45,22 @@ What this means in practice, honestly:
 
 ## Submissions and removals
 
-Two issue forms live in [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/):
-**Suggest a project** (label `submission`) and **Request removal** (label
-`removal`). Nothing is added or removed without the maintainer's review:
+Three issue forms live in [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/):
+**Suggest a project** (label `submission`), **Add an account** (label `account`)
+and **Request removal** (label `removal`). Nothing is added or removed without
+the maintainer's review:
 
-1. Someone fills in a form. GitHub opens an issue with the `submission` or
-   `removal` label.
+1. Someone fills in a form. GitHub opens an issue with the `submission`,
+   `account` or `removal` label.
 2. The maintainer reads it and, if it's fine, adds the label `accepted`.
 3. A workflow runs `dotnet run gitge.cs -- submit --issue <n>`:
    - A submission is added to `data/manual/projects.json`. GitHub URLs are
      normalised to `owner/repo` and checked: the repo must exist, be public, not be
      a fork and have a description. Duplicates and opted-out or excluded owners
      are rejected.
+   - An account is added to `include` in `data/manual/developers.json`. The login
+     must exist on GitHub; accounts already found by location, and opted-out or
+     excluded ones, are rejected.
    - A removal adds the login or `owner/repo` to `data/optout.json`.
 4. If it succeeds (exit 0), the workflow opens a pull request that closes the
    issue. If it's rejected (exit 3), the workflow posts the bilingual explanation

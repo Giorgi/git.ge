@@ -10,5 +10,6 @@ files).
 | submit-other.md | submission | non-GitHub entry: URL lower-cased host, no trailing slash, owner `someone` |
 | submit-duplicate.md | submission | rejected: `example/already-listed` is seeded as already listed |
 | submit-invalid-url.md | submission | rejected: not a URL (a bare `host/path` would be accepted as https) |
+| add-account.md | account | `NewPerson` (from a profile URL) added to `include` in `data/manual/developers.json` |
 | remove-login.md | removal | `SomeUser` (leading `@` dropped) added to `developers` |
 | remove-repo.md | removal | `someone/project` (from a full URL) added to `projects` |

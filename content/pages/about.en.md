@@ -45,12 +45,15 @@ project). You can also send a pull request that adds it to `data/optout.json`.
 Once the request is accepted, removal takes effect with the next nightly update
 and applies everywhere, including the site's data files.
 
-## Suggesting a project {#submit}
+## Adding an account or a project {#submit}
 
-Projects are found automatically, but you can also
-[suggest one]({{repoUrl}}/issues/new?template=submit-project.yml), for example if
-you don't set a location on GitHub or the project isn't hosted on GitHub. Every
-suggestion is reviewed by hand before it's added.
+Accounts and projects are found automatically. If you don't set a location on
+GitHub, or it doesn't name a Georgian city,
+[add your account or organisation]({{repoUrl}}/issues/new?template=add-account.yml):
+all of its projects that meet the listing rules then appear automatically. A
+single project, for example one not hosted on GitHub, can be
+[suggested]({{repoUrl}}/issues/new?template=submit-project.yml) on its own.
+Every request is reviewed by hand before it's added.
 
 ## Privacy {#privacy}
 

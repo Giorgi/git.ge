@@ -1,0 +1,28 @@
+# Parsed by `gitge.cs submit`, which matches each heading by the English label
+# after " / ". If you rename a label, update AccountForm in gitge.cs too.
+name: "ანგარიშის დამატება / Add an account"
+description: "დაამატეთ თქვენი GitHub-ის ანგარიში ან ორგანიზაცია git.ge-ზე / Add your GitHub account or organisation to git.ge"
+title: "ანგარიში / Account: "
+labels: ["account"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        git.ge ანგარიშებს ავტომატურად პოულობს GitHub-ის ადგილმდებარეობის მიხედვით. თუ ადგილმდებარეობა არ გაქვთ მითითებული, ის საქართველოს ქალაქს არ შეიცავს ან ორგანიზაციას ადგილმდებარეობა არ აქვს, დაამატეთ ანგარიში აქ. დამტკიცების შემდეგ ანგარიშის ყველა პროექტი, რომელიც საიტის წესებს აკმაყოფილებს, ავტომატურად გამოჩნდება, მომავალი პროექტების ჩათვლით. ერთი პროექტის დასამატებლად გამოიყენეთ „პროექტის შეთავაზება“.
+
+        git.ge finds accounts automatically from GitHub profile locations. If yours has no location, one that doesn't name a Georgian city, or it's an organisation without a location, add it here. Once it's accepted, all of the account's projects that meet the listing rules appear automatically, including future ones. To add a single project, use “Suggest a project”.
+  - type: input
+    id: login
+    attributes:
+      label: "GitHub-ის ანგარიში / GitHub account"
+      description: "მომხმარებლის ან ორგანიზაციის სახელი GitHub-ზე / The user or organisation login on GitHub"
+      placeholder: "login"
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: "თანხმობა / Consent"
+      options:
+        - label: "ეს ჩემი ანგარიშია ან ამ ორგანიზაციის წევრი ვარ / This is my account, or I'm a member of this organisation"
+          required: true

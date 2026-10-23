@@ -1,9 +1,10 @@
 # Turn an accepted submission or removal issue into a pull request.
 #
-# Flow: someone opens an issue with the submission or removal form (labelled
-# `submission` / `removal`); the maintainer reviews it and adds `accepted`;
-# this workflow runs `gitge.cs submit`, which validates the issue and edits
-# data/manual/projects.json or data/optout.json. The change is proposed as a
+# Flow: someone opens an issue with the project, account or removal form
+# (labelled `submission` / `account` / `removal`); the maintainer reviews it and
+# adds `accepted`; this workflow runs `gitge.cs submit`, which validates the issue
+# and edits data/manual/projects.json, data/manual/developers.json or
+# data/optout.json. The change is proposed as a
 # PR that closes the issue, so nothing reaches the site without a merge.
 #
 # Requires the repository setting "Allow GitHub Actions to create and approve
@@ -26,6 +27,7 @@ jobs:
     if: >-
       github.event.label.name == 'accepted' &&
       (contains(github.event.issue.labels.*.name, 'submission') ||
+       contains(github.event.issue.labels.*.name, 'account') ||
        contains(github.event.issue.labels.*.name, 'removal'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -77,7 +79,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BRANCH"
-          git add data/manual/projects.json data/optout.json
+          git add data/manual/projects.json data/manual/developers.json data/optout.json
           git commit -q -m "Apply #$ISSUE"
           # Force: re-accepting an issue replaces the earlier proposal.
           git push -q --force origin "$BRANCH"

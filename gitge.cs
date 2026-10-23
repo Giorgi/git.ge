@@ -1010,7 +1010,7 @@ static class SelfTest
     // Offline: no GitHub calls; every file written is a temporary copy.
     static void Submissions(Paths paths)
     {
-        Log.Info("Submissions and removals (offline, fixtures in tests/fixtures/issues)");
+        Log.Info("Submissions, accounts and removals (offline, fixtures in tests/fixtures/issues)");
         var work = Path.Combine(Path.GetTempPath(), $"gitge-submit-{Guid.NewGuid():N}");
         try
         {
@@ -1020,6 +1020,8 @@ static class SelfTest
             File.WriteAllText(temp.ManualProjects, "[\n  {\"fullName\":\"example/already-listed\"}\n]\n");
             File.WriteAllText(temp.ManualDevelopers, "{ \"include\": [], \"exclude\": [\"excluded-user\"] }\n");
             File.WriteAllText(temp.OptOut, "{ \"developers\": [], \"projects\": [] }\n");
+            Directory.CreateDirectory(Path.GetDirectoryName(temp.Developers)!);
+            File.WriteAllText(temp.Developers, "[\n  {\"login\":\"Discovered-One\"}\n]\n");
 
             string Fixture(string name) => File.ReadAllText(Path.Combine(paths.Root, "tests", "fixtures", "issues", name));
             SubmitResult Run(string body, string type, int? issue = null) => Submit.Execute(temp, body, type, issue, github: null).GetAwaiter().GetResult();
@@ -1058,6 +1060,21 @@ static class SelfTest
             Check(Run(Fixture("submit-github.md").Replace("[X]", "[ ]"), "submission", 44).ExitCode == Submit.Rejected, "a submission without consent is rejected");
             Check(Run(Fixture("submit-github.md").Replace("Giorgi/DuckDB.NET", "excluded-user/thing"), "submission").ExitCode == Submit.Rejected,
                   "a project of an excluded developer is rejected");
+
+            List<string> Included() => Store.Read<ManualDevelopers>(temp.ManualDevelopers).Include;
+            var account = Run(Fixture("add-account.md"), "account", 60);
+            Check(account.ExitCode == 0 && Included().SequenceEqual(["NewPerson"]) && account.Markdown.Contains("Closes #60"),
+                  "account: login taken from a profile URL, added to the include list");
+            Check(Run(Fixture("add-account.md").Replace("https://github.com/NewPerson/", "@another"), "account", 61).ExitCode == 0
+                  && Included().SequenceEqual(["another", "NewPerson"]), "account: '@' dropped, include list stays sorted");
+            Check(Run(Fixture("add-account.md"), "account", 60).ExitCode == 0 && Included().Count == 2, "running an account twice adds it once");
+            Check(Run(Fixture("add-account.md").Replace("https://github.com/NewPerson/", "discovered-one"), "account").ExitCode == Submit.Rejected,
+                  "account: one already found by location is rejected");
+            Check(Run(Fixture("add-account.md").Replace("https://github.com/NewPerson/", "excluded-user"), "account").ExitCode == Submit.Rejected,
+                  "account: an excluded login is rejected");
+            Check(Run(Fixture("add-account.md").Replace("https://github.com/NewPerson/", "not a login!"), "account").ExitCode == Submit.Rejected,
+                  "account: a malformed login is rejected");
+            Check(Run(Fixture("add-account.md").Replace("[X]", "[ ]"), "account").ExitCode == Submit.Rejected, "account: no consent is rejected");
 
             var login = Run(Fixture("remove-login.md"), "removal", 50);
             Check(login.ExitCode == 0 && Store.Read<OptOut>(temp.OptOut).Developers.SequenceEqual(["SomeUser"]), "removal of a login: '@' dropped, added to developers");
@@ -1570,7 +1587,7 @@ sealed class SiteProject
 // ---------------------------------------------------------------------------
 // Submit: turn an accepted issue from .github/ISSUE_TEMPLATE/ into a data change.
 //   submit --issue <n>                                   read issue n from GitHub
-//   submit --body-file <f> --type <submission|removal>   read a saved issue body
+//   submit --body-file <f> --type <submission|account|removal>   read a saved issue body
 //          [--issue <n>] [--offline]
 // Exit 0: done (or already done); stdout is a pull request body.
 // Exit 3: rejected; stdout is a polite bilingual comment for the issue.
@@ -1595,6 +1612,12 @@ static class Submit
         ["Consent"] = "consent",
     };
 
+    static readonly Dictionary<string, string> AccountForm = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["GitHub account"] = "login",
+        ["Consent"] = "consent",
+    };
+
     static readonly Dictionary<string, string> RemovalForm = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Account or project"] = "target",
@@ -1611,7 +1634,7 @@ static class Submit
         if (options.BodyFile is not null)
         {
             body = File.ReadAllText(options.BodyFile);
-            type = options.Type ?? throw new ArgumentException("--type submission|removal is required with --body-file");
+            type = options.Type ?? throw new ArgumentException("--type submission|account|removal is required with --body-file");
         }
         else if (options.Issue is { } number)
         {
@@ -1619,7 +1642,7 @@ static class Submit
         }
         else
         {
-            throw new ArgumentException("submit needs --issue <n>, or --body-file <path> --type <submission|removal>");
+            throw new ArgumentException("submit needs --issue <n>, or --body-file <path> --type <submission|account|removal>");
         }
 
         var result = await Execute(paths, body, type, options.Issue, github);
@@ -1632,8 +1655,9 @@ static class Submit
     public static Task<SubmitResult> Execute(Paths paths, string body, string type, int? issue, GitHub? github) => type switch
     {
         "submission" => Submission(paths, ParseForm(body, SubmissionForm), issue, github),
+        "account" => Account(paths, ParseForm(body, AccountForm), issue, github),
         "removal" => Task.FromResult(Removal(paths, ParseForm(body, RemovalForm), issue)),
-        _ => throw new ArgumentException($"Unknown submission type '{type}'; expected 'submission' or 'removal'"),
+        _ => throw new ArgumentException($"Unknown submission type '{type}'; expected 'submission', 'account' or 'removal'"),
     };
 
     static async Task<SubmitResult> Submission(Paths paths, Dictionary<string, string> form, int? issue, GitHub? github)
@@ -1747,6 +1771,45 @@ static class Submit
         return Done(summary.ToString().TrimEnd(), issue);
     }
 
+    // An account that discovery can't find by location: added to the include list in
+    // data/manual/developers.json, so all of its qualifying projects are found from then on.
+    static async Task<SubmitResult> Account(Paths paths, Dictionary<string, string> form, int? issue, GitHub? github)
+    {
+        if (!Consented(form))
+            return RejectAccount("საჭიროა თანხმობა, რომ ეს თქვენი ანგარიშია ან ორგანიზაციის წევრი ხართ.",
+                                 "The form needs the confirmation that this is your account or that you're a member of the organisation.");
+
+        var raw = form.GetValueOrDefault("login", "").Trim();
+        var login = Regex.Replace(raw, @"^(https?://)?(www\.)?github\.com/", "", RegexOptions.IgnoreCase).TrimStart('@').Trim('/');
+        if (!Login.IsMatch(login))
+            return RejectAccount($"„{raw}“ არ ჰგავს GitHub-ის ანგარიშის სახელს.", $"“{raw}” doesn't look like a GitHub login.");
+
+        if (github is not null)
+        {
+            var data = await github.GraphQL("""
+                query($l: String!) { repositoryOwner(login: $l) { login } }
+                """, new() { ["l"] = login });
+            if (data["repositoryOwner"] is not { } owner)
+                return RejectAccount($"ანგარიში {login} GitHub-ზე ვერ მოიძებნა.", $"The account {login} wasn't found on GitHub.");
+            login = owner["login"]!.GetValue<string>();
+        }
+
+        var ic = StringComparer.OrdinalIgnoreCase;
+        var manual = Store.Read<ManualDevelopers>(paths.ManualDevelopers);
+        if (manual.Exclude.Contains(login, ic) || Store.Read<OptOut>(paths.OptOut).Developers.Contains(login, ic))
+            return RejectAccount($"ანგარიში {login} git.ge-დან ამოღებულია.", $"The account {login} has been removed from git.ge.");
+        if (manual.Include.Contains(login, ic))
+            return Done($"**{login}** is already in the include list; nothing to change.", issue);
+        if (Store.ReadList<Developer>(paths.Developers).Any(d => d.Login.Equals(login, StringComparison.OrdinalIgnoreCase)))
+            return RejectAccount($"ანგარიში {login} უკვე სიაშია.", $"The account {login} is already listed.");
+
+        manual.Include.Add(login);
+        manual.Include.Sort(ic);
+        Store.WriteObject(paths.ManualDevelopers, manual);
+        return Done($"Adds the account **{login}** to the include list in `data/manual/developers.json`{(issue is null ? "" : $", as requested in #{issue}")}. " +
+                    "Its projects that meet the listing rules appear with the next nightly update.", issue);
+    }
+
     static SubmitResult Removal(Paths paths, Dictionary<string, string> form, int? issue)
     {
         if (!Consented(form))
@@ -1829,12 +1892,9 @@ static class Submit
             """, new() { ["o"] = owner, ["n"] = name, ["i"] = number });
         var issue = data["repository"]?["issue"] ?? throw new InvalidOperationException($"Issue #{number} not found in {owner}/{name}");
         var labels = issue["labels"]!["nodes"]!.AsArray().Select(l => l!["name"]!.GetValue<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var type = (labels.Contains("submission"), labels.Contains("removal")) switch
-        {
-            (true, false) => "submission",
-            (false, true) => "removal",
-            _ => throw new InvalidOperationException($"Issue #{number} needs exactly one of the labels 'submission' or 'removal'"),
-        };
+        string[] types = ["submission", "account", "removal"];
+        var type = types.Where(labels.Contains).ToList() is [var only] ? only
+            : throw new InvalidOperationException($"Issue #{number} needs exactly one of the labels 'submission', 'account' or 'removal'");
         return (issue["body"]?.GetValue<string>() ?? "", type);
     }
 
@@ -1856,6 +1916,15 @@ static class Submit
         შეგიძლიათ შეასწოროთ issue და საიტის ავტორი მას ხელახლა გადახედავს.
 
         Thanks for the suggestion! Unfortunately the project couldn't be added: {en}
+        You can edit the issue and the maintainer will take another look.
+
+        """);
+
+    static SubmitResult RejectAccount(string ka, string en) => new(Rejected, $"""
+        გმადლობთ! სამწუხაროდ, ანგარიშის დამატება ვერ მოხერხდა: {ka}
+        შეგიძლიათ შეასწოროთ issue და საიტის ავტორი მას ხელახლა გადახედავს.
+
+        Thanks! Unfortunately the account couldn't be added: {en}
         You can edit the issue and the maintainer will take another look.
 
         """);
@@ -2438,7 +2507,7 @@ sealed class QualityBar
     // A repo named like its owner (a profile README) needs at least this many stars.
     public int ProfileRepoMinStars { get; set; } = 30;
     // Case-insensitive regexes matched against the repo name and description,
-    // to drop course exercises and test assignments.
+    // to drop course exercises, test assignments and descriptions that are a pasted licence.
     public List<string> ExcludePatterns { get; set; } = [];
 
     Regex[]? excludeRegexes;
