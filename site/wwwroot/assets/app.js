@@ -176,6 +176,26 @@
     });
   }
 
+  // README badge (developer pages): copies the Markdown shown next to it.
+  for (const button of document.querySelectorAll("[data-badge-copy]")) {
+    const row = button.parentElement;
+    const code = row.querySelector("[data-badge-code]");
+    const status = row.querySelector("[data-badge-status]");
+    if (!navigator.clipboard) continue;
+    button.hidden = false;
+    let timer;
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(code.textContent);
+        status.textContent = t("dev.badgeCopied");
+      } catch {
+        getSelection().selectAllChildren(code);   // let the person copy it themselves
+      }
+      clearTimeout(timer);
+      timer = setTimeout(() => { status.textContent = ""; }, 2500);
+    });
+  }
+
   // ---- Sorting --------------------------------------------------------------
 
   const sorters = {

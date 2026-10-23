@@ -261,6 +261,14 @@ input { caret-color: var(--accent); }
 .dev-share-btn:hover { color: var(--fg); text-decoration: underline; text-underline-offset: .2em; }
 .dev-share-status { font-size: .85rem; color: var(--muted); }
 .dev-share-status:empty { display: none; }
+/* README badge block at the bottom of a developer page. */
+.dev-badge { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.dev-badge-text { margin: 0 0 .6rem; font-size: .9rem; color: var(--muted); }
+.dev-badge-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+.dev-badge-row img { display: block; }
+.dev-badge-code { font-size: .8rem; padding: .3rem .5rem; background: var(--soft); border-radius: 4px; overflow-wrap: anywhere; user-select: all; }
+.dev-badge-copy { font: inherit; font-size: .9rem; font-weight: 600; color: var(--fg); background: none; border: 0; padding: .2rem 0; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
+.dev-badge-copy[hidden] { display: none; }
 .dev-stats {
   grid-area: stats; list-style: none; margin: 1.6rem 0 0; padding: .9rem 0 0; border-top: 2px solid var(--fg);
   display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem 2.6rem;

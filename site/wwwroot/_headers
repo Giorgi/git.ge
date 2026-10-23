@@ -17,6 +17,10 @@
 /og/*
   Cache-Control: public, max-age=31536000, immutable
 
+# The README badge: same bytes for everyone; a day, so a redesign still spreads.
+/badge.svg
+  Cache-Control: public, max-age=86400
+
 # Data files for the site itself, not pages to index.
 /index.json
   X-Robots-Tag: noindex

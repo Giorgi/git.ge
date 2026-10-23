@@ -201,6 +201,19 @@
                 </aside>
             }
         </div>
+
+        @* For the person themselves: a README badge that links back here. The Markdown is
+           plain text to select without JavaScript; app.js adds the copy button. *@
+        <section class="dev-badge" aria-labelledby="dev-badge">
+            <h2 id="dev-badge" class="dev-label"><T K="dev.badgeTitle" /></h2>
+            <p class="dev-badge-text"><T K="dev.badgeText" /></p>
+            <div class="dev-badge-row">
+                <img src="/badge.svg" width="104" height="20" alt="listed on git.ge">
+                <code class="dev-badge-code" data-badge-code>@BadgeMarkdown</code>
+                <button type="button" class="dev-badge-copy" hidden data-badge-copy><T K="dev.badgeCopy" /></button>
+                <span class="dev-share-status" role="status" data-badge-status></span>
+            </div>
+        </section>
     </article>
 </Layout>
 
@@ -213,6 +226,8 @@
     [Parameter, EditorRequired] public SiteDeveloper D { get; set; } = default!;
 
     bool Active => Site.IsActive(D);
+
+    string BadgeMarkdown => $"[![listed on git.ge]({Site.Url("/badge.svg")})]({Site.Url(D.Path)})";
     int ProjectCount => D.Projects.Count + D.Smaller.Count;
 
     // Stars gained over the trend window across all their projects: real deltas, so
