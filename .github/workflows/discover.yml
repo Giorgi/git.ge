@@ -22,6 +22,10 @@ on:
         description: Discard an unfinished run's checkpoint and start over
         type: boolean
         default: false
+      login:
+        description: "Only these accounts (comma-separated; on the include list or already listed), then deploy"
+        type: string
+        default: ""
 
 # Shared with nightly.yml: only one workflow writes the `data` branch at a time.
 concurrency:
@@ -37,6 +41,7 @@ jobs:
     timeout-minutes: 350
     permissions:
       contents: write   # push to the `data` branch
+      actions: write    # start deploy.yml after a --login run
     env:
       GH_TOKEN: ${{ secrets.GITGE_TOKEN || github.token }}
       DOTNET_NOLOGO: true
@@ -76,7 +81,13 @@ jobs:
         timeout-minutes: 320
         env:
           RESTART: ${{ inputs.restart && '--restart' || '' }}
-        run: dotnet run gitge.cs -- discover $RESTART
+          LOGIN: ${{ inputs.login }}
+        run: |
+          if [ -n "$LOGIN" ]; then
+            dotnet run gitge.cs -- discover --login "$LOGIN"
+          else
+            dotnet run gitge.cs -- discover $RESTART
+          fi
 
       - name: Refresh newly discovered repos
         if: steps.gate.outputs.run == 'true'
@@ -95,10 +106,22 @@ jobs:
         # always(): an unfinished run's checkpoint must be saved for the resume.
         if: always() && steps.data.outcome == 'success' && steps.gate.outputs.run == 'true'
         working-directory: data/bot
+        env:
+          LOGIN: ${{ inputs.login }}
         run: |
-          if [ -f state/discovery.json ]; then
+          if [ -n "$LOGIN" ]; then
+            message="Discovery of $LOGIN $(date -u +%F)"
+          elif [ -f state/discovery.json ]; then
             message="Discovery checkpoint $(date -u +%F)"
           else
             message="Weekly discovery $(date -u +%F)"
           fi
           bash ../../.github/scripts/commit-data.sh "$message"
+
+      # A --login run is for getting a just-added account onto the site now rather
+      # than after the nightly. A dispatch made with GITHUB_TOKEN does start a run.
+      - name: Deploy
+        if: success() && inputs.login != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main

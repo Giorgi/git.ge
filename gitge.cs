@@ -4,6 +4,7 @@
 
 // git.ge tooling. Run from the repository root:
 //   dotnet run gitge.cs -- discover [--only <term>] [--max-users <n>] [--restart]
+//   dotnet run gitge.cs -- discover --login <login>[,<login>…]
 //   dotnet run gitge.cs -- refresh [--force]
 //   dotnet run gitge.cs -- review [--top <n>] > review.md
 //   dotnet run gitge.cs -- trend | prune | selftest | prepare
@@ -73,6 +74,7 @@ try
         default:
             Console.Error.WriteLine("usage: dotnet run gitge.cs -- <discover|refresh|review> [options]");
             Console.Error.WriteLine("  discover [--only <location term>] [--max-users <n>] [--restart]");
+            Console.Error.WriteLine("  discover --login <login>[,<login>…]   only these accounts (included or already known)");
             Console.Error.WriteLine("  refresh [--force]    --force re-fetches repos already refreshed today");
             Console.Error.WriteLine("  review [--top <n>]   Markdown list of the most visible developers, for curation");
             Console.Error.WriteLine("  trend                Show the current trend window and top gainers");
@@ -107,13 +109,19 @@ static class Discovery
         var manualDevelopers = Store.Read<ManualDevelopers>(paths.ManualDevelopers);
         var optOut = Store.Read<OptOut>(paths.OptOut);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var isFullRun = options.Only is null && options.MaxUsers is null;
+        var isFullRun = options.Only is null && options.MaxUsers is null && options.Logins is null;
+        // --login: just these accounts, no search and no checkpoint, so it can run beside
+        // an unfinished weekly run without touching its checkpoint.
+        var checkpointed = options.Logins is null;
 
         var blocked = Logins(manualDevelopers.Exclude.Concat(optOut.Developers));
         var blockedProjects = new HashSet<string>(optOut.Projects, StringComparer.OrdinalIgnoreCase);
 
         // A crashed or timed-out run leaves a checkpoint; pick up where it stopped.
-        var state = LoadCheckpoint(paths, options);
+        var state = checkpointed ? LoadCheckpoint(paths, options) : new DiscoveryState { StartedAt = DateTimeOffset.UtcNow };
+        if (options.Logins is { } only)
+            foreach (var login in only)
+                state.Candidates[login] = KnownAccount(paths, manualDevelopers, blocked, login);
 
         // 1. Collect candidate owners: location search + include list.
         if (state.Candidates.Count == 0)
@@ -164,7 +172,7 @@ static class Discovery
                     Name = owner.Name,
                     Location = owner.Location,
                     HtmlUrl = owner.HtmlUrl,
-                    MatchedTerm = candidates.GetValueOrDefault(owner.Login),
+                    MatchedTerm = checkpointed ? candidates.GetValueOrDefault(owner.Login) : existing?.MatchedTerm,
                     Source = includeSet.Contains(owner.Login) ? "include" : "search",
                     FirstSeenAt = existing?.FirstSeenAt ?? today.ToString("yyyy-MM-dd"),
                 };
@@ -192,7 +200,7 @@ static class Discovery
                 state.Fetched = [.. fetched];
                 state.Seen = [.. seenOwners];
                 state.Withheld |= github.WithheldNodes > 0;
-                Store.WriteObject(paths.DiscoveryState, state);
+                if (checkpointed) Store.WriteObject(paths.DiscoveryState, state);
                 sinceCheckpoint.Restart();
             }
         }
@@ -216,7 +224,9 @@ static class Discovery
         }
         foreach (var project in projects.Values.ToList())
         {
-            var ownerGone = project.Source == "discovered" && !developers.ContainsKey(project.Owner);
+            // A --login run only cleans up after the accounts it fetched.
+            var ownerGone = project.Source == "discovered" && !developers.ContainsKey(project.Owner)
+                            && (checkpointed || options.Logins!.Contains(project.Owner, StringComparer.OrdinalIgnoreCase));
             if (blocked.Contains(project.Owner) || blockedProjects.Contains(project.FullName) || ownerGone)
             {
                 projects.Remove(project.Key);
@@ -225,11 +235,23 @@ static class Discovery
         }
 
         WriteData(paths, developers, projects);
-        File.Delete(paths.DiscoveryState);
+        if (checkpointed) File.Delete(paths.DiscoveryState);
         Log.Info($"Discovery done: {developers.Count} developers, {projects.Count} projects " +
                  $"({newProjects} new, {admittedTotal} passed the bar, removed {removedDevelopers} developers / {removedProjects} projects)" +
                  (dropUnseen ? "" : " [owners not seen were kept]"));
         github.LogUsage();
+    }
+
+    // For --login: the account must be on the include list or already found by location
+    // (anything else would be dropped by the next full run). Returns its matched term.
+    static string? KnownAccount(Paths paths, ManualDevelopers manual, HashSet<string> blocked, string login)
+    {
+        if (blocked.Contains(login))
+            throw new InvalidOperationException($"--login {login}: the account is excluded or opted out.");
+        var known = Store.ReadList<Developer>(paths.Developers).FirstOrDefault(d => d.Login.Equals(login, StringComparison.OrdinalIgnoreCase));
+        if (known is null && !manual.Include.Contains(login, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"--login {login}: not on the include list in data/manual/developers.json and not found by location; add it there first.");
+        return known?.MatchedTerm;
     }
 
     static readonly TimeSpan CheckpointInterval = TimeSpan.FromMinutes(1);
@@ -3052,6 +3074,7 @@ sealed record RestList(List<JsonNode> Items, string? ETag, bool NotModified, boo
 sealed class Options
 {
     public string? Only { get; private set; }
+    public List<string>? Logins { get; private set; }
     public int? MaxUsers { get; private set; }
     public int? Top { get; private set; }
     public bool Restart { get; private set; }
@@ -3070,6 +3093,7 @@ sealed class Options
             switch (args[i])
             {
                 case "--only": options.Only = args[++i]; break;
+                case "--login": options.Logins = [.. args[++i].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)]; break;
                 case "--max-users": options.MaxUsers = int.Parse(args[++i]); break;
                 case "--top": options.Top = int.Parse(args[++i]); break;
                 case "--restart": options.Restart = true; break;

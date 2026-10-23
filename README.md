@@ -94,12 +94,21 @@ dotnet run gitge.cs -- discover
 dotnet run gitge.cs -- discover --only Batumi
 dotnet run gitge.cs -- discover --only Tbilisi --max-users 200
 
+# just some accounts (on the include list or already listed), e.g. one just added
+dotnet run gitge.cs -- discover --login pgagnidze,Owloops
+
 # update stats for every known repo and write today's star snapshot
 dotnet run gitge.cs -- refresh
 ```
 
-A partial run (`--only` or `--max-users`) only adds and updates. Only a full run
-removes developers who are no longer found.
+A partial run (`--only`, `--max-users` or `--login`) only adds and updates. Only
+a full run removes developers who are no longer found, and not even a full run
+does when GitHub withheld some results with an error.
+
+On GitHub, run the Discover workflow with the `login` input to do a `--login` run
+there: it also refreshes the new repos, commits the data and starts a deploy, so
+a newly added account is on the site within minutes. It saves no checkpoint and
+leaves an unfinished weekly run's checkpoint alone.
 
 **Both commands resume after a crash or timeout.** Just run the same command
 again:
