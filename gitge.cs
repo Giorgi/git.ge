@@ -122,6 +122,7 @@ static class Discovery
             foreach (var login in manualDevelopers.Include)
                 if (!blocked.Contains(login))
                     state.Candidates[login] = null;
+            state.Withheld |= github.WithheldNodes > 0;
             Store.WriteObject(paths.DiscoveryState, state);
         }
         var candidates = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -190,16 +191,24 @@ static class Discovery
                 WriteData(paths, developers, projects);
                 state.Fetched = [.. fetched];
                 state.Seen = [.. seenOwners];
+                state.Withheld |= github.WithheldNodes > 0;
                 Store.WriteObject(paths.DiscoveryState, state);
                 sinceCheckpoint.Restart();
             }
         }
 
-        // 3. Drop anything blocked; on a full run also drop owners no longer found.
+        // 3. Drop anything blocked; on a full run also drop owners no longer found. When
+        // GitHub withheld results (an error other than NOT_FOUND), an owner missing from
+        // them may still exist, so nobody is dropped for not being seen: removing them would
+        // reset their projects' first-seen dates when they come back.
+        var withheld = state.Withheld || github.WithheldNodes > 0;
+        var dropUnseen = isFullRun && !withheld;
+        if (isFullRun && withheld)
+            Log.Warn("GitHub withheld some results (see the GraphQL errors above); owners not seen were kept");
         int removedDevelopers = 0, removedProjects = 0;
         foreach (var login in developers.Keys.ToList())
         {
-            if (blocked.Contains(login) || (isFullRun && !seenOwners.Contains(login)))
+            if (blocked.Contains(login) || (dropUnseen && !seenOwners.Contains(login)))
             {
                 developers.Remove(login);
                 removedDevelopers++;
@@ -219,7 +228,7 @@ static class Discovery
         File.Delete(paths.DiscoveryState);
         Log.Info($"Discovery done: {developers.Count} developers, {projects.Count} projects " +
                  $"({newProjects} new, {admittedTotal} passed the bar, removed {removedDevelopers} developers / {removedProjects} projects)" +
-                 (isFullRun ? "" : " [partial run: owners not seen were kept]"));
+                 (dropUnseen ? "" : " [owners not seen were kept]"));
         github.LogUsage();
     }
 
@@ -2547,6 +2556,7 @@ sealed class DiscoveryState
     public Dictionary<string, string?> Candidates { get; set; } = [];  // login -> matched term
     public List<string> Fetched { get; set; } = [];                    // owners whose repos are done
     public List<string> Seen { get; set; } = [];                       // fetched owners with a listed repo
+    public bool Withheld { get; set; }                                 // GitHub withheld some results
 }
 
 sealed class ManualDevelopers
@@ -2889,13 +2899,22 @@ sealed class GitHub : IDisposable
                 continue;
             }
             // NOT_FOUND is expected for renamed/deleted owners and repos; callers see a null node.
+            // Any other error (FORBIDDEN: an enterprise policy hiding its members from this
+            // token) also leaves a null node, for something that does exist; counted in WithheldNodes.
             foreach (var error in errors.Where(e => e?["type"]?.GetValue<string>() != "NOT_FOUND"))
+            {
+                Interlocked.Increment(ref withheldNodes);
                 Log.Warn($"  GraphQL error: {error?.ToJsonString()}");
+            }
             return (json["data"] ?? throw new HttpRequestException($"GraphQL returned no data: {text}"), errors);
         }
     }
 
     // REST (core API) state, tracked separately from GraphQL points.
+    int withheldNodes;
+    // GraphQL results GitHub withheld with an error other than NOT_FOUND, since this client was created.
+    public int WithheldNodes => Volatile.Read(ref withheldNodes);
+
     int restRequests;
     int? coreRemaining;
     DateTimeOffset? coreResetAt;
