@@ -179,7 +179,7 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 .go svg { flex: none; }
 /* The categories, one quiet line under the search, so they stay one step from the top. */
 /* "293 ვები": number first, bold, as in the headline above ("438 დეველოპერი."). */
-.hero-cats { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .35rem 1.4rem; margin: 0; font-size: 1rem; }
+.hero-cats { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem 1.4rem; margin: 0; font-size: 1rem; }
 .hero-cats .n { font-weight: 800; font-size: 1.12em; font-variant-numeric: tabular-nums; }
 .hero-cats-label { color: var(--muted); }
 @media (max-width: 36rem) { .hero-cats { gap: .3rem .9rem; font-size: .88rem; } }
