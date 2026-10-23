@@ -29,7 +29,8 @@
       "тестов\\w* задани",
       "домашн\\w* задани",
       "\\b(during|as part of|for) (the |a |my )?[\\w -]*course\\b",
-      "\\bbootcamp\\b"
+      "\\bbootcamp\\b",
+      "^\\s*(GNU )?(AFFERO |LESSER )?GENERAL PUBLIC LICENSE"
     ]
   },
   "helpWantedLabels": ["good first issue", "good-first-issue", "help wanted", "help-wanted"]
