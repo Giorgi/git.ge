@@ -17,7 +17,8 @@
             </form>
         </div>
         <nav class="hero-cats" aria-labelledby="hero-cats-label">
-            <span id="hero-cats-label" class="visually-hidden"><T K="home.categories" /></span>
+            @* Visible: says what the numbers count, and that these are ways in. *@
+            <span id="hero-cats-label" class="hero-cats-label"><T K="home.categoriesLead" /></span>
             @foreach (var cat in Site.Data.Categories)
             {
                 <a href="/c/@cat/"><span class="n">@Site.Listed.Count(p => p.Category == cat)</span> <T K="@($"cat.{cat}")" /></a>
