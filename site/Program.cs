@@ -69,6 +69,7 @@ if (Directory.Exists(avatarCache))
 
 // Share images for roundups (needs the avatars above), before the pages that point at them.
 Site.OgImages = OgImages.Roundups(root, output, Site.Roundups);
+Site.DeveloperOgImages = OgImages.Developers(root, output, Site.Data.DeveloperPages);
 
 // Razor escapes all text; allow every Unicode range so Georgian stays readable UTF-8
 // instead of numeric entities, which would roughly triple its size.
@@ -384,6 +385,14 @@ static int SiteSelfTest(string built)
         Regex.Match(File.ReadAllText(f), @"<meta property=""og:image"" content=""https?://[^/""]+(/og/roundup-[^""]+\.png)""") is not { Success: true } m
         || !File.Exists(Path.Combine(built, m.Groups[1].Value.TrimStart('/')))).ToList();
     Check(missingOg.Count == 0, $"every roundup has its own share image ({roundupPages.Count} roundups, {missingOg.Count} without)");
+
+    var developerPages = Directory.Exists(built)
+        ? Directory.GetDirectories(built, "@*").Select(d => Path.Combine(d, "index.html")).Where(File.Exists).ToList()
+        : [];
+    var missingDevOg = developerPages.Where(f =>
+        Regex.Match(File.ReadAllText(f), @"<meta property=""og:image"" content=""https?://[^/""]+(/og/dev-[^""]+\.jpg)""") is not { Success: true } m
+        || !File.Exists(Path.Combine(built, m.Groups[1].Value.TrimStart('/')))).ToList();
+    Check(missingDevOg.Count == 0, $"every developer page has its own share image ({developerPages.Count} pages, {missingDevOg.Count} without)");
 
     // Help-wanted label filter: spellings normalise to the two values, anything else drops.
     List<string> Labels(params string[] labels) => HelpWantedFilters.LabelsOf(new HelpWantedIssue { Labels = [.. labels] });

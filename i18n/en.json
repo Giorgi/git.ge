@@ -152,6 +152,7 @@
   "dev.commitsOne": "1 commit",
   "dev.metaDescription": "{0} (@{1}): {2} open-source projects on git.ge, {3} stars in total{4}.",
   "dev.ranking": "Category ranking",
+  "og.rank": "{0}: {1} in {2}",
   "dev.rankLine": "{0}: {1} most-starred in {2} (of {3} projects)",
   "dev.share": "Share",
   "dev.copied": "Link copied",

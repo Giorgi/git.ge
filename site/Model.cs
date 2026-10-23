@@ -170,6 +170,7 @@ public static class Site
     public static Dictionary<string, string> Pages { get; set; } = [];     // name.lang -> HTML
     public static Dictionary<string, string> AssetVersions { get; set; } = [];
     public static Dictionary<string, string> OgImages { get; set; } = [];   // roundup slug -> /og/….png
+    public static Dictionary<string, string> DeveloperOgImages { get; set; } = [];   // lower-cased login -> /og/….png
 
     // "New on git.ge" sort: offered once at least this many developers were first seen
     // after the earliest first-seen date (config/site.json developerPages.firstSeenSortMin).

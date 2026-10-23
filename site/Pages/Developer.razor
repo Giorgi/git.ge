@@ -3,6 +3,7 @@
    developers they follow and who follows them, and contributions between git.ge
    projects. Empty sections are left out. See docs/specs/developer-pages.md. *@
 <Layout Path="@D.Path" Title="@PageTitle" Description="@Summary" OgType="profile"
+        OgImage="@Site.DeveloperOgImages.GetValueOrDefault(D.Login.ToLowerInvariant())" OgImageAlt="@($"git.ge · {D.DisplayName}")"
         Crumbs="@Crumbs" JsonLd="@(new object[] { Seo.Profile(D) })">
     <article class="dev">
         @* The home poster at the scale of one person: the face large (with the wall's red
