@@ -182,7 +182,13 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 .hero-cats { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem 1.4rem; margin: 0; font-size: 1rem; }
 .hero-cats .n { font-weight: 800; font-size: 1.12em; font-variant-numeric: tabular-nums; }
 .hero-cats-label { color: var(--muted); }
-@media (max-width: 36rem) { .hero-cats { gap: .3rem .9rem; font-size: .88rem; } }
+@media (max-width: 36rem) {
+  .hero-cats { gap: .3rem .9rem; font-size: .88rem; }
+  /* Phones pack better with the short ones paired: სასწავლო after თამაშები, სხვა after
+     ხელსაწყოები (5 lines instead of 6-7 on 412px+ screens, never more elsewhere). */
+  .hero-cats a[href="/c/systems/"], .hero-cats a[href="/c/devops/"], .hero-cats a[href="/c/libraries/"],
+  .hero-cats a[href="/c/tools/"], .hero-cats a[href="/c/other/"] { order: 1; }
+}
 .home .p-name:hover, .home .wall-cap a:hover, .home .more a:hover { text-decoration: underline; text-underline-offset: .15em; }
 
 ::selection { background: var(--accent); color: #fff; }
