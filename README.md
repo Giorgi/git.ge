@@ -1,5 +1,7 @@
 # git.ge
 
+[![listed on git.ge](https://git.ge/badge.svg)](https://git.ge/@giorgi/)
+
 A static directory of open-source projects by developers in Georgia. There is no
 backend: GitHub is the storage layer, a scheduled GitHub Action fetches data and
 commits it, and the site is regenerated as static HTML.

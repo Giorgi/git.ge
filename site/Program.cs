@@ -409,6 +409,15 @@ static int SiteSelfTest(string built)
         || !File.Exists(Path.Combine(built, m.Groups[1].Value.TrimStart('/')))).ToList();
     Check(missingDevOg.Count == 0, $"every developer page has its own share image ({developerPages.Count} pages, {missingDevOg.Count} without)");
 
+    Check(File.Exists(Path.Combine(built, "badge.svg")), "the README badge (/badge.svg) is in the built site");
+    var wrongBadge = developerPages.Where(f =>
+    {
+        var path = "/" + Path.GetFileName(Path.GetDirectoryName(f)) + "/";   // /@login/
+        return Regex.Match(File.ReadAllText(f), @"data-badge-code>\[!\[[^\]]*\]\(https?://[^/)]+/badge\.svg\)\]\(https?://[^/)]+([^)]+)\)</code>")
+            is not { Success: true } m || m.Groups[1].Value != path;
+    }).ToList();
+    Check(wrongBadge.Count == 0, $"every developer page's badge snippet links to that page ({developerPages.Count} pages, {wrongBadge.Count} wrong)");
+
     var home = Path.Combine(built, "index.html");
     Check(!File.Exists(home) || (Regex.Match(File.ReadAllText(home), @"<meta property=""og:image"" content=""https?://[^/""]+(/og/site-[^""]+\.png)""") is { Success: true } hm
                                  && File.Exists(Path.Combine(built, hm.Groups[1].Value.TrimStart('/')))),

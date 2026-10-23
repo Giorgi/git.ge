@@ -55,6 +55,12 @@ single project, for example one not hosted on GitHub, can be
 [suggested]({{repoUrl}}/issues/new?template=submit-project.yml) on its own.
 Every request is reviewed by hand before it's added.
 
+## README badge {#badge}
+
+Every developer page ends with a small "listed on git.ge" badge and the Markdown
+to put it in a GitHub README; it links to that page. It is one image, the same
+for everyone, served from git.ge.
+
 ## Privacy {#privacy}
 
 No cookies, no tracking, and no requests to third parties. If you
