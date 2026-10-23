@@ -20,15 +20,25 @@
                 </p>
                 <h1 class="dev-name">@D.DisplayName</h1>
             </div>
-            @* Shown by app.js: the share sheet on touch devices, otherwise copies the link.
-               Bottom right, on the rule, at the height of the name. *@
+            @* The right column: Share on the top line (level with the login), the README
+               badge on the bottom line (level with the name). *@
             <span class="dev-share">
-                @* For the person themselves: the README badge, which is its own label, opens
-                   the Markdown that links back here. A native <details>, so it works without
-                   JavaScript; app.js adds the copy button and closes it on Escape or a click
-                   outside. *@
+                @* Shown by app.js: the share sheet on touch devices, otherwise copies the link. *@
+                <span class="dev-share-row">
+                    <button type="button" class="dev-share-btn" hidden data-share>
+                        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3.5v11M7.75 7.75 12 3.5l4.25 4.25M5.5 12.5v5.75c0 .97.78 1.75 1.75 1.75h9.5c.97 0 1.75-.78 1.75-1.75V12.5" />
+                        </svg>
+                        <T K="dev.share" />
+                    </button>
+                    <span class="dev-share-status" role="status" data-share-status></span>
+                </span>
+                @* For the person themselves: a short caption and the badge open the Markdown
+                   that links back here. A native <details>, so it works without JavaScript;
+                   app.js adds the copy button and closes it on Escape or a click outside. *@
                 <details class="dev-badge">
                     <summary title="@Site.Strings.Ka("dev.badgeTitle")" data-i18n-title="dev.badgeTitle">
+                        <span class="dev-badge-cap"><T K="dev.badgeCaption" /></span>
                         <img src="/badge.svg" width="104" height="20" alt="@Site.Strings.Ka("dev.badgeTitle")">
                     </summary>
                     <div class="dev-badge-pop">
@@ -41,13 +51,6 @@
                         </div>
                     </div>
                 </details>
-                <button type="button" class="dev-share-btn" hidden data-share>
-                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 3.5v11M7.75 7.75 12 3.5l4.25 4.25M5.5 12.5v5.75c0 .97.78 1.75 1.75 1.75h9.5c.97 0 1.75-.78 1.75-1.75V12.5" />
-                    </svg>
-                    <T K="dev.share" />
-                </button>
-                <span class="dev-share-status" role="status" data-share-status></span>
             </span>
             <ul class="dev-stats">
                 <li><b>@Format.Number(ProjectCount)</b> <T K="@(ProjectCount == 1 ? "dev.statProjectOne" : "dev.statProjects")" /></li>

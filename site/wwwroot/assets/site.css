@@ -253,8 +253,10 @@ input { caret-color: var(--accent); }
 .dev-last { white-space: nowrap; }
 .dev-last.on { color: var(--accent); }
 .dev-last::before { content: "· "; color: var(--muted); }
-/* Share: bottom right, on the rule at the height of the name; ink text, no box. */
-.dev-share { grid-area: share; align-self: end; display: flex; align-items: center; gap: .6rem; padding-bottom: .35rem; }
+/* Right column: Share on the top line (level with the login), the badge on the bottom
+   line (level with the name); ink text, no box. */
+.dev-share { grid-area: share; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; margin-top: -.75rem; }
+.dev-share-row { display: flex; align-items: center; gap: .6rem; }
 .dev-share-btn { display: inline-flex; align-items: center; gap: .4rem; font: inherit; font-size: 1rem; font-weight: 600; color: var(--fg); background: none; border: 0; padding: .3rem 0; cursor: pointer; }
 .dev-share-btn[hidden] { display: none; }
 .dev-share-btn svg { flex: none; display: block; }
@@ -262,10 +264,12 @@ input { caret-color: var(--accent); }
 .dev-share-status { font-size: .85rem; color: var(--muted); }
 .dev-share-status:empty { display: none; }
 /* README badge beside Share: the badge itself opens a small panel with the Markdown. */
-/* The panel hangs from the right edge of the badge-and-share group, so it stays on
-   screen on phones too, where the badge isn't at the right edge. */
-.dev-share { gap: 1.2rem; position: relative; }
+/* The panel hangs from the right edge of the column, so it stays on screen on phones. */
+.dev-share { position: relative; }
 .dev-badge summary { list-style: none; display: flex; align-items: center; gap: .3rem; cursor: pointer; padding: .3rem 0; }
+/* Two short lines, so the column stays narrow and long names keep their width. */
+.dev-badge-cap { max-width: 9.5rem; margin-right: .35rem; font-size: .85rem; line-height: 1.25; text-align: right; color: var(--muted); }
+.dev-badge summary:hover .dev-badge-cap { color: var(--fg); text-decoration: underline; text-underline-offset: .15em; }
 .dev-badge summary::-webkit-details-marker { display: none; }
 .dev-badge summary::after { content: ""; width: .4rem; height: .4rem; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: translateY(-25%) rotate(45deg); }
 .dev-badge[open] summary::after { transform: translateY(15%) rotate(-135deg); }
@@ -295,7 +299,8 @@ input { caret-color: var(--accent); }
 .dev-head .chips { grid-area: chips; margin-top: .7rem; }
 @media (max-width: 36rem) {
   .dev-head { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "face share" "id id" "stats stats" "chips chips"; gap: 0 1rem; margin-top: 1.4rem; }
-  .dev-share { align-self: center; padding-bottom: 0; }
+  .dev-share { align-self: center; justify-content: center; padding: 0; }
+  .dev-badge-cap { display: none; }
   .dev-id { margin-top: .8rem; }
   .dev-face .avatar { width: 64px; height: 64px; font-size: 1.6rem; }
   .dev-face { justify-self: start; }

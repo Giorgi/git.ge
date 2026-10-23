@@ -160,6 +160,7 @@
   "dev.rankLine": "{0}: ვარსკვლავებით {1} კატეგორიაში „{2}“ ({3} პროექტიდან)",
   "dev.share": "გაზიარება",
   "dev.badgeTitle": "ნიშანი README-სთვის",
+  "dev.badgeCaption": "ეს თქვენი გვერდია? ჩასვით README-ში",
   "dev.badgeText": "ეს თქვენი გვერდია? ჩასვით ეს ნიშანი GitHub-ის README-ში და ის ამ გვერდზე მიუთითებს.",
   "dev.badgeCopy": "კოპირება",
   "dev.badgeCopied": "დაკოპირდა",
