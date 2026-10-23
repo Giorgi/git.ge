@@ -6,8 +6,9 @@ A static directory of open-source projects by developers in Georgia. There is no
 backend: GitHub is the storage layer, a scheduled GitHub Action fetches data and
 commits it, and the site is regenerated as static HTML.
 
-Status: **work in progress.** The fetcher works. The site generator, submission
-forms and workflows are not built yet (see `spec.md` for the build order).
+Status: **live at [git.ge](https://git.ge/).** The fetcher, site generator,
+submission forms and nightly workflows all run; new features are added as they
+come up.
 
 ## How data flows
 
