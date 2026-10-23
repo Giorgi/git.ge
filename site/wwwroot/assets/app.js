@@ -178,9 +178,9 @@
 
   // README badge (developer pages): copies the Markdown shown next to it.
   for (const button of document.querySelectorAll("[data-badge-copy]")) {
-    const row = button.parentElement;
-    const code = row.querySelector("[data-badge-code]");
-    const status = row.querySelector("[data-badge-status]");
+    const box = button.closest(".dev-badge");
+    const code = box.querySelector("[data-badge-code]");
+    const status = box.querySelector("[data-badge-status]");
     if (!navigator.clipboard) continue;
     button.hidden = false;
     let timer;
@@ -193,6 +193,13 @@
       }
       clearTimeout(timer);
       timer = setTimeout(() => { status.textContent = ""; }, 2500);
+    });
+  }
+  // The badge menu closes like a menu: Escape, or a click anywhere else.
+  for (const box of document.querySelectorAll("details.dev-badge")) {
+    document.addEventListener("click", event => { if (box.open && !box.contains(event.target)) box.open = false; });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && box.open) { box.open = false; box.querySelector("summary").focus(); }
     });
   }
 

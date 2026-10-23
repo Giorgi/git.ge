@@ -261,12 +261,23 @@ input { caret-color: var(--accent); }
 .dev-share-btn:hover { color: var(--fg); text-decoration: underline; text-underline-offset: .2em; }
 .dev-share-status { font-size: .85rem; color: var(--muted); }
 .dev-share-status:empty { display: none; }
-/* README badge block at the bottom of a developer page. */
-.dev-badge { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line); }
-.dev-badge-text { margin: 0 0 .6rem; font-size: .9rem; color: var(--muted); }
-.dev-badge-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
-.dev-badge-row img { display: block; }
-.dev-badge-code { font-size: .8rem; padding: .3rem .5rem; background: var(--soft); border-radius: 4px; overflow-wrap: anywhere; user-select: all; }
+/* README badge beside Share: the badge itself opens a small panel with the Markdown. */
+/* The panel hangs from the right edge of the badge-and-share group, so it stays on
+   screen on phones too, where the badge isn't at the right edge. */
+.dev-share { gap: 1.2rem; position: relative; }
+.dev-badge summary { list-style: none; display: flex; align-items: center; gap: .3rem; cursor: pointer; padding: .3rem 0; }
+.dev-badge summary::-webkit-details-marker { display: none; }
+.dev-badge summary::after { content: ""; width: .4rem; height: .4rem; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: translateY(-25%) rotate(45deg); }
+.dev-badge[open] summary::after { transform: translateY(15%) rotate(-135deg); }
+.dev-badge summary img { display: block; }
+.dev-badge-pop {
+  position: absolute; right: 0; top: calc(100% + .4rem); z-index: 5; width: min(27rem, calc(100vw - 2rem));
+  padding: .9rem 1rem; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, .12);
+}
+.dev-badge-title { margin: 0; font-weight: 700; font-size: .95rem; }
+.dev-badge-text { margin: .2rem 0 .6rem; font-size: .88rem; color: var(--muted); }
+.dev-badge-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin-top: .5rem; }
+.dev-badge-code { display: block; font-size: .78rem; padding: .4rem .55rem; background: var(--soft); border-radius: 4px; overflow-wrap: anywhere; user-select: all; }
 .dev-badge-copy { font: inherit; font-size: .9rem; font-weight: 600; color: var(--fg); background: none; border: 0; padding: .2rem 0; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
 .dev-badge-copy[hidden] { display: none; }
 .dev-stats {
@@ -308,8 +319,15 @@ input { caret-color: var(--accent); }
 .chip a { color: var(--fg); }
 .dev-label { margin: 0 0 .35rem; font-size: .85rem; font-weight: 600; letter-spacing: 0; color: var(--muted); }
 .dev-ranks { margin-top: 2rem; }
-.dev-ranks ul { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
-.dev-ranks li { display: flex; align-items: center; gap: .6rem; padding: .08rem 0; overflow-wrap: anywhere; }
+/* Medal, project name, sentence: three columns (subgrid), so the sentences line up
+   after the longest name. On phones the sentence follows the name inline. */
+.dev-ranks ul { list-style: none; padding: 0; margin: 0; font-size: .9rem; display: grid; grid-template-columns: auto auto minmax(0, 1fr); column-gap: .6rem; }
+.dev-ranks li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; padding: .08rem 0; overflow-wrap: anywhere; }
+html[lang="ka"] .dev-ranks li > .l10n[lang="ka"], html[lang="en"] .dev-ranks li > .l10n[lang="en"] { display: contents; }
+@media (max-width: 36rem) {
+  .dev-ranks li { display: flex; gap: .6rem; }
+  html[lang="ka"] .dev-ranks li > .l10n[lang="ka"], html[lang="en"] .dev-ranks li > .l10n[lang="en"] { display: inline; }
+}
 /* Medals for top-three ranks: metal colours from the place itself (content, not decoration). */
 .medal { flex: none; display: block; transform: translateY(-15%); }  /* the disc's centre, not the ribbon's, level with the text */
 .medal-n { font: 800 13px var(--font, sans-serif); }
