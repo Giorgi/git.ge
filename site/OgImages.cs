@@ -36,6 +36,48 @@ static class OgImages
         georgianBlack = SKTypeface.FromFile(Path.Combine(fonts, "noto-sans-georgian-900.ttf"));
     }
 
+    // The site's own image (home and every page without one of its own): the home page's
+    // headline, "438 დეველოპერი. 1,083 ღია კოდის პროექტი.", with the same counts.
+    public static string SiteImage(string root, string output)
+    {
+        LoadFonts(root);
+        using var surface = SKSurface.Create(new SKImageInfo(W, H));
+        var c = surface.Canvas;
+        c.Clear(Bg);
+        // The homepage image: a bigger wordmark than the others, and a bold tagline.
+        // One block: wordmark, the two counts, the tagline and its English line.
+        var x = Text(c, "git", Pad, 150, 64, true, Fg);
+        Text(c, ".ge", x, 150, 64, true, Accent);
+
+        var devs = Format.Number(Site.Data.Developers);
+        var projects = Format.Number(Site.Listed.Count());
+        var line1 = $"{devs} {Site.Strings.Ka("home.heroDevs")}";
+        var line2 = $"{projects} {Site.Strings.Ka("home.heroProjects")}";
+        var size = 104f;
+        while (size > 48 && Math.Max(Measure(line1, size, true), Measure(line2, size, true)) > W - 2 * Pad) size -= 2;
+        Text(c, line1, Pad, 292, size, true, Fg);
+        var px = Text(c, projects, Pad, 292 + size * 1.08f, size, true, Accent);
+        Text(c, " " + Site.Strings.Ka("home.heroProjects"), px, 292 + size * 1.08f, size, true, Fg);
+        var tagline = Site.Strings.Ka("site.tagline");
+        var tsize = 38f;
+        while (tsize > 26 && Measure(tagline, tsize, true) > W - 2 * Pad) tsize -= 1;
+        var line2Y = 292 + size * 1.08f;
+        Text(c, tagline, Pad, line2Y + 92, tsize, true, Fg);
+        // In English too: of all the images this one is the likeliest to reach non-Georgian readers.
+        Text(c, Site.Strings.English["site.tagline"], Pad, line2Y + 140, 30, false, Muted);
+
+        using var rule = new SKPaint { Color = Line, StrokeWidth = 2 };
+        c.DrawLine(0, H - 1, W, H - 1, rule);
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        var png = data.ToArray();
+        var dir = Path.Combine(output, "og");
+        Directory.CreateDirectory(dir);
+        var name = $"site-{Convert.ToHexStringLower(SHA256.HashData(png))[..8]}.png";
+        File.WriteAllBytes(Path.Combine(dir, name), png);
+        return $"/og/{name}";
+    }
+
     // Draws each developer page's image (JPEG: photos make PNGs twice the size) into
     // <output>/og/ and returns login → site path.
     public static Dictionary<string, string> Developers(string root, string output, IEnumerable<SiteDeveloper> developers)

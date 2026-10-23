@@ -169,6 +169,7 @@ public static class Site
     public static List<Roundup> Roundups { get; set; } = [];
     public static Dictionary<string, string> Pages { get; set; } = [];     // name.lang -> HTML
     public static Dictionary<string, string> AssetVersions { get; set; } = [];
+    public static string SiteOgImage { get; set; } = "/og.png";   // the default share image, drawn per build
     public static Dictionary<string, string> OgImages { get; set; } = [];   // roundup slug -> /og/….png
     public static Dictionary<string, string> DeveloperOgImages { get; set; } = [];   // lower-cased login -> /og/….png
 

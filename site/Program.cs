@@ -68,6 +68,7 @@ if (Directory.Exists(avatarCache))
     AvatarImages.Build(avatarCache, output);
 
 // Share images for roundups (needs the avatars above), before the pages that point at them.
+Site.SiteOgImage = OgImages.SiteImage(root, output);
 Site.OgImages = OgImages.Roundups(root, output, Site.Roundups);
 Site.DeveloperOgImages = OgImages.Developers(root, output, Site.Data.DeveloperPages);
 
@@ -393,6 +394,11 @@ static int SiteSelfTest(string built)
         Regex.Match(File.ReadAllText(f), @"<meta property=""og:image"" content=""https?://[^/""]+(/og/dev-[^""]+\.jpg)""") is not { Success: true } m
         || !File.Exists(Path.Combine(built, m.Groups[1].Value.TrimStart('/')))).ToList();
     Check(missingDevOg.Count == 0, $"every developer page has its own share image ({developerPages.Count} pages, {missingDevOg.Count} without)");
+
+    var home = Path.Combine(built, "index.html");
+    Check(!File.Exists(home) || (Regex.Match(File.ReadAllText(home), @"<meta property=""og:image"" content=""https?://[^/""]+(/og/site-[^""]+\.png)""") is { Success: true } hm
+                                 && File.Exists(Path.Combine(built, hm.Groups[1].Value.TrimStart('/')))),
+          "the home page uses the drawn site image (counts), and the file exists");
 
     // Help-wanted label filter: spellings normalise to the two values, anything else drops.
     List<string> Labels(params string[] labels) => HelpWantedFilters.LabelsOf(new HelpWantedIssue { Labels = [.. labels] });
