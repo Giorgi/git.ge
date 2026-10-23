@@ -3,7 +3,8 @@
 <Layout Path="@PagePath(Page)" TitleKey="@(Page == 1 ? "projects.title" : "projects.titlePage")" TitleArgs="@(Page == 1 ? [] : [Page])"
         Description="@Description" Crumbs="@Crumbs">
     <h1><T K="projects.title" /></h1>
-    <p class="note"><T K="projects.note" Args="@([Site.Data.ListingMinStars])" /></p>
+    @* Hidden while searching (app.js): it describes the list, not the results. *@
+    <p class="note" id="list-note"><T K="projects.note" Args="@([Site.Data.ListingMinStars])" /></p>
 
     <div class="search" hidden>
         <label for="q" class="visually-hidden"><T K="projects.searchLabel" /></label>

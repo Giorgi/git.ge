@@ -561,6 +561,7 @@
   const status = document.getElementById("q-status");
   const list = document.getElementById("list");
   const pager = document.querySelector(".pager");
+  const note = document.getElementById("list-note");
   const original = [...list.children];
   let index = null;
   let loading = null;
@@ -584,6 +585,7 @@
     if (!query) {
       list.replaceChildren(...original);
       if (pager) pager.hidden = false;
+      if (note) note.hidden = false;
       status.textContent = "";
       return;
     }
@@ -594,6 +596,7 @@
     const hits = index.projects.filter(p => words.every(w => p.text.includes(w)));
     list.replaceChildren(...hits.slice(0, 200).map(card));
     if (pager) pager.hidden = true;
+    if (note) note.hidden = true;
 
     status.textContent = hits.length ? t("projects.results", hits.length) : t("projects.noResults");
 
