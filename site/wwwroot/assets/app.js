@@ -179,12 +179,14 @@
   // README badge (developer pages): copies the Markdown shown next to it.
   for (const button of document.querySelectorAll("[data-badge-copy]")) {
     const box = button.closest(".dev-badge");
-    const code = box.querySelector("[data-badge-code]");
     const status = box.querySelector("[data-badge-status]");
     if (!navigator.clipboard) continue;
     button.hidden = false;
     let timer;
     button.addEventListener("click", async () => {
+      // The snippet for the chosen style (the radios above it).
+      const style = box.querySelector('input[name="badge-style"]:checked')?.value || "rounded";
+      const code = box.querySelector(`[data-badge-code][data-style="${style}"]`);
       try {
         await navigator.clipboard.writeText(code.textContent);
         status.textContent = t("dev.badgeCopied");

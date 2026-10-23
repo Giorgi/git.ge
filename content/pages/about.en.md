@@ -58,8 +58,8 @@ Every request is reviewed by hand before it's added.
 ## README badge {#badge}
 
 Every developer page ends with a small "listed on git.ge" badge and the Markdown
-to put it in a GitHub README; it links to that page. It is one image, the same
-for everyone, served from git.ge.
+to put it in a GitHub README; it links to that page. It comes in two styles
+(rounded and square), the same images for everyone, served from git.ge.
 
 ## Privacy {#privacy}
 

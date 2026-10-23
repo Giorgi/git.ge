@@ -288,6 +288,14 @@ input { caret-color: var(--accent); }
 .dev-badge-title { margin: 0; font-weight: 700; font-size: .95rem; }
 .dev-badge-text { margin: .2rem 0 .6rem; font-size: .88rem; color: var(--muted); }
 .dev-badge-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin-top: .5rem; }
+.dev-badge-styles { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; margin: 0 0 .6rem; }
+.dev-badge-styles label { display: flex; align-items: center; gap: .4rem; font-size: .85rem; color: var(--muted); cursor: pointer; }
+.dev-badge-styles input { margin: 0; accent-color: var(--accent); }
+.dev-badge-styles img { display: block; }
+.dev-badge-styles label:has(input:checked) { color: var(--fg); }
+.dev-badge-code[data-style="square"],
+.dev-badge-pop:has(input[value="square"]:checked) .dev-badge-code[data-style="rounded"] { display: none; }
+.dev-badge-pop:has(input[value="square"]:checked) .dev-badge-code[data-style="square"] { display: block; }
 .dev-badge-code { display: block; font-size: .78rem; padding: .4rem .55rem; background: var(--soft); border-radius: 4px; overflow-wrap: anywhere; user-select: all; }
 .dev-badge-copy { font: inherit; font-size: .9rem; font-weight: 600; color: var(--fg); background: none; border: 0; padding: .2rem 0; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
 .dev-badge-copy[hidden] { display: none; }

@@ -411,14 +411,18 @@ static int SiteSelfTest(string built)
 
     // Like the checks above, only once the site has been built (CI runs this before the build).
     if (Directory.Exists(built))
-        Check(File.Exists(Path.Combine(built, "badge.svg")), "the README badge (/badge.svg) is in the built site");
+        Check(File.Exists(Path.Combine(built, "badge.svg")) && File.Exists(Path.Combine(built, "badge-square.svg")),
+              "the README badges (/badge.svg, /badge-square.svg) are in the built site");
     var wrongBadge = developerPages.Where(f =>
     {
         var path = "/" + Path.GetFileName(Path.GetDirectoryName(f)) + "/";   // /@login/
-        return Regex.Match(File.ReadAllText(f), @"data-badge-code>\[!\[[^\]]*\]\(https?://[^/)]+/badge\.svg\)\]\(https?://[^/)]+([^)]+)\)</code>")
-            is not { Success: true } m || m.Groups[1].Value != path;
+        // One snippet per style (rounded, square), each linking to this page.
+        var snippets = Regex.Matches(File.ReadAllText(f),
+            @"data-badge-code data-style=""(\w+)"">\[!\[[^\]]*\]\(https?://[^/)]+/badge(-square)?\.svg\)\]\(https?://[^/)]+([^)]+)\)</code>");
+        return snippets.Count != 2 || snippets.Any(m => m.Groups[3].Value != path)
+            || snippets[0].Groups[2].Success || !snippets[1].Groups[2].Success;
     }).ToList();
-    Check(wrongBadge.Count == 0, $"every developer page's badge snippet links to that page ({developerPages.Count} pages, {wrongBadge.Count} wrong)");
+    Check(wrongBadge.Count == 0, $"every developer page has both badge snippets, linking to that page ({developerPages.Count} pages, {wrongBadge.Count} wrong)");
 
     var home = Path.Combine(built, "index.html");
     Check(!File.Exists(home) || (Regex.Match(File.ReadAllText(home), @"<meta property=""og:image"" content=""https?://[^/""]+(/og/site-[^""]+\.png)""") is { Success: true } hm

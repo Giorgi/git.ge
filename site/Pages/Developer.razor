@@ -44,7 +44,14 @@
                     <div class="dev-badge-pop">
                         <p class="dev-badge-title"><T K="dev.badgeTitle" /></p>
                         <p class="dev-badge-text"><T K="dev.badgeText" /></p>
-                        <code class="dev-badge-code" data-badge-code>@BadgeMarkdown</code>
+                        @* Two styles; the radios switch the snippet in CSS (:has), so this works
+                           without JavaScript too. Copy copies the one shown. *@
+                        <div class="dev-badge-styles" role="radiogroup" aria-label="@Site.Strings.Ka("dev.badgeStyle")" data-i18n-title="dev.badgeStyle">
+                            <label><input type="radio" name="badge-style" value="rounded" checked><img src="/badge.svg" width="104" height="20" alt=""><span><T K="dev.badgeRounded" /></span></label>
+                            <label><input type="radio" name="badge-style" value="square"><img src="/badge-square.svg" width="104" height="20" alt=""><span><T K="dev.badgeSquare" /></span></label>
+                        </div>
+                        <code class="dev-badge-code" data-badge-code data-style="rounded">@BadgeMarkdown("/badge.svg")</code>
+                        <code class="dev-badge-code" data-badge-code data-style="square">@BadgeMarkdown("/badge-square.svg")</code>
                         <div class="dev-badge-row">
                             <button type="button" class="dev-badge-copy" hidden data-badge-copy><T K="dev.badgeCopy" /></button>
                             <span class="dev-share-status" role="status" data-badge-status></span>
@@ -235,7 +242,7 @@
 
     bool Active => Site.IsActive(D);
 
-    string BadgeMarkdown => $"[![listed on git.ge]({Site.Url("/badge.svg")})]({Site.Url(D.Path)})";
+    string BadgeMarkdown(string image) => $"[![listed on git.ge]({Site.Url(image)})]({Site.Url(D.Path)})";
     int ProjectCount => D.Projects.Count + D.Smaller.Count;
 
     // Stars gained over the trend window across all their projects: real deltas, so
