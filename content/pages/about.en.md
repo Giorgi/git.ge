@@ -33,7 +33,7 @@ with projects changed in the last {{dormantMonths}} months first; for the others
 
 ## The maintainer's projects {#maintainer}
 
-The site is maintained by [@{{maintainerLogin}}](https://github.com/{{maintainerLogin}}).
+The site is maintained by [@{{maintainerLogin}}]({{maintainerPath}}).
 Their own projects are never picked for the Spotlight. They appear in the normal
 listings and sorts like everyone else's. This rule is enforced in the site's code.
 

@@ -305,6 +305,7 @@ static Dictionary<string, string> LoadPages(string dir, MarkdownPipeline markdow
         ["listingMinStars"] = Site.Data.ListingMinStars.ToString(CultureInfo.InvariantCulture),
         ["dormantMonths"] = Site.Data.DormantMonths.ToString(CultureInfo.InvariantCulture),
         ["maintainerLogin"] = Site.Data.MaintainerLogin,
+        ["maintainerPath"] = $"/@{Site.Data.MaintainerLogin.ToLowerInvariant()}/",   // their git.ge page
         ["repoUrl"] = Site.Data.RepoUrl,
         ["trendWindowDays"] = Site.Data.Trend.WindowDays.ToString(CultureInfo.InvariantCulture),
     };
