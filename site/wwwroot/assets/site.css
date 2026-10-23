@@ -255,7 +255,7 @@ input { caret-color: var(--accent); }
 .dev-last::before { content: "· "; color: var(--muted); }
 /* Right column: Share on the top line (level with the login), the badge on the bottom
    line (level with the name); ink text, no box. */
-.dev-share { grid-area: share; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; margin-top: -.75rem; }
+.dev-share { grid-area: share; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; margin-top: .25rem; }
 .dev-share-row { display: flex; align-items: center; gap: .6rem; }
 .dev-share-btn { display: inline-flex; align-items: center; gap: .4rem; font: inherit; font-size: 1rem; font-weight: 600; color: var(--fg); background: none; border: 0; padding: .3rem 0; cursor: pointer; }
 .dev-share-btn[hidden] { display: none; }
@@ -266,13 +266,14 @@ input { caret-color: var(--accent); }
 /* README badge beside Share: the badge itself opens a small panel with the Markdown. */
 /* The panel hangs from the right edge of the column, so it stays on screen on phones. */
 .dev-share { position: relative; }
-.dev-badge summary { list-style: none; display: flex; align-items: center; gap: .3rem; cursor: pointer; padding: .3rem 0; }
-/* Two short lines, so the column stays narrow and long names keep their width. */
-.dev-badge-cap { max-width: 9.5rem; margin-right: .35rem; font-size: .85rem; line-height: 1.25; text-align: right; color: var(--muted); }
+/* The badge and its arrow, with the caption on one line under them, right-aligned. */
+.dev-badge summary { list-style: none; display: flex; flex-direction: column; align-items: flex-end; gap: .25rem; cursor: pointer; padding: .3rem 0; }
+.dev-badge-pic { display: flex; align-items: center; gap: .3rem; }
+.dev-badge-cap { font-size: .82rem; line-height: 1.25; white-space: nowrap; color: var(--muted); }
 .dev-badge summary:hover .dev-badge-cap { color: var(--fg); text-decoration: underline; text-underline-offset: .15em; }
 .dev-badge summary::-webkit-details-marker { display: none; }
-.dev-badge summary::after { content: ""; width: .4rem; height: .4rem; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: translateY(-25%) rotate(45deg); }
-.dev-badge[open] summary::after { transform: translateY(15%) rotate(-135deg); }
+.dev-badge-pic::after { content: ""; width: .4rem; height: .4rem; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: translateY(-25%) rotate(45deg); }
+.dev-badge[open] .dev-badge-pic::after { transform: translateY(15%) rotate(-135deg); }
 .dev-badge summary img { display: block; }
 .dev-badge-pop {
   position: absolute; right: 0; top: calc(100% + .4rem); z-index: 5; width: min(27rem, calc(100vw - 2rem));
