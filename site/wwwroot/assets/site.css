@@ -336,8 +336,8 @@ input { caret-color: var(--accent); }
 .dev-card { display: flex; flex: 1; gap: .7rem; align-items: center; min-width: 0; padding: .45rem 0; border-bottom: 1px solid var(--line); color: var(--fg); }
 .dev-card:hover { text-decoration: none; }
 .dev-card .avatar.on { outline: 2px solid var(--accent); outline-offset: 2px; }
-.devs-key { display: inline-flex; align-items: center; gap: .45rem; margin-left: 1rem; }
-@media (max-width: 36rem) { .devs-key { display: flex; margin: .2rem 0 0; } }
+/* Its own line under the intro, flush with it. */
+.devs-key { display: flex; align-items: center; gap: .45rem; margin-top: .2rem; }
 .devs-key-ring { flex: none; width: .75rem; height: .75rem; border-radius: 50%; border: 2px solid var(--accent); }
 .dev-card:hover strong { text-decoration: underline; text-underline-offset: .15em; }
 .dev-card-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
