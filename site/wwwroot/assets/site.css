@@ -458,7 +458,7 @@ input { caret-color: var(--accent); }
 .linklike { font: inherit; color: var(--fg); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: .15em; background: none; border: 0; padding: 0; margin-left: .6rem; cursor: pointer; }
 .linklike:hover { text-decoration: underline; }
 /* Elements above set a display value, which would otherwise override [hidden]. */
-.dev-cell[hidden], .dev-group[hidden], .sort[hidden], .devs-side[hidden], .hw-project[hidden] { display: none; }
+.dev-cell[hidden], .dev-group[hidden], .sort[hidden], .devs-side[hidden], .hw-project[hidden], .pager[hidden] { display: none; }
 /* Which meta line a card shows follows the active sort (app.js sets data-metric). */
 .m-metric { display: none; }
 .dev-dir[data-metric="followed"] .m-default, .dev-dir[data-metric="pushed"] .m-default, .dev-dir[data-metric="first"] .m-default { display: none; }

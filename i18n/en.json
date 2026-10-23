@@ -82,7 +82,7 @@
   "category.note": "Showing projects with at least {0} stars.",
 
   "projects.title": "All projects",
-  "projects.note": "Showing projects with at least {0} stars. Search also covers projects with fewer.",
+  "projects.note": "The list shows projects with at least {0} stars. Search also finds projects with fewer.",
   "projects.search": "Search: name, description, language, topic…",
   "projects.searchLabel": "Search projects",
   "projects.results": "{0} found",
