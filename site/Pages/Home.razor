@@ -20,7 +20,7 @@
             <span id="hero-cats-label" class="visually-hidden"><T K="home.categories" /></span>
             @foreach (var cat in Site.Data.Categories)
             {
-                <a href="/c/@cat/"><T K="@($"cat.{cat}")" /><span class="n">@Site.Listed.Count(p => p.Category == cat)</span></a>
+                <a href="/c/@cat/"><span class="n">@Site.Listed.Count(p => p.Category == cat)</span> <T K="@($"cat.{cat}")" /></a>
             }
         </nav>
     </section>

@@ -178,8 +178,10 @@ h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.01em; }
 .go { display: inline-flex; align-items: center; gap: .35em; }
 .go svg { flex: none; }
 /* The categories, one quiet line under the search, so they stay one step from the top. */
-.hero-cats { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; margin: 0; font-size: .95rem; }
-.hero-cats .n { color: var(--muted); font-size: .82rem; margin-left: .25em; font-variant-numeric: tabular-nums; }
+/* "293 ვები": number first, bold, as in the headline above ("438 დეველოპერი."). */
+.hero-cats { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .35rem 1.4rem; margin: 0; font-size: 1rem; }
+.hero-cats .n { font-weight: 800; font-size: 1.12em; font-variant-numeric: tabular-nums; }
+@media (max-width: 36rem) { .hero-cats { gap: .3rem .9rem; font-size: .88rem; } }
 .home .p-name:hover, .home .wall-cap a:hover, .home .more a:hover { text-decoration: underline; text-underline-offset: .15em; }
 
 ::selection { background: var(--accent); color: #fff; }
