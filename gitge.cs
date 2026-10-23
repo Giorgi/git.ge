@@ -1107,6 +1107,11 @@ static class SelfTest
                   "account: a malformed login is rejected");
             Check(Run(Fixture("add-account.md").Replace("[X]", "[ ]"), "account").ExitCode == Submit.Rejected, "account: no consent is rejected");
 
+            var asOwner = Run(Fixture("submit-github.md"), "owner", 70);
+            Check(asOwner.ExitCode == 0 && Included().Contains("Giorgi") && !Manual().Any(p => p.Issue == 70),
+                  "a project suggestion accepted as its owner: the owner is included, no project entry");
+            Check(Run(Fixture("submit-other.md"), "owner").ExitCode == Submit.Rejected, "a suggestion not on GitHub can't be accepted as an owner");
+
             var login = Run(Fixture("remove-login.md"), "removal", 50);
             Check(login.ExitCode == 0 && Store.Read<OptOut>(temp.OptOut).Developers.SequenceEqual(["SomeUser"]), "removal of a login: '@' dropped, added to developers");
             var repo = Run(Fixture("remove-repo.md"), "removal", 51);
@@ -1619,6 +1624,8 @@ sealed class SiteProject
 // Submit: turn an accepted issue from .github/ISSUE_TEMPLATE/ into a data change.
 //   submit --issue <n>                                   read issue n from GitHub
 //   submit --body-file <f> --type <submission|account|removal>   read a saved issue body
+//   submit --issue <n> --as-owner   a project suggestion, accepted as its owner's account
+//                                    (label accept-user): adds the owner to the include list
 //          [--issue <n>] [--offline]
 // Exit 0: done (or already done); stdout is a pull request body.
 // Exit 3: rejected; stdout is a polite bilingual comment for the issue.
@@ -1676,6 +1683,8 @@ static class Submit
             throw new ArgumentException("submit needs --issue <n>, or --body-file <path> --type <submission|account|removal>");
         }
 
+        if (options.AsOwner)
+            type = type == "submission" ? "owner" : throw new ArgumentException("--as-owner applies to project suggestions only");
         var result = await Execute(paths, body, type, options.Issue, github);
         Console.OutputEncoding = new UTF8Encoding(false);
         Console.Write(result.Markdown);
@@ -1687,6 +1696,7 @@ static class Submit
     {
         "submission" => Submission(paths, ParseForm(body, SubmissionForm), issue, github),
         "account" => Account(paths, ParseForm(body, AccountForm), issue, github),
+        "owner" => Owner(paths, ParseForm(body, SubmissionForm), issue, github),
         "removal" => Task.FromResult(Removal(paths, ParseForm(body, RemovalForm), issue)),
         _ => throw new ArgumentException($"Unknown submission type '{type}'; expected 'submission', 'account' or 'removal'"),
     };
@@ -1839,6 +1849,22 @@ static class Submit
         Store.WriteObject(paths.ManualDevelopers, manual);
         return Done($"Adds the account **{login}** to the include list in `data/manual/developers.json`{(issue is null ? "" : $", as requested in #{issue}")}. " +
                     "Its projects that meet the listing rules appear with the next nightly update.", issue);
+    }
+
+    // A project suggestion accepted as its owner's account (label accept-user): the
+    // owner from the GitHub URL goes through the account checks and onto the include
+    // list, so this project and the owner's others are found from then on.
+    static Task<SubmitResult> Owner(Paths paths, Dictionary<string, string> form, int? issue, GitHub? github)
+    {
+        var rawUrl = form.GetValueOrDefault("url", "").Trim();
+        var withScheme = rawUrl.Contains("://", StringComparison.Ordinal) ? rawUrl : "https://" + rawUrl;
+        var onGitHub = Uri.TryCreate(withScheme, UriKind.Absolute, out var uri)
+                       && (uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) || uri.Host.Equals("www.github.com", StringComparison.OrdinalIgnoreCase));
+        var owner = onGitHub ? uri!.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() : null;
+        if (owner is null)
+            return Task.FromResult(RejectAccount("პროექტი GitHub-ზე არ არის, ამიტომ დასამატებელი ანგარიში არ გვაქვს; ის ცალკე პროექტად შეიძლება დაემატოს.",
+                                                 "The project isn't on GitHub, so there is no account to add; it can be added as a single project instead."));
+        return Account(paths, new() { ["login"] = owner, ["consent"] = form.GetValueOrDefault("consent", "") }, issue, github);
     }
 
     static SubmitResult Removal(Paths paths, Dictionary<string, string> form, int? issue)
@@ -3083,6 +3109,7 @@ sealed class Options
     public string? BodyFile { get; private set; }
     public string? Type { get; private set; }
     public bool Offline { get; private set; }
+    public bool AsOwner { get; private set; }
     public string? Month { get; private set; }
 
     public static Options Parse(string[] args)
@@ -3102,6 +3129,7 @@ sealed class Options
                 case "--body-file": options.BodyFile = args[++i]; break;
                 case "--type": options.Type = args[++i]; break;
                 case "--offline": options.Offline = true; break;
+                case "--as-owner": options.AsOwner = true; break;
                 case "--month": options.Month = args[++i]; break;
                 default: throw new ArgumentException($"Unknown option '{args[i]}'");
             }
