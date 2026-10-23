@@ -65,10 +65,14 @@ the maintainer's review:
      must exist on GitHub; accounts already found by location, and opted-out or
      excluded ones, are rejected.
    - A removal adds the login or `owner/repo` to `data/optout.json`.
+   - On a project suggestion, the label `accept-user` (instead of `accepted`)
+     adds the project's owner to `include` instead, so this project and their
+     others are found automatically.
 4. If it succeeds (exit 0), the workflow opens a pull request that closes the
    issue. If it's rejected (exit 3), the workflow posts the bilingual explanation
    as a comment on the issue instead.
-5. The maintainer merges the pull request.
+5. The maintainer merges the pull request. A merge that adds logins to `include`
+   starts Discover for just those accounts, which deploys when done.
 
 Each added entry records the issue it came from (`"issue": 42`), so running the
 same issue twice changes nothing. To try it locally without GitHub:

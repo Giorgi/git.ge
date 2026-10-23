@@ -16,6 +16,11 @@ on:
     # Daily 04:41 UTC: resume an unfinished discovery, if a checkpoint exists.
     - cron: "41 4 * * *"
     # GitHub may start scheduled runs late; nothing depends on exact timing.
+  # A merged account PR (or any edit that adds logins to the include list): fetch
+  # just the added accounts and deploy, so they're on the site within minutes.
+  push:
+    branches: [main]
+    paths: ["data/manual/developers.json"]
   workflow_dispatch:
     inputs:
       restart:
@@ -61,12 +66,37 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
+          BEFORE: ${{ github.event.before }}
+          INPUT_LOGIN: ${{ inputs.login }}
         run: |
-          if [ "$EVENT" = "schedule" ] && [ "$SCHEDULE" = "41 4 * * *" ] && [ ! -f data/bot/state/discovery.json ]; then
+          if [ "$EVENT" = "push" ]; then
+            # Logins in the include list now that weren't before this push.
+            git fetch -q --depth=1 origin "$BEFORE" 2>/dev/null || true
+            added=$(python3 - <<'PY'
+          import json, os, subprocess
+          def include(ref):
+              try:
+                  return json.loads(subprocess.check_output(["git", "show", f"{ref}:data/manual/developers.json"]))["include"]
+              except Exception:
+                  return []
+          before = {login.lower() for login in include(os.environ["BEFORE"])}
+          print(",".join(login for login in include("HEAD") if login.lower() not in before))
+          PY
+            )
+            if [ -z "$added" ]; then
+              echo "No logins added to the include list."
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "Added to the include list: $added"
+              echo "run=true" >> "$GITHUB_OUTPUT"
+              echo "login=$added" >> "$GITHUB_OUTPUT"
+            fi
+          elif [ "$EVENT" = "schedule" ] && [ "$SCHEDULE" = "41 4 * * *" ] && [ ! -f data/bot/state/discovery.json ]; then
             echo "No unfinished discovery to resume."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "login=$INPUT_LOGIN" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/setup-dotnet@v6
@@ -81,7 +111,7 @@ jobs:
         timeout-minutes: 320
         env:
           RESTART: ${{ inputs.restart && '--restart' || '' }}
-          LOGIN: ${{ inputs.login }}
+          LOGIN: ${{ steps.gate.outputs.login }}
         run: |
           if [ -n "$LOGIN" ]; then
             dotnet run gitge.cs -- discover --login "$LOGIN"
@@ -107,7 +137,7 @@ jobs:
         if: always() && steps.data.outcome == 'success' && steps.gate.outputs.run == 'true'
         working-directory: data/bot
         env:
-          LOGIN: ${{ inputs.login }}
+          LOGIN: ${{ steps.gate.outputs.login }}
         run: |
           if [ -n "$LOGIN" ]; then
             message="Discovery of $LOGIN $(date -u +%F)"
@@ -121,7 +151,7 @@ jobs:
       # A --login run is for getting a just-added account onto the site now rather
       # than after the nightly. A dispatch made with GITHUB_TOKEN does start a run.
       - name: Deploy
-        if: success() && inputs.login != ''
+        if: success() && steps.gate.outputs.login != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy.yml --ref main
