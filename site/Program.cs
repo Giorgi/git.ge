@@ -409,7 +409,9 @@ static int SiteSelfTest(string built)
         || !File.Exists(Path.Combine(built, m.Groups[1].Value.TrimStart('/')))).ToList();
     Check(missingDevOg.Count == 0, $"every developer page has its own share image ({developerPages.Count} pages, {missingDevOg.Count} without)");
 
-    Check(File.Exists(Path.Combine(built, "badge.svg")), "the README badge (/badge.svg) is in the built site");
+    // Like the checks above, only once the site has been built (CI runs this before the build).
+    if (Directory.Exists(built))
+        Check(File.Exists(Path.Combine(built, "badge.svg")), "the README badge (/badge.svg) is in the built site");
     var wrongBadge = developerPages.Where(f =>
     {
         var path = "/" + Path.GetFileName(Path.GetDirectoryName(f)) + "/";   // /@login/
