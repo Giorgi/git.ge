@@ -341,11 +341,17 @@ input { caret-color: var(--accent); }
 .dev-ranks { margin-top: 2rem; }
 /* Medal, project name, sentence: three columns (subgrid), so the sentences line up
    after the longest name. On phones the sentence follows the name inline. */
-.dev-ranks ul { list-style: none; padding: 0; margin: 0; font-size: .9rem; display: grid; grid-template-columns: auto auto minmax(0, 1fr); column-gap: .6rem; }
+.dev-ranks ul { list-style: none; padding: 0; margin: 0; font-size: .9rem; display: grid; grid-template-columns: auto auto minmax(0, 1fr); }
 .dev-ranks li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; padding: .08rem 0; overflow-wrap: anywhere; }
 html[lang="ka"] .dev-ranks li > .l10n[lang="ka"], html[lang="en"] .dev-ranks li > .l10n[lang="en"] { display: contents; }
+/* Fixed columns, since ranks below third have no medal; spacing on the items, not
+   column-gap, so a list without medals isn't indented by an empty first column. */
+.dev-ranks .medal { grid-column: 1; margin-right: .6rem; }
+.dev-ranks .rank-name { grid-column: 2; padding-right: .6rem; }
+.dev-ranks .rank-rest { grid-column: 3; }
 @media (max-width: 36rem) {
   .dev-ranks li { display: flex; gap: .6rem; }
+  .dev-ranks .medal, .dev-ranks .rank-name { margin-right: 0; padding-right: 0; }
   html[lang="ka"] .dev-ranks li > .l10n[lang="ka"], html[lang="en"] .dev-ranks li > .l10n[lang="en"] { display: inline; }
 }
 /* Medals for top-three ranks: metal colours from the place itself (content, not decoration). */
