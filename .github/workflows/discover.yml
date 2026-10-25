@@ -46,7 +46,8 @@ jobs:
     timeout-minutes: 350
     permissions:
       contents: write   # push to the `data` branch
-      actions: write    # start deploy.yml after a --login run
+    outputs:
+      login: ${{ steps.gate.outputs.login }}
     env:
       GH_TOKEN: ${{ secrets.GITGE_TOKEN || github.token }}
       DOTNET_NOLOGO: true
@@ -148,10 +149,32 @@ jobs:
           fi
           bash ../../.github/scripts/commit-data.sh "$message"
 
-      # A --login run is for getting a just-added account onto the site now rather
-      # than after the nightly. A dispatch made with GITHUB_TOKEN does start a run.
-      - name: Deploy
-        if: success() && steps.gate.outputs.login != ''
+  # A --login run is for getting a just-added account onto the site now rather
+  # than after the nightly: build from the data just committed, and deploy.
+  deploy:
+    needs: discover
+    if: needs.discover.result == 'success' && needs.discover.outputs.login != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+
+  # The page is live: tell the submission issue, with the README badge.
+  welcome:
+    needs: [discover, deploy]
+    if: github.event_name == 'push' && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Comment on the submission issue
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run deploy.yml --ref main
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          LOGINS: ${{ needs.discover.outputs.login }}
+        run: bash .github/scripts/welcome.sh

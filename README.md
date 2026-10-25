@@ -72,7 +72,8 @@ the maintainer's review:
    issue. If it's rejected (exit 3), the workflow posts the bilingual explanation
    as a comment on the issue instead.
 5. The maintainer merges the pull request. A merge that adds logins to `include`
-   starts Discover for just those accounts, which deploys when done.
+   starts Discover for just those accounts, which deploys when done and then
+   comments on the submission issue with the developer's page and README badge.
 
 Each added entry records the issue it came from (`"issue": 42`), so running the
 same issue twice changes nothing. To try it locally without GitHub:

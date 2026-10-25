@@ -11,7 +11,8 @@
 # with NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID secrets. Netlify reads the same
 # _headers file format, so nothing else changes.
 #
-# Called by nightly.yml with an already built `_site` artifact. Run manually
+# Called by nightly.yml with an already built `_site` artifact, and by
+# discover.yml without one (after fetching just-added accounts). Run manually
 # (workflow_dispatch) to rebuild from the current data and deploy. A push to main
 # that changes content/roundups/ does the same, so a committed roundup goes live
 # right away (page and share image come from the same build).
@@ -22,9 +23,10 @@ on:
   workflow_call:
     inputs:
       artifact:
-        description: Name of the uploaded artifact that contains _site
+        description: Name of the uploaded artifact that contains _site (none - build it here)
         type: string
-        required: true
+        required: false
+        default: ""
   workflow_dispatch:
   push:
     branches: [main]
