@@ -611,6 +611,45 @@
   });
 
   input.addEventListener("focus", load, { once: true });
+
+  // Sorting sorts all listed projects, not just this page. The server renders the pages
+  // in the default order, so another sort comes from /index.json, cut into pages of the
+  // same size. ?sort= carries it through the pager links and a reload.
+  const bar = document.querySelector(".sort[data-sort-for='list']");
+  const defaultSort = bar?.querySelector("button[aria-pressed='true']")?.dataset.sort;
+  const page = Number(pager?.dataset.page || 1);
+  const pageSize = Number(pager?.dataset.size || original.length);
+  let pageSort = defaultSort;
+
+  async function showPage() {
+    const key = pageSort;
+    if (key === defaultSort) {
+      list.replaceChildren(...original);
+      return;
+    }
+    await load();
+    if (key !== pageSort || input.value.trim()) return;   // another sort, or a search, came first
+    const all = document.createElement("ol");
+    all.append(...index.projects.filter(p => p.i).map(card));
+    sortList(all, key);
+    list.replaceChildren(...[...all.children].slice((page - 1) * pageSize, page * pageSize));
+  }
+
+  const withSort = url => {
+    if (pageSort === defaultSort) url.searchParams.delete("sort");
+    else url.searchParams.set("sort", pageSort);
+    return url.pathname + url.search + url.hash;
+  };
+  bar?.addEventListener("sorted", () => {
+    pageSort = bar.dataset.current;
+    history.replaceState(null, "", withSort(new URL(location.href)));
+    for (const a of pager?.querySelectorAll("a") || []) a.href = withSort(new URL(a.href));
+    // While searching, the sort bar has already sorted the results in place.
+    if (!input.value.trim()) showPage();
+  });
+  const askedSort = new URLSearchParams(location.search).get("sort");
+  if (askedSort) bar?.querySelector(`button[data-sort="${CSS.escape(askedSort)}"]`)?.click();
+
   // Arriving from the home page search (/projects/?q=…): run that search.
   const asked = new URLSearchParams(location.search).get("q");
   if (asked) {
@@ -620,7 +659,7 @@
   input.addEventListener("input", async () => {
     const query = input.value.trim().toLowerCase();
     if (!query) {
-      list.replaceChildren(...original);
+      showPage();
       if (pager) pager.hidden = false;
       if (note) note.hidden = false;
       devHits = [];

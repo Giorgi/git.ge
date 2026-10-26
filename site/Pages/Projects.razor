@@ -23,7 +23,8 @@
 
     @if (PageCount > 1)
     {
-        <nav class="pager" aria-label="@Site.Strings.Ka("projects.page", Page, PageCount)">
+        @* data-page and data-size: app.js cuts a non-default sort of all listed projects into the same pages. *@
+        <nav class="pager" aria-label="@Site.Strings.Ka("projects.page", Page, PageCount)" data-page="@Page" data-size="@PageSize">
             @if (Page > 1)
             {
                 <a href="@PagePath(Page - 1)" rel="prev"><T K="projects.prev" /></a>

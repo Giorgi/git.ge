@@ -231,6 +231,7 @@ before the data date (the latest snapshot, not the wall clock). A push exactly
 - The home page's top list without trend data shows the most-starred active
   projects.
 - `index.json` carries `o: 1` for dormant projects.
+- `index.json` carries `i: 1` for listed projects (the ones on `/projects/`).
 
 ## What is shown where
 

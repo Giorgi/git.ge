@@ -174,6 +174,7 @@ string SearchIndex()
         ["a"] = p.Archived ? 1 : null,
         ["o"] = p.Dormant ? 1 : null,
         ["v"] = p.Verified ? 1 : null,
+        ["i"] = p.Listed ? 1 : null,   // on /projects/ (the pages a sort other than the default rebuilds)
         ["x"] = p.HelpWanted > 0 ? p.Anchor : null,
         ["w"] = Site.Developer(p.Owner) is not null ? 1 : null,   // owner has a developer page (/@login/)
         ["f"] = Site.Avatar(p.Owner),   // the owner's saved avatar, for the face in search results
