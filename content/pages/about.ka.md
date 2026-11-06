@@ -63,6 +63,21 @@ Markdown-ის კოდი, რომლითაც მას GitHub-ის R
 მიუთითებს. ნიშანს ორი სტილი აქვს (მომრგვალებული და კუთხეებიანი); სურათები ყველასთვის
 ერთნაირია და git.ge-დან იტვირთება.
 
+ზოგი საიტი სხვა დომენიდან SVG სურათებს არ აჩვენებს: მაგალითად, VS Code Marketplace
+ისეთ ექსტენშენს არ აქვეყნებს, რომლის README-შიც ასეთი სურათია. ამისთვის ორივე
+სტილს PNG ვერსიაც აქვს: `badge.png` (104×20), `badge@2x.png` (208×40) და
+`badge@4x.png` (416×80), და იგივე `badge-square`-ით. Markdown-ში, უბრალო ვერსია:
+
+```markdown
+[![listed on git.ge](https://git.ge/badge.png)](https://git.ge/@your-login/)
+```
+
+ან უფრო მკვეთრი, ნიშნის საკუთარ ზომაზე, HTML-ით:
+
+```html
+<a href="https://git.ge/@your-login/"><img src="https://git.ge/badge@2x.png" width="104" height="20" alt="listed on git.ge"></a>
+```
+
 ## კონფიდენციალურობა {#privacy}
 
 არანაირი ქუქი-ფაილი, თვალთვალი ან მესამე მხარისთვის გაგზავნილი

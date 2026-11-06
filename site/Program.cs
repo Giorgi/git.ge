@@ -414,6 +414,9 @@ static int SiteSelfTest(string built)
     if (Directory.Exists(built))
         Check(File.Exists(Path.Combine(built, "badge.svg")) && File.Exists(Path.Combine(built, "badge-square.svg")),
               "the README badges (/badge.svg, /badge-square.svg) are in the built site");
+        Check(new[] { "badge", "badge-square" }.SelectMany(b => new[] { $"{b}.png", $"{b}@2x.png", $"{b}@4x.png" })
+                  .All(f => File.Exists(Path.Combine(built, f))),
+              "the PNG copies of both badges (1x, 2x, 4x) are in the built site");
     var wrongBadge = developerPages.Where(f =>
     {
         var path = "/" + Path.GetFileName(Path.GetDirectoryName(f)) + "/";   // /@login/

@@ -167,6 +167,8 @@
   "dev.badgeRounded": "Rounded",
   "dev.badgeSquare": "Square",
   "dev.badgeCopied": "Copied",
+  "dev.badgePng": "Can't use SVG (on the VS Code Marketplace, say)?",
+  "dev.badgePngLink": "PNG versions",
   "dev.copied": "Link copied",
   "dev.moreRanks": "{0} more rankings",
   "dev.moreRanksOne": "1 more ranking",

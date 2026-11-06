@@ -61,6 +61,21 @@ Every developer page ends with a small "listed on git.ge" badge and the Markdown
 to put it in a GitHub README; it links to that page. It comes in two styles
 (rounded and square), the same images for everyone, served from git.ge.
 
+Some places refuse SVG images from other domains: the VS Code Marketplace, for one,
+won't publish an extension whose README has one. For those there are PNG copies of
+both styles: `badge.png` (104×20), `badge@2x.png` (208×40) and `badge@4x.png`
+(416×80), and the same with `badge-square`. In Markdown, the plain one:
+
+```markdown
+[![listed on git.ge](https://git.ge/badge.png)](https://git.ge/@your-login/)
+```
+
+Or the sharper one at the badge's own size, in HTML:
+
+```html
+<a href="https://git.ge/@your-login/"><img src="https://git.ge/badge@2x.png" width="104" height="20" alt="listed on git.ge"></a>
+```
+
 ## Privacy {#privacy}
 
 No cookies, no tracking, and no requests to third parties. If you

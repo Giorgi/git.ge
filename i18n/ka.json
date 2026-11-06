@@ -167,6 +167,8 @@
   "dev.badgeRounded": "მომრგვალებული",
   "dev.badgeSquare": "კუთხეებიანი",
   "dev.badgeCopied": "დაკოპირდა",
+  "dev.badgePng": "SVG-ს ვერ ჩასვამთ (მაგალითად, VS Code Marketplace-ზე)?",
+  "dev.badgePngLink": "PNG ვერსიები",
   "dev.copied": "ბმული დაკოპირდა",
   "dev.moreRanks": "კიდევ {0} რეიტინგი",
   "dev.moreRanksOne": "კიდევ 1 რეიტინგი",

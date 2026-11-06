@@ -22,6 +22,19 @@
   Cache-Control: public, max-age=86400
 /badge-square.svg
   Cache-Control: public, max-age=86400
+# PNG copies, for READMEs shown where SVG from other domains is refused (VS Code Marketplace).
+/badge.png
+  Cache-Control: public, max-age=86400
+/badge@2x.png
+  Cache-Control: public, max-age=86400
+/badge@4x.png
+  Cache-Control: public, max-age=86400
+/badge-square.png
+  Cache-Control: public, max-age=86400
+/badge-square@2x.png
+  Cache-Control: public, max-age=86400
+/badge-square@4x.png
+  Cache-Control: public, max-age=86400
 
 # Data files for the site itself, not pages to index.
 /index.json
